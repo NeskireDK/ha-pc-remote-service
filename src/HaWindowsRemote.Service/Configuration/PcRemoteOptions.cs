@@ -7,7 +7,8 @@ public sealed class PcRemoteOptions
     public int Port { get; set; } = 5000;
     public AuthOptions Auth { get; set; } = new();
     public string ToolsPath { get; set; } = "./tools";
-    public string ProfilesPath { get; set; } = "./profiles";
+    public string ProfilesPath { get; set; } = "./monitor-profiles";
+    public Dictionary<string, AppDefinitionOptions> Apps { get; set; } = new();
 }
 
 public sealed class AuthOptions
