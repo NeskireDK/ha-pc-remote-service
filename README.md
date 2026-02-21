@@ -30,8 +30,6 @@ All endpoints except `/api/health` require the `X-Api-Key` header.
 | Method | Route | Description |
 |--------|-------|-------------|
 | `POST` | `/api/system/sleep` | Suspend the PC |
-| `GET` | `/api/system/mac` | List MAC addresses of active network interfaces |
-| `POST` | `/api/system/wol/{mac}` | Send Wake-on-LAN magic packet to a MAC address |
 
 ### Audio
 
