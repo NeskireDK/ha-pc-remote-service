@@ -41,6 +41,14 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenAnyIP(pcRemoteConfig.Port);
 });
 
+// Application services
+builder.Services.AddSingleton<AppService>();
+builder.Services.AddSingleton<AudioService>();
+builder.Services.AddSingleton<MonitorService>();
+
+// mDNS/Zeroconf advertisement
+builder.Services.AddHostedService<MdnsAdvertiserService>();
+
 // Platform-specific services
 if (OperatingSystem.IsWindows())
 {
@@ -60,5 +68,8 @@ app.UseMiddleware<ApiKeyMiddleware>();
 // Endpoints
 app.MapHealthEndpoints();
 app.MapSystemEndpoints();
+app.MapAppEndpoints();
+app.MapAudioEndpoints();
+app.MapMonitorEndpoints();
 
 app.Run();
