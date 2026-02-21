@@ -3,27 +3,29 @@ using System.Text;
 
 namespace HaPcRemote.Service.Services;
 
-public static class CliRunner
+public class CliRunner : ICliRunner
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
-
-    public static async Task<string> RunAsync(string exePath, string arguments, TimeSpan? timeout = null)
+    public async Task<string> RunAsync(string exePath, IEnumerable<string> arguments, int timeoutMs = 10000)
     {
         if (!File.Exists(exePath))
             throw new FileNotFoundException($"CLI tool not found: {exePath}", exePath);
 
-        var effectiveTimeout = timeout ?? DefaultTimeout;
+        var effectiveTimeout = TimeSpan.FromMilliseconds(timeoutMs);
 
         using var process = new Process();
-        process.StartInfo = new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = exePath,
-            Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+
+        foreach (var arg in arguments)
+            startInfo.ArgumentList.Add(arg);
+
+        process.StartInfo = startInfo;
 
         process.Start();
 

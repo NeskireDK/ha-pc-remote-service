@@ -20,7 +20,7 @@ public static class SystemEndpoints
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to initiate sleep");
-                return Results.Json(ApiResponse.Fail(ex.Message), AppJsonContext.Default.ApiResponse,
+                return Results.Json(ApiResponse.Fail("Internal server error"), AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
         });

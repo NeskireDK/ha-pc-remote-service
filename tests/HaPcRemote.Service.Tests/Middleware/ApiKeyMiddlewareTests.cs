@@ -24,18 +24,6 @@ public class ApiKeyMiddlewareTests
         return monitor;
     }
 
-    private static (ApiKeyMiddleware middleware, bool nextCalled) CreateMiddleware(
-        ILogger<ApiKeyMiddleware> logger)
-    {
-        var nextCalled = false;
-        var middleware = new ApiKeyMiddleware(_ =>
-        {
-            nextCalled = true;
-            return Task.CompletedTask;
-        }, logger);
-        return (middleware, nextCalled);
-    }
-
     [Fact]
     public async Task InvokeAsync_ValidKey_CallsNext()
     {

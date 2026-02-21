@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using HaPcRemote.Service.Configuration;
 using Microsoft.Extensions.Options;
@@ -32,10 +33,10 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
 
-    public MdnsAdvertiserService(IOptions<PcRemoteOptions> options, ILogger<MdnsAdvertiserService> logger)
+    public MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> options, ILogger<MdnsAdvertiserService> logger)
     {
         _logger = logger;
-        _servicePort = options.Value.Port;
+        _servicePort = options.CurrentValue.Port;
         _hostname = GetHostname();
         _instanceName = $"{Environment.MachineName}._pc-remote._tcp.local.";
         _txtRecords = new Dictionary<string, string>
@@ -362,6 +363,8 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
         var sb = new StringBuilder();
         var jumped = false;
         var savedOffset = 0;
+        var hops = 0;
+        const int maxHops = 10;
 
         while (offset < data.Length)
         {
@@ -375,10 +378,12 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
             // DNS name compression pointer
             if ((len & 0xC0) == 0xC0)
             {
+                if (++hops > maxHops) break; // guard against malformed pointer loops
                 if (!jumped)
                 {
                     savedOffset = offset + 2;
                 }
+                if (offset + 1 >= data.Length) break;
                 offset = ((len & 0x3F) << 8) | data[offset + 1];
                 jumped = true;
                 continue;
@@ -437,8 +442,9 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
 
     private static string GetVersion()
     {
-        var assembly = typeof(MdnsAdvertiserService).Assembly;
-        var version = assembly.GetName().Version;
-        return version is not null ? $"{version.Major}.{version.Minor}.{version.Build}" : "0.0.0";
+        return typeof(MdnsAdvertiserService).Assembly
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion?.Split('+')[0]
+            ?? "0.0.0";
     }
 }

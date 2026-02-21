@@ -9,28 +9,50 @@ public static class AudioEndpoints
     {
         var group = endpoints.MapGroup("/api/audio");
 
-        group.MapGet("/devices", async (AudioService audioService) =>
+        group.MapGet("/devices", async (AudioService audioService, ILogger<AudioService> logger) =>
         {
-            var devices = await audioService.GetDevicesAsync();
-            return Results.Json(
-                ApiResponse.Ok<List<AudioDevice>>(devices),
-                AppJsonContext.Default.ApiResponseListAudioDevice);
+            try
+            {
+                var devices = await audioService.GetDevicesAsync();
+                return Results.Json(
+                    ApiResponse.Ok<List<AudioDevice>>(devices),
+                    AppJsonContext.Default.ApiResponseListAudioDevice);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get audio devices");
+                return Results.Json(
+                    ApiResponse.Fail("Internal server error"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
         });
 
-        group.MapGet("/current", async (AudioService audioService) =>
+        group.MapGet("/current", async (AudioService audioService, ILogger<AudioService> logger) =>
         {
-            var device = await audioService.GetCurrentDeviceAsync();
-            if (device is null)
+            try
             {
-                return Results.Json(
-                    ApiResponse.Fail("No default audio device found"),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status404NotFound);
-            }
+                var device = await audioService.GetCurrentDeviceAsync();
+                if (device is null)
+                {
+                    return Results.Json(
+                        ApiResponse.Fail("No default audio device found"),
+                        AppJsonContext.Default.ApiResponse,
+                        statusCode: StatusCodes.Status404NotFound);
+                }
 
-            return Results.Json(
-                ApiResponse.Ok(device),
-                AppJsonContext.Default.ApiResponseAudioDevice);
+                return Results.Json(
+                    ApiResponse.Ok(device),
+                    AppJsonContext.Default.ApiResponseAudioDevice);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get current audio device");
+                return Results.Json(
+                    ApiResponse.Fail("Internal server error"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
         });
 
         group.MapPost("/set/{deviceName}", async (string deviceName, AudioService audioService,

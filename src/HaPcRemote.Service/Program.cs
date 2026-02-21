@@ -2,6 +2,7 @@ using HaPcRemote.Service;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Endpoints;
 using HaPcRemote.Service.Middleware;
+using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -82,6 +83,7 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 // Application services
+builder.Services.AddSingleton<ICliRunner, CliRunner>();
 builder.Services.AddSingleton<AppService>();
 builder.Services.AddSingleton<AudioService>();
 builder.Services.AddSingleton<MonitorService>();
@@ -101,6 +103,25 @@ else
 }
 
 var app = builder.Build();
+
+// Global exception handler
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next(context);
+    }
+    catch (Exception ex)
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Unhandled exception");
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(
+            ApiResponse.Fail("Internal server error"),
+            AppJsonContext.Default.ApiResponse);
+    }
+});
 
 // Middleware
 app.UseMiddleware<ApiKeyMiddleware>();

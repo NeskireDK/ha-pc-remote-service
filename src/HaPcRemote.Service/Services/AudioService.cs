@@ -7,15 +7,17 @@ namespace HaPcRemote.Service.Services;
 public class AudioService
 {
     private readonly IOptionsMonitor<PcRemoteOptions> _options;
+    private readonly ICliRunner _cliRunner;
 
-    public AudioService(IOptionsMonitor<PcRemoteOptions> options)
+    public AudioService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner)
     {
         _options = options;
+        _cliRunner = cliRunner;
     }
 
     public async Task<List<AudioDevice>> GetDevicesAsync()
     {
-        var output = await CliRunner.RunAsync(GetExePath(), "/scomma \"\" /Columns \"Name,Direction,Default,Volume Percent\"");
+        var output = await _cliRunner.RunAsync(GetExePath(), ["/scomma", "", "/Columns", "Name,Direction,Default,Volume Percent"]);
         return ParseCsvOutput(output);
     }
 
@@ -27,7 +29,7 @@ public class AudioService
 
     public async Task SetDefaultDeviceAsync(string deviceName)
     {
-        await CliRunner.RunAsync(GetExePath(), $"/SetDefault \"{deviceName}\" 1");
+        await _cliRunner.RunAsync(GetExePath(), ["/SetDefault", deviceName, "1"]);
     }
 
     public async Task SetVolumeAsync(int level)
@@ -35,8 +37,8 @@ public class AudioService
         var current = await GetCurrentDeviceAsync()
             ?? throw new InvalidOperationException("No default audio device found.");
 
-        await CliRunner.RunAsync(GetExePath(), $"/SetVolume \"{current.Name}\" {level}");
-        await CliRunner.RunAsync(GetExePath(), $"/Unmute \"{current.Name}\"");
+        await _cliRunner.RunAsync(GetExePath(), ["/SetVolume", current.Name, level.ToString()]);
+        await _cliRunner.RunAsync(GetExePath(), ["/Unmute", current.Name]);
     }
 
     private string GetExePath() =>

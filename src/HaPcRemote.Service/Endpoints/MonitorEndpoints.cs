@@ -11,12 +11,23 @@ public static class MonitorEndpoints
 
         // ── Monitor control endpoints ────────────────────────────────
 
-        group.MapGet("/list", async (MonitorService monitorService) =>
+        group.MapGet("/list", async (MonitorService monitorService, ILogger<MonitorService> logger) =>
         {
-            var monitors = await monitorService.GetMonitorsAsync();
-            return Results.Json(
-                ApiResponse.Ok<List<MonitorInfo>>(monitors),
-                AppJsonContext.Default.ApiResponseListMonitorInfo);
+            try
+            {
+                var monitors = await monitorService.GetMonitorsAsync();
+                return Results.Json(
+                    ApiResponse.Ok<List<MonitorInfo>>(monitors),
+                    AppJsonContext.Default.ApiResponseListMonitorInfo);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get monitors");
+                return Results.Json(
+                    ApiResponse.Fail("Internal server error"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
         });
 
         group.MapPost("/solo/{id}", async (string id, MonitorService monitorService,
@@ -133,12 +144,23 @@ public static class MonitorEndpoints
 
         // ── Profile endpoints ────────────────────────────────────────
 
-        group.MapGet("/profiles", async (MonitorService monitorService) =>
+        group.MapGet("/profiles", async (MonitorService monitorService, ILogger<MonitorService> logger) =>
         {
-            var profiles = await monitorService.GetProfilesAsync();
-            return Results.Json(
-                ApiResponse.Ok<List<MonitorProfile>>(profiles),
-                AppJsonContext.Default.ApiResponseListMonitorProfile);
+            try
+            {
+                var profiles = await monitorService.GetProfilesAsync();
+                return Results.Json(
+                    ApiResponse.Ok<List<MonitorProfile>>(profiles),
+                    AppJsonContext.Default.ApiResponseListMonitorProfile);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get monitor profiles");
+                return Results.Json(
+                    ApiResponse.Fail("Internal server error"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
         });
 
         group.MapPost("/set/{profile}", async (string profile, MonitorService monitorService,

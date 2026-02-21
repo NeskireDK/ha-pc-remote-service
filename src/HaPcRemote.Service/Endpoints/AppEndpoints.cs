@@ -9,12 +9,23 @@ public static class AppEndpoints
     {
         var group = endpoints.MapGroup("/api/app");
 
-        group.MapGet("/status", async (AppService appService) =>
+        group.MapGet("/status", async (AppService appService, ILogger<AppService> logger) =>
         {
-            var statuses = await appService.GetAllStatusesAsync();
-            return Results.Json(
-                ApiResponse.Ok<List<AppInfo>>(statuses),
-                AppJsonContext.Default.ApiResponseListAppInfo);
+            try
+            {
+                var statuses = await appService.GetAllStatusesAsync();
+                return Results.Json(
+                    ApiResponse.Ok<List<AppInfo>>(statuses),
+                    AppJsonContext.Default.ApiResponseListAppInfo);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get app statuses");
+                return Results.Json(
+                    ApiResponse.Fail("Internal server error"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
         });
 
         group.MapPost("/launch/{appKey}", async (string appKey, AppService appService,

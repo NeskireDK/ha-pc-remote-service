@@ -52,6 +52,9 @@ public class MonitorServiceTests : IDisposable
         return monitor;
     }
 
+    private MonitorService CreateService(string? profilesPath = null) =>
+        new MonitorService(CreateOptions(profilesPath), A.Fake<ICliRunner>());
+
     // ── Profile tests (existing) ─────────────────────────────────────
 
     [Fact]
@@ -61,7 +64,7 @@ public class MonitorServiceTests : IDisposable
         File.WriteAllText(Path.Combine(_tempDir, "work.cfg"), "");
         File.WriteAllText(Path.Combine(_tempDir, "readme.txt"), ""); // should be ignored
 
-        var service = new MonitorService(CreateOptions());
+        var service = CreateService();
 
         var result = await service.GetProfilesAsync();
 
@@ -73,7 +76,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task GetProfilesAsync_EmptyDirectory_ReturnsEmptyList()
     {
-        var service = new MonitorService(CreateOptions());
+        var service = CreateService();
 
         var result = await service.GetProfilesAsync();
 
@@ -83,7 +86,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task GetProfilesAsync_NonExistentDirectory_ReturnsEmptyList()
     {
-        var service = new MonitorService(CreateOptions("/nonexistent/path"));
+        var service = CreateService("/nonexistent/path");
 
         var result = await service.GetProfilesAsync();
 
@@ -93,10 +96,19 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task ApplyProfileAsync_UnknownProfile_ThrowsKeyNotFoundException()
     {
-        var service = new MonitorService(CreateOptions());
+        var service = CreateService();
 
         await Should.ThrowAsync<KeyNotFoundException>(
             () => service.ApplyProfileAsync("nonexistent"));
+    }
+
+    [Fact]
+    public async Task ApplyProfileAsync_PathTraversal_ThrowsArgumentException()
+    {
+        var service = CreateService();
+
+        await Should.ThrowAsync<ArgumentException>(
+            () => service.ApplyProfileAsync("../escape"));
     }
 
     // ── CSV parsing tests ────────────────────────────────────────────

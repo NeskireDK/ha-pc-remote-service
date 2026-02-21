@@ -7,10 +7,12 @@ namespace HaPcRemote.Service.Services;
 public class MonitorService
 {
     private readonly IOptionsMonitor<PcRemoteOptions> _options;
+    private readonly ICliRunner _cliRunner;
 
-    public MonitorService(IOptionsMonitor<PcRemoteOptions> options)
+    public MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner)
     {
         _options = options;
+        _cliRunner = cliRunner;
     }
 
     // ── Profile methods ──────────────────────────────────────────────
@@ -49,33 +51,33 @@ public class MonitorService
         if (!File.Exists(profilePath))
             throw new KeyNotFoundException($"Monitor profile '{profileName}' not found.");
 
-        await CliRunner.RunAsync(GetExePath(), $"/LoadConfig \"{profilePath}\"");
+        await _cliRunner.RunAsync(GetExePath(), ["/LoadConfig", profilePath]);
     }
 
     // ── Monitor control methods ──────────────────────────────────────
 
     public async Task<List<MonitorInfo>> GetMonitorsAsync()
     {
-        var output = await CliRunner.RunAsync(GetExePath(), "/scomma \"\"");
+        var output = await _cliRunner.RunAsync(GetExePath(), ["/scomma", ""]);
         return ParseCsvOutput(output);
     }
 
     public async Task EnableMonitorAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
-        await CliRunner.RunAsync(GetExePath(), $"/enable \"{monitor.Name}\"");
+        await _cliRunner.RunAsync(GetExePath(), ["/enable", monitor.Name]);
     }
 
     public async Task DisableMonitorAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
-        await CliRunner.RunAsync(GetExePath(), $"/disable \"{monitor.Name}\"");
+        await _cliRunner.RunAsync(GetExePath(), ["/disable", monitor.Name]);
     }
 
     public async Task SetPrimaryAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
-        await CliRunner.RunAsync(GetExePath(), $"/SetPrimary \"{monitor.Name}\"");
+        await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", monitor.Name]);
     }
 
     public async Task SoloMonitorAsync(string id)
@@ -87,14 +89,14 @@ public class MonitorService
         foreach (var m in monitors.Where(m => !MatchesId(m, id)))
         {
             if (m.IsActive)
-                await CliRunner.RunAsync(GetExePath(), $"/disable \"{m.Name}\"");
+                await _cliRunner.RunAsync(GetExePath(), ["/disable", m.Name]);
         }
 
         // Enable target and set as primary
         if (!target.IsActive)
-            await CliRunner.RunAsync(GetExePath(), $"/enable \"{target.Name}\"");
+            await _cliRunner.RunAsync(GetExePath(), ["/enable", target.Name]);
 
-        await CliRunner.RunAsync(GetExePath(), $"/SetPrimary \"{target.Name}\"");
+        await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", target.Name]);
     }
 
     // ── CSV parsing ──────────────────────────────────────────────────
