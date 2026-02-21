@@ -5,11 +5,15 @@ namespace HaPcRemote.Service.Tests.Services;
 
 public class AudioServiceTests
 {
+    // Real SoundVolumeView /scomma column order (0-indexed):
+    // [0] Name, [1] Type, [2] Direction, [3] Device Name,
+    // [4] Default (Console), [5] Default Multimedia, [6] Default Communications,
+    // [7] Device State, [8] Muted, [9] Volume dB, [10] Volume Percent, ...
     private const string SampleCsv =
         """
-        Speakers,Realtek Audio,{guid},Render,,Render,Yes,50.0%,0,,
-        Headphones,Realtek Audio,{guid2},Render,,,No,75.5%,0,,
-        Microphone,Realtek Audio,{guid3},Capture,,Capture,Yes,80.0%,0,,
+        Speakers,Device,Render,Realtek High Definition Audio,Render,Render,,Active,No,-10.50,50.0%,0,0,0,0,,,,{guid},,,,
+        Headphones,Device,Render,Realtek High Definition Audio,,,,Active,No,-6.00,75.5%,0,0,0,0,,,,{guid2},,,,
+        Microphone,Device,Capture,Realtek High Definition Audio,Capture,Capture,,Active,No,-3.00,80.0%,0,0,0,0,,,,{guid3},,,,
         """;
 
     [Fact]
@@ -76,7 +80,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_CaptureDevicesExcluded()
     {
-        var csv = "Microphone,Realtek Audio,{guid},Capture,,Capture,Yes,100.0%,0,,";
+        var csv = "Microphone,Device,Capture,Realtek High Definition Audio,Capture,Capture,,Active,No,-3.00,100.0%,0,0,0,0,,,,{guid},,,,";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.ShouldBeEmpty();
@@ -85,7 +89,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_NoDefaultDevice_AllIsDefaultFalse()
     {
-        var csv = "Speakers,Realtek Audio,{guid},Render,,,No,50.0%,0,,";
+        var csv = "Speakers,Device,Render,Realtek High Definition Audio,,,,Active,No,-10.50,50.0%,0,0,0,0,,,,{guid},,,,";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(1);
@@ -95,7 +99,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_VolumeWithoutPercent_ParsesAsZero()
     {
-        var csv = "Speakers,Realtek Audio,{guid},Render,,Render,Yes,invalid,0,,";
+        var csv = "Speakers,Device,Render,Realtek High Definition Audio,Render,Render,,Active,No,-10.50,invalid,0,0,0,0,,,,{guid},,,,";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices[0].Volume.ShouldBe(0);
@@ -104,7 +108,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_QuotedFieldsWithCommas_ParsedCorrectly()
     {
-        var csv = "\"Speakers, Front\",Realtek Audio,{guid},Render,,Render,Yes,50.0%,0,,";
+        var csv = "\"Speakers, Front\",Device,Render,Realtek High Definition Audio,Render,Render,,Active,No,-10.50,50.0%,0,0,0,0,,,,{guid},,,,";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(1);
@@ -114,7 +118,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_WindowsLineEndings_ParsedCorrectly()
     {
-        var csv = "Speakers,Realtek Audio,{guid},Render,,Render,Yes,50.0%,0,,\r\nHeadphones,Realtek Audio,{guid2},Render,,,No,75.0%,0,,\r\n";
+        var csv = "Speakers,Device,Render,Realtek High Definition Audio,Render,Render,,Active,No,-10.50,50.0%,0,0,0,0,,,,{guid},,,,\r\nHeadphones,Device,Render,Realtek High Definition Audio,,,,Active,No,-6.00,75.0%,0,0,0,0,,,,{guid2},,,,\r\n";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(2);

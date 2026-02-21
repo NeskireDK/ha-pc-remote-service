@@ -53,16 +53,22 @@ public class AudioService
                 continue;
 
             var columns = CliRunner.SplitCsvLine(trimmed);
-            if (columns.Count < 8)
+            if (columns.Count < 11)
                 continue;
 
-            // Column 3 = Direction (Render/Capture), only keep Render
-            if (!string.Equals(columns[3], "Render", StringComparison.OrdinalIgnoreCase))
+            // SoundVolumeView /scomma column layout (0-indexed):
+            // [0] Name, [1] Type, [2] Direction, [3] Device Name,
+            // [4] Default (Console), [5] Default Multimedia, [6] Default Communications,
+            // [7] Device State, [8] Muted, [9] Volume dB, [10] Volume Percent
+
+            // Column 2 = Direction (Render/Capture), only keep Render
+            if (!string.Equals(columns[2], "Render", StringComparison.OrdinalIgnoreCase))
                 continue;
 
             var name = columns[0];
-            var isDefault = string.Equals(columns[5], "Render", StringComparison.OrdinalIgnoreCase);
-            var volume = ParseVolumePercent(columns[7]);
+            // Column 4 = Default (Console): contains "Render" when this is the default render device
+            var isDefault = string.Equals(columns[4], "Render", StringComparison.OrdinalIgnoreCase);
+            var volume = ParseVolumePercent(columns[10]);
 
             devices.Add(new AudioDevice
             {
