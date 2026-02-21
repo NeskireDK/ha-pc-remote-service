@@ -1,46 +1,38 @@
 # ha-windows-remote-service
 
-A lightweight Windows Service (Native AOT) that exposes a REST API for controlling audio, monitors, apps, and system power on a Windows PC. Designed for use with the [ha-windows-remote](https://github.com/NeskireDK/ha-windows-remote) Home Assistant integration.
-
-## Project Structure
-
-```
-ha-windows-remote-service/
-  HaWindowsRemote.sln
-  src/
-    HaWindowsRemote.Service/
-      Program.cs                          # Entry point, DI, middleware, endpoints
-      AppJsonContext.cs                   # JSON source generator (AOT-safe)
-      Configuration/
-        PcRemoteOptions.cs                # Strongly-typed config binding
-      Endpoints/
-        HealthEndpoints.cs                # GET /api/health
-        SystemEndpoints.cs                # POST /api/system/sleep
-      Middleware/
-        ApiKeyMiddleware.cs               # X-Api-Key header validation
-      Models/
-        ApiResponse.cs                    # Standard API response wrapper
-        HealthResponse.cs                 # Health check response
-      Services/
-        ApiKeyService.cs                  # Key generation + config persistence
-        IPowerService.cs                  # Platform abstraction for power mgmt
-        WindowsPowerService.cs            # Windows P/Invoke SetSuspendState
-```
+A lightweight Windows Service (Native AOT) that exposes a REST API for controlling a Windows PC. Designed for use with the [ha-windows-remote](https://github.com/NeskireDK/ha-windows-remote) Home Assistant integration.
 
 ## Quick Start
 
-1. Download the latest release
-2. Place NirSoft tools in `./tools/` (optional, for audio/monitor control)
-3. Run the exe once to generate `appsettings.json` with your API key
-4. Install as a Windows Service:
+1. Download the latest release from [Releases](https://github.com/NeskireDK/ha-windows-remote-service/releases)
+2. Run the exe once — it auto-generates `appsettings.json` with a random API key
+3. Install as a Windows Service:
    ```powershell
    sc create HaWindowsRemote binPath="C:\path\to\HaWindowsRemote.Service.exe"
    sc start HaWindowsRemote
    ```
 
+## API
+
+All endpoints except `/api/health` require the `X-Api-Key` header.
+
+| Method | Route | Description | Status |
+|--------|-------|-------------|--------|
+| `GET` | `/api/health` | Health check (no auth) | Done |
+| `POST` | `/api/system/sleep` | Suspend the PC | Done |
+| `GET` | `/api/audio/devices` | List audio output devices | Planned |
+| `GET` | `/api/audio/current` | Current default output device | Planned |
+| `POST` | `/api/audio/set/{deviceName}` | Switch default output | Planned |
+| `POST` | `/api/audio/volume/{level}` | Set master volume (0-100) | Planned |
+| `GET` | `/api/monitor/profiles` | List saved monitor profiles | Planned |
+| `POST` | `/api/monitor/set/{profile}` | Load a monitor profile | Planned |
+| `POST` | `/api/app/launch/{appKey}` | Launch a predefined app | Planned |
+| `POST` | `/api/app/kill/{appKey}` | Kill a predefined app | Planned |
+| `GET` | `/api/app/status/{appKey}` | Check if app is running | Planned |
+
 ## Configuration
 
-`appsettings.json` is auto-generated on first run with a random API key:
+`appsettings.json` is auto-generated on first run:
 
 ```json
 {
@@ -56,20 +48,25 @@ ha-windows-remote-service/
 }
 ```
 
-## API
+## Roadmap
 
-All endpoints except `/api/health` require the `X-Api-Key` header.
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| `GET` | `/api/health` | Health check (no auth) |
-| `POST` | `/api/system/sleep` | Suspend the PC |
+- [x] Health endpoint
+- [x] System sleep (P/Invoke SetSuspendState)
+- [x] API key auth (auto-generated)
+- [x] Native AOT build + GitHub Actions release
+- [x] Unit tests (xUnit + Shouldly + FakeItEasy)
+- [ ] Audio control (NirSoft SoundVolumeView)
+- [ ] Monitor profiles (NirSoft MultiMonitorTool)
+- [ ] App launch/kill management
+- [ ] Linux support (systemd hosting)
+- [ ] mDNS/Zeroconf discovery
 
 ## Building
 
 ```bash
 dotnet build HaWindowsRemote.sln
-dotnet publish src/HaWindowsRemote.Service -c Release -r win-x64
+dotnet test HaWindowsRemote.sln
+dotnet publish src/HaWindowsRemote.Service -c Release -r win-x64 /p:PublishAot=true
 ```
 
 ## License
