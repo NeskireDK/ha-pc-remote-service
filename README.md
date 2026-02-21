@@ -9,11 +9,11 @@ A lightweight Windows Service (Native AOT) that exposes a REST API for controlli
 3. Run the exe once — it auto-generates `appsettings.json` with a random API key
 4. Install as a Windows Service:
    ```powershell
-   sc create HaWindowsRemote binPath="C:\path\to\HaWindowsRemote.Service.exe"
-   sc start HaWindowsRemote
+   sc create HaPcRemote binPath="C:\path\to\HaPcRemote.Service.exe"
+   sc start HaPcRemote
    ```
 
-The service advertises itself via mDNS (`_windows-remote._tcp`) for auto-discovery by the HA integration.
+The service advertises itself via mDNS (`_pc-remote._tcp`) for auto-discovery by the HA integration.
 
 ## API Endpoints
 
@@ -128,9 +128,9 @@ Two free NirSoft tools are required. Place them in the `ToolsPath` directory (de
 ## Building
 
 ```bash
-dotnet build HaWindowsRemote.sln
-dotnet test HaWindowsRemote.sln
-dotnet publish src/HaWindowsRemote.Service -c Release -r win-x64 /p:PublishAot=true
+dotnet build HaPcRemote.sln
+dotnet test HaPcRemote.sln
+dotnet publish src/HaPcRemote.Service -c Release -r win-x64 /p:PublishAot=true
 ```
 
 ## License
