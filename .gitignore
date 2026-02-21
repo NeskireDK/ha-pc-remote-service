@@ -1,0 +1,31 @@
+## .NET
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+## Native AOT artifacts
+*.pdb
+*.ilk
+
+## NirSoft tools (downloaded at deploy time)
+tools/
+
+## IDE
+.idea/
+*.swp
+*~
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+## Config overrides
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
