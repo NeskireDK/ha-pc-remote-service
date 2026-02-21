@@ -17,6 +17,10 @@ namespace HaWindowsRemote.Service;
 [JsonSerializable(typeof(MonitorProfile))]
 [JsonSerializable(typeof(List<MonitorProfile>))]
 [JsonSerializable(typeof(ApiResponse<List<MonitorProfile>>))]
+[JsonSerializable(typeof(MonitorInfo))]
+[JsonSerializable(typeof(List<MonitorInfo>))]
+[JsonSerializable(typeof(ApiResponse<MonitorInfo>))]
+[JsonSerializable(typeof(ApiResponse<List<MonitorInfo>>))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
