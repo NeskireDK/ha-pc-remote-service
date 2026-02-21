@@ -21,6 +21,9 @@ namespace HaPcRemote.Service;
 [JsonSerializable(typeof(List<MonitorInfo>))]
 [JsonSerializable(typeof(ApiResponse<MonitorInfo>))]
 [JsonSerializable(typeof(ApiResponse<List<MonitorInfo>>))]
+[JsonSerializable(typeof(MacAddressInfo))]
+[JsonSerializable(typeof(List<MacAddressInfo>))]
+[JsonSerializable(typeof(ApiResponse<List<MacAddressInfo>>))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]

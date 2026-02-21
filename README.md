@@ -30,6 +30,8 @@ All endpoints except `/api/health` require the `X-Api-Key` header.
 | Method | Route | Description |
 |--------|-------|-------------|
 | `POST` | `/api/system/sleep` | Suspend the PC |
+| `GET` | `/api/system/mac` | List MAC addresses of active network interfaces |
+| `POST` | `/api/system/wol/{mac}` | Send Wake-on-LAN magic packet to a MAC address |
 
 ### Audio
 
@@ -76,7 +78,9 @@ Apps are defined in `appsettings.json` under `PcRemote.Apps`.
 
 ## Configuration
 
-`appsettings.json` is auto-generated on first run. Full example:
+Runtime-generated settings (API key) are stored in `%ProgramData%\HaPcRemote\appsettings.json` so the service works correctly when installed in read-only locations like `C:\Program Files`. Static configuration is read from `appsettings.json` next to the executable; the ProgramData file overrides matching values.
+
+Full example:
 
 ```json
 {

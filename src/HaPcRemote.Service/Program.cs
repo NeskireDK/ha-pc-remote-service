@@ -9,6 +9,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Windows Service support
 builder.Host.UseWindowsService();
 
+// Writable config: use %ProgramData%\HaPcRemote so that runtime-generated
+// settings (API key) persist even when the exe is in a read-only location
+// like C:\Program Files.
+var writableConfigDir = ConfigPaths.GetWritableConfigDir();
+var writableConfigPath = ConfigPaths.GetWritableConfigPath();
+builder.Configuration.AddJsonFile(writableConfigPath, optional: true, reloadOnChange: true);
+
 // JSON serialization (AOT-safe)
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
@@ -45,7 +52,20 @@ var pcRemoteConfig = builder.Configuration
 if (pcRemoteConfig.Auth.Enabled && string.IsNullOrEmpty(pcRemoteConfig.Auth.ApiKey))
 {
     var generatedKey = ApiKeyService.GenerateApiKey();
-    var configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+
+    // Write to the writable config directory; fall back to exe directory
+    // if ProgramData is not available (e.g. portable/dev scenarios).
+    string configPath;
+    try
+    {
+        Directory.CreateDirectory(writableConfigDir);
+        configPath = writableConfigPath;
+    }
+    catch
+    {
+        configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+    }
+
     ApiKeyService.WriteApiKeyToConfig(configPath, generatedKey);
 
     // Reload configuration so the new key is picked up
