@@ -17,6 +17,26 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.Configure<PcRemoteOptions>(
     builder.Configuration.GetSection(PcRemoteOptions.SectionName));
 
+// Resolve relative paths against the exe directory, not CWD.
+// Windows Services start with CWD=C:\Windows\System32, so relative paths
+// like ./tools/ must be anchored to AppContext.BaseDirectory instead.
+builder.Services.PostConfigure<PcRemoteOptions>(options =>
+{
+    var baseDir = AppContext.BaseDirectory;
+
+    if (!Path.IsPathRooted(options.ToolsPath))
+        options.ToolsPath = Path.GetFullPath(options.ToolsPath, baseDir);
+
+    if (!Path.IsPathRooted(options.ProfilesPath))
+        options.ProfilesPath = Path.GetFullPath(options.ProfilesPath, baseDir);
+
+    foreach (var app in options.Apps.Values)
+    {
+        if (!string.IsNullOrEmpty(app.ExePath) && !Path.IsPathRooted(app.ExePath))
+            app.ExePath = Path.GetFullPath(app.ExePath, baseDir);
+    }
+});
+
 var pcRemoteConfig = builder.Configuration
     .GetSection(PcRemoteOptions.SectionName)
     .Get<PcRemoteOptions>() ?? new PcRemoteOptions();
