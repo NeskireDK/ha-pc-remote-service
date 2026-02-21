@@ -37,16 +37,11 @@ public class MonitorService
 
     public async Task ApplyProfileAsync(string profileName)
     {
+        if (profileName.Contains('/') || profileName.Contains('\\') || profileName.Contains(".."))
+            throw new ArgumentException($"Invalid profile name: '{profileName}'");
+
         var config = _options.CurrentValue;
         var profilePath = Path.Combine(config.ProfilesPath, $"{profileName}.cfg");
-
-        var resolvedProfilesDir = Path.GetFullPath(config.ProfilesPath);
-        var resolvedProfilePath = Path.GetFullPath(profilePath);
-        if (!resolvedProfilePath.StartsWith(resolvedProfilesDir + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            && !resolvedProfilePath.Equals(resolvedProfilesDir, StringComparison.Ordinal))
-        {
-            throw new ArgumentException($"Invalid profile name: '{profileName}'");
-        }
 
         if (!File.Exists(profilePath))
             throw new KeyNotFoundException($"Monitor profile '{profileName}' not found.");

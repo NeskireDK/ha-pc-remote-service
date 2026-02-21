@@ -102,13 +102,18 @@ public class MonitorServiceTests : IDisposable
             () => service.ApplyProfileAsync("nonexistent"));
     }
 
-    [Fact]
-    public async Task ApplyProfileAsync_PathTraversal_ThrowsArgumentException()
+    [Theory]
+    [InlineData("../escape")]
+    [InlineData("..\\escape")]
+    [InlineData("sub/dir")]
+    [InlineData("sub\\dir")]
+    [InlineData("..")]
+    public async Task ApplyProfileAsync_PathTraversal_ThrowsArgumentException(string profileName)
     {
         var service = CreateService();
 
         await Should.ThrowAsync<ArgumentException>(
-            () => service.ApplyProfileAsync("../escape"));
+            () => service.ApplyProfileAsync(profileName));
     }
 
     // ── CSV parsing tests ────────────────────────────────────────────
