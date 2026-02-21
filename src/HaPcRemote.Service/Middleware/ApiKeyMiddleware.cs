@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using Microsoft.Extensions.Options;
@@ -47,7 +48,9 @@ public sealed class ApiKeyMiddleware
             return;
         }
 
-        if (!string.Equals(providedKey, config.Auth.ApiKey, StringComparison.Ordinal))
+        if (!CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(providedKey.ToString()),
+                System.Text.Encoding.UTF8.GetBytes(config.Auth.ApiKey)))
         {
             _logger.LogWarning("Request to {Path} with invalid API key", path);
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;

@@ -52,7 +52,7 @@ public class AudioService
             if (string.IsNullOrWhiteSpace(trimmed))
                 continue;
 
-            var columns = SplitCsvLine(trimmed);
+            var columns = CliRunner.SplitCsvLine(trimmed);
             if (columns.Count < 8)
                 continue;
 
@@ -84,40 +84,4 @@ public class AudioService
             : 0;
     }
 
-    private static List<string> SplitCsvLine(string line)
-    {
-        var fields = new List<string>();
-        var current = new System.Text.StringBuilder();
-        var inQuotes = false;
-
-        for (var i = 0; i < line.Length; i++)
-        {
-            var c = line[i];
-
-            if (c == '"')
-            {
-                if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
-                {
-                    current.Append('"');
-                    i++; // skip escaped quote
-                }
-                else
-                {
-                    inQuotes = !inQuotes;
-                }
-            }
-            else if (c == ',' && !inQuotes)
-            {
-                fields.Add(current.ToString());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(c);
-            }
-        }
-
-        fields.Add(current.ToString());
-        return fields;
-    }
 }

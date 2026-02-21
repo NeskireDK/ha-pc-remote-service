@@ -17,11 +17,18 @@ public class AppService
     public Task<List<AppInfo>> GetAllStatusesAsync()
     {
         var apps = _options.CurrentValue.Apps;
+        if (apps is null || apps.Count == 0)
+            return Task.FromResult(new List<AppInfo>());
+
+        var runningProcesses = Process.GetProcesses()
+            .Select(p => { var name = p.ProcessName; p.Dispose(); return name; })
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var result = apps.Select(kvp => new AppInfo
         {
             Key = kvp.Key,
             DisplayName = kvp.Value.DisplayName,
-            IsRunning = IsProcessRunning(kvp.Value.ProcessName)
+            IsRunning = runningProcesses.Contains(kvp.Value.ProcessName)
         }).ToList();
 
         return Task.FromResult(result);
