@@ -41,7 +41,7 @@ public static class MonitorEndpoints
             {
                 logger.LogError(ex, "Failed to solo monitor '{Id}'", id);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
@@ -69,7 +69,7 @@ public static class MonitorEndpoints
             {
                 logger.LogError(ex, "Failed to enable monitor '{Id}'", id);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
@@ -97,7 +97,7 @@ public static class MonitorEndpoints
             {
                 logger.LogError(ex, "Failed to disable monitor '{Id}'", id);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
@@ -125,7 +125,7 @@ public static class MonitorEndpoints
             {
                 logger.LogError(ex, "Failed to set primary monitor '{Id}'", id);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
@@ -163,7 +163,7 @@ public static class MonitorEndpoints
             {
                 logger.LogError(ex, "Failed to apply monitor profile '{Profile}'", profile);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }

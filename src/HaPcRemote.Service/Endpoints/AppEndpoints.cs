@@ -39,7 +39,7 @@ public static class AppEndpoints
             {
                 logger.LogError(ex, "Failed to launch app '{AppKey}'", appKey);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
@@ -67,7 +67,7 @@ public static class AppEndpoints
             {
                 logger.LogError(ex, "Failed to kill app '{AppKey}'", appKey);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }

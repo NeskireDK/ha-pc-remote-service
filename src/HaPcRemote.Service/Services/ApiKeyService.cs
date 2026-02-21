@@ -34,7 +34,11 @@ public static class ApiKeyService
 
         auth["ApiKey"] = apiKey;
 
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        File.WriteAllText(configPath, root.ToJsonString(options));
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            root.WriteTo(writer);
+        }
+        File.WriteAllBytes(configPath, stream.ToArray());
     }
 }

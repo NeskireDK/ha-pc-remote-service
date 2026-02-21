@@ -48,7 +48,7 @@ public static class AudioEndpoints
             {
                 logger.LogError(ex, "Failed to set default audio device '{DeviceName}'", deviceName);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
@@ -77,7 +77,7 @@ public static class AudioEndpoints
             {
                 logger.LogError(ex, "Failed to set volume to {Level}", level);
                 return Results.Json(
-                    ApiResponse.Fail(ex.Message),
+                    ApiResponse.Fail("Internal server error"),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status500InternalServerError);
             }
