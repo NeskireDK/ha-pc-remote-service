@@ -1,0 +1,43 @@
+<svg width="512" height="512" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b0764"/>
+      <stop offset="100%" stop-color="#581c87"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="112" height="112" rx="24" fill="url(#bg)"/>
+  <rect x="3" y="3" width="106" height="106" rx="22" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <!-- Couch — flat material style -->
+  <path d="M18 68 L18 52 C18 48 22 44 26 44 L30 44 L30 40 C30 36 34 34 38 34 L74 34 C78 34 82 36 82 40 L82 44 L86 44 C90 44 94 48 94 52 L94 68" fill="#7e22ce" opacity="0.5"/>
+  <path d="M18 68 L18 52 C18 48 22 44 26 44 L30 44 L30 40 C30 36 34 34 38 34 L74 34 C78 34 82 36 82 40 L82 44 L86 44 C90 44 94 48 94 52 L94 68" fill="none" stroke="#d8b4fe" stroke-width="2.5"/>
+  <!-- Seat line -->
+  <line x1="30" y1="52" x2="82" y2="52" stroke="#d8b4fe" stroke-width="1.5" opacity="0.5"/>
+  <!-- Person — head -->
+  <circle cx="56" cy="30" r="6" fill="#f3e8ff"/>
+  <!-- Person — body -->
+  <path d="M50 35 C48 42 46 48 48 52 L64 52 C66 48 64 42 62 35" fill="#f3e8ff" opacity="0.85"/>
+  <!-- Controller in lap -->
+  <rect x="44" y="50" width="24" height="10" rx="5" fill="#e9d5ff"/>
+  <!-- D-pad left -->
+  <line x1="50" y1="53" x2="50" y2="57" stroke="#581c87" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="48" y1="55" x2="52" y2="55" stroke="#581c87" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Buttons right -->
+  <circle cx="62" cy="53.5" r="1.5" fill="#581c87"/>
+  <circle cx="62" cy="57" r="1.5" fill="#581c87"/>
+  <!-- Monitor/TV -->
+  <rect x="76" y="58" width="20" height="14" rx="2" fill="#1e1b2e" stroke="#d8b4fe" stroke-width="1.5"/>
+  <rect x="78" y="60" width="16" height="10" rx="1" fill="#a855f7" opacity="0.2"/>
+  <!-- TV Stand -->
+  <line x1="86" y1="72" x2="86" y2="76" stroke="#d8b4fe" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="82" y1="76" x2="90" y2="76" stroke="#d8b4fe" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Wifi signal from controller to screen -->
+  <path d="M68 52 Q72 48 76 52" stroke="rgba(216,180,254,0.3)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M70 48 Q74 44 78 48" stroke="rgba(216,180,254,0.2)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Couch legs -->
+  <rect x="18" y="68" width="8" height="8" rx="4" fill="#7e22ce" opacity="0.4"/>
+  <rect x="86" y="68" width="8" height="8" rx="4" fill="#7e22ce" opacity="0.4"/>
+  <!-- Person legs stretched out -->
+  <path d="M50 52 L44 62 L40 64" stroke="#f3e8ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path d="M62 52 L60 62 L56 64" stroke="#f3e8ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+</svg>

@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b0764"/>
+      <stop offset="100%" stop-color="#581c87"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="112" height="112" rx="24" fill="url(#bg)"/>
+  <!-- Couch — simplified -->
+  <path d="M16 70 L16 50 C16 46 22 42 28 42 L28 38 C28 34 34 32 40 32 L72 32 C78 32 84 34 84 38 L84 42 C90 42 96 46 96 50 L96 70" fill="#7e22ce" opacity="0.5" stroke="#d8b4fe" stroke-width="3.5"/>
+  <!-- Person — head -->
+  <circle cx="56" cy="28" r="9" fill="#f3e8ff"/>
+  <!-- Person — body slouched -->
+  <path d="M46 36 Q50 52 46 58 L66 58 Q62 52 66 36" fill="#f3e8ff" opacity="0.85"/>
+  <!-- Controller -->
+  <rect x="40" y="55" width="32" height="12" rx="6" fill="#e9d5ff"/>
+  <!-- D-pad -->
+  <line x1="50" y1="58.5" x2="50" y2="63.5" stroke="#581c87" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="47.5" y1="61" x2="52.5" y2="61" stroke="#581c87" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Buttons -->
+  <circle cx="63" cy="59" r="2" fill="#581c87"/>
+  <circle cx="63" cy="63.5" r="2" fill="#581c87"/>
+</svg>
