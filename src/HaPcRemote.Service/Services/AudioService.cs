@@ -15,7 +15,7 @@ public class AudioService
 
     public async Task<List<AudioDevice>> GetDevicesAsync()
     {
-        var output = await CliRunner.RunAsync(GetExePath(), "/scomma \"\"");
+        var output = await CliRunner.RunAsync(GetExePath(), "/scomma \"\" /Columns \"Name,Direction,Default,Volume Percent\"");
         return ParseCsvOutput(output);
     }
 
@@ -45,7 +45,6 @@ public class AudioService
     internal static List<AudioDevice> ParseCsvOutput(string csvOutput)
     {
         var devices = new List<AudioDevice>();
-
         foreach (var line in csvOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var trimmed = line.TrimEnd('\r');
@@ -53,31 +52,22 @@ public class AudioService
                 continue;
 
             var columns = CliRunner.SplitCsvLine(trimmed);
-            if (columns.Count < 11)
+            if (columns.Count < 4)
                 continue;
 
-            // SoundVolumeView /scomma column layout (0-indexed):
-            // [0] Name, [1] Type, [2] Direction, [3] Device Name,
-            // [4] Default (Console), [5] Default Multimedia, [6] Default Communications,
-            // [7] Device State, [8] Muted, [9] Volume dB, [10] Volume Percent
+            // Columns selected via /Columns flag:
+            // [0] Name, [1] Direction, [2] Default (Console), [3] Volume Percent
 
-            // Column 2 = Direction (Render/Capture), only keep Render
-            if (!string.Equals(columns[2], "Render", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(columns[1], "Render", StringComparison.OrdinalIgnoreCase))
                 continue;
-
-            var name = columns[0];
-            // Column 4 = Default (Console): contains "Render" when this is the default render device
-            var isDefault = string.Equals(columns[4], "Render", StringComparison.OrdinalIgnoreCase);
-            var volume = ParseVolumePercent(columns[10]);
 
             devices.Add(new AudioDevice
             {
-                Name = name,
-                Volume = volume,
-                IsDefault = isDefault
+                Name = columns[0],
+                IsDefault = string.Equals(columns[2], "Render", StringComparison.OrdinalIgnoreCase),
+                Volume = ParseVolumePercent(columns[3])
             });
         }
-
         return devices;
     }
 
