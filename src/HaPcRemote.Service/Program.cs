@@ -115,11 +115,14 @@ app.Use(async (context, next) =>
     {
         var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "Unhandled exception");
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(
-            ApiResponse.Fail("Internal server error"),
-            AppJsonContext.Default.ApiResponse);
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(
+                ApiResponse.Fail("Internal server error"),
+                AppJsonContext.Default.ApiResponse);
+        }
     }
 });
 

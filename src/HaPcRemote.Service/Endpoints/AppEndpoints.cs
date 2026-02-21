@@ -84,7 +84,8 @@ public static class AppEndpoints
             }
         });
 
-        group.MapGet("/status/{appKey}", async (string appKey, AppService appService) =>
+        group.MapGet("/status/{appKey}", async (string appKey, AppService appService,
+            ILogger<AppService> logger) =>
         {
             try
             {
@@ -99,6 +100,14 @@ public static class AppEndpoints
                     ApiResponse.Fail(ex.Message),
                     AppJsonContext.Default.ApiResponse,
                     statusCode: StatusCodes.Status404NotFound);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get status for app '{AppKey}'", appKey);
+                return Results.Json(
+                    ApiResponse.Fail("Internal server error"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status500InternalServerError);
             }
         });
 
