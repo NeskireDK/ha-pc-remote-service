@@ -1,10 +1,10 @@
-# ha-windows-remote-service
+# ha-pc-remote-service
 
-A lightweight Windows Service (Native AOT) that exposes a REST API for controlling a Windows PC. Designed for use with the [ha-windows-remote](https://github.com/NeskireDK/ha-windows-remote) Home Assistant integration.
+A lightweight Windows Service (Native AOT) that exposes a REST API for controlling a Windows PC. Designed for use with the [ha-pc-remote](https://github.com/NeskireDK/ha-pc-remote) Home Assistant integration.
 
 ## Quick Start
 
-1. Download the latest release from [Releases](https://github.com/NeskireDK/ha-windows-remote-service/releases)
+1. Download the latest release from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
 2. Place [NirSoft tools](#nirsoft-tools) in a `tools/` folder next to the exe
 3. Run the exe once — it auto-generates `appsettings.json` with a random API key
 4. Install as a Windows Service:
