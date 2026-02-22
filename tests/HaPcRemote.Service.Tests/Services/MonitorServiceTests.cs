@@ -12,34 +12,125 @@ public class MonitorServiceTests : IDisposable
     private readonly string _tempDir;
     private readonly ICliRunner _cliRunner = A.Fake<ICliRunner>();
 
-    private void SetupCliRunnerWithCsv(string csv = SampleCsv)
+    private void SetupCliRunnerWithXml(string xml = SampleXml)
     {
         A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
             .Invokes((string _, IEnumerable<string> args, int _) =>
             {
                 var argList = args.ToList();
-                if (argList.Count >= 2 && argList[0] == "/scomma" && !string.IsNullOrEmpty(argList[1]))
-                    File.WriteAllText(argList[1], csv);
+                if (argList.Count >= 2 && argList[0] == "/sxml" && !string.IsNullOrEmpty(argList[1]))
+                    File.WriteAllText(argList[1], xml);
             })
             .Returns(string.Empty);
     }
 
-    // Realistic MultiMonitorTool /scomma output (14+ columns per line):
-    // 0=Name, 1=Short Monitor ID, 2=Monitor ID, 3=Monitor Key, 4=Monitor String,
-    // 5=Monitor Name, 6=Serial Number, 7=Adapter Name, 8=Resolution,
-    // 9=Orientation, 10=Width, 11=Height, 12=BitsPerPixel, 13=DisplayFrequency,
-    // 14+=additional flags (Primary=Yes/No)
-    private const string SampleCsv =
+    // Realistic MultiMonitorTool /sxml output based on actual tool output
+    private const string SampleXml =
         """
-        \\.\DISPLAY1,GSM59A4,GSM59A4-1234,Active,\\.\DISPLAY1\GSM59A4,LG ULTRAGEAR,ABC123,NVIDIA GeForce,3840x2160,0,3840,2160,32,144,Yes
-        \\.\DISPLAY2,DEL4321,DEL4321-5678,Active,\\.\DISPLAY2\DEL4321,Dell U2723QE,XYZ789,NVIDIA GeForce,2560x1440,0,2560,1440,32,60,No
-        \\.\DISPLAY3,SAM0F00,SAM0F00-9012,Active,\\.\DISPLAY3\SAM0F00,Samsung Odyssey,,NVIDIA GeForce,1920x1080,0,1920,1080,32,240,No
+        <?xml version="1.0" ?>
+        <monitors_list>
+        <item>
+        <resolution>3840 X 2160</resolution>
+        <left-top>0, 0</left-top>
+        <right-bottom>3840, 2160</right-bottom>
+        <active>Yes</active>
+        <disconnected>No</disconnected>
+        <primary>Yes</primary>
+        <colors>32</colors>
+        <frequency>144</frequency>
+        <orientation>Default</orientation>
+        <maximum_resolution>3840 X 2160</maximum_resolution>
+        <current_scale>100%</current_scale>
+        <maximum_scale>200%</maximum_scale>
+        <name>\\.\DISPLAY1</name>
+        <adapter>NVIDIA GeForce</adapter>
+        <device_id>PCI\VEN_10DE</device_id>
+        <device_key>\Registry\Machine\System\CurrentControlSet\Control\Video\{ABC}\0000</device_key>
+        <monitor_id>MONITOR\GSM59A4\{4d36e96e-e325-11ce-bfc1-08002be10318}\0001</monitor_id>
+        <short_monitor_id>GSM59A4</short_monitor_id>
+        <monitor_key>\Registry\Machine\System\CurrentControlSet\Control\Class\{4d36e96e}\0001</monitor_key>
+        <monitor_string>LG ULTRAGEAR</monitor_string>
+        <monitor_name>LG ULTRAGEAR</monitor_name>
+        <monitor_serial_number>ABC123</monitor_serial_number>
+        </item>
+        <item>
+        <resolution>2560 X 1440</resolution>
+        <left-top>3840, 0</left-top>
+        <right-bottom>6400, 1440</right-bottom>
+        <active>Yes</active>
+        <disconnected>No</disconnected>
+        <primary>No</primary>
+        <colors>32</colors>
+        <frequency>60</frequency>
+        <orientation>Default</orientation>
+        <maximum_resolution>2560 X 1440</maximum_resolution>
+        <current_scale>100%</current_scale>
+        <maximum_scale>200%</maximum_scale>
+        <name>\\.\DISPLAY2</name>
+        <adapter>NVIDIA GeForce</adapter>
+        <device_id>PCI\VEN_10DE</device_id>
+        <device_key>\Registry\Machine\System\CurrentControlSet\Control\Video\{DEF}\0001</device_key>
+        <monitor_id>MONITOR\DEL4321\{4d36e96e-e325-11ce-bfc1-08002be10318}\0002</monitor_id>
+        <short_monitor_id>DEL4321</short_monitor_id>
+        <monitor_key>\Registry\Machine\System\CurrentControlSet\Control\Class\{4d36e96e}\0002</monitor_key>
+        <monitor_string>Dell U2723QE</monitor_string>
+        <monitor_name>Dell U2723QE</monitor_name>
+        <monitor_serial_number>XYZ789</monitor_serial_number>
+        </item>
+        <item>
+        <resolution>1920 X 1080</resolution>
+        <left-top>6400, 0</left-top>
+        <right-bottom>8320, 1080</right-bottom>
+        <active>Yes</active>
+        <disconnected>No</disconnected>
+        <primary>No</primary>
+        <colors>32</colors>
+        <frequency>240</frequency>
+        <orientation>Default</orientation>
+        <maximum_resolution>1920 X 1080</maximum_resolution>
+        <current_scale>100%</current_scale>
+        <maximum_scale>200%</maximum_scale>
+        <name>\\.\DISPLAY3</name>
+        <adapter>NVIDIA GeForce</adapter>
+        <device_id>PCI\VEN_10DE</device_id>
+        <device_key>\Registry\Machine\System\CurrentControlSet\Control\Video\{GHI}\0002</device_key>
+        <monitor_id>MONITOR\SAM0F00\{4d36e96e-e325-11ce-bfc1-08002be10318}\0003</monitor_id>
+        <short_monitor_id>SAM0F00</short_monitor_id>
+        <monitor_key>\Registry\Machine\System\CurrentControlSet\Control\Class\{4d36e96e}\0003</monitor_key>
+        <monitor_string>Samsung Odyssey</monitor_string>
+        <monitor_name>Samsung Odyssey</monitor_name>
+        <monitor_serial_number></monitor_serial_number>
+        </item>
+        </monitors_list>
         """;
 
-    private const string CsvWithDisconnected =
+    private const string XmlWithDisconnected =
         """
-        \\.\DISPLAY1,GSM59A4,GSM59A4-1234,Active,\\.\DISPLAY1\GSM59A4,LG ULTRAGEAR,ABC123,NVIDIA GeForce,3840x2160,0,3840,2160,32,144,Yes
-        \\.\DISPLAY4,AOC1234,AOC1234-0000,Disconnected,\\.\DISPLAY4\AOC1234,AOC Monitor,DISC01,NVIDIA GeForce,,0,0,0,0,0,No
+        <?xml version="1.0" ?>
+        <monitors_list>
+        <item>
+        <resolution>3840 X 2160</resolution>
+        <active>Yes</active>
+        <disconnected>No</disconnected>
+        <primary>Yes</primary>
+        <frequency>144</frequency>
+        <name>\\.\DISPLAY1</name>
+        <short_monitor_id>GSM59A4</short_monitor_id>
+        <monitor_name>LG ULTRAGEAR</monitor_name>
+        <monitor_serial_number>ABC123</monitor_serial_number>
+        </item>
+        <item>
+        <resolution></resolution>
+        <active>No</active>
+        <disconnected>Yes</disconnected>
+        <primary>No</primary>
+        <frequency>0</frequency>
+        <name>\\.\DISPLAY4</name>
+        <short_monitor_id>AOC1234</short_monitor_id>
+        <monitor_name>AOC Monitor</monitor_name>
+        <monitor_serial_number>DISC01</monitor_serial_number>
+        </item>
+        </monitors_list>
         """;
 
     public MonitorServiceTests()
@@ -143,64 +234,64 @@ public class MonitorServiceTests : IDisposable
             A<int>._)).MustHaveHappenedOnceExactly();
     }
 
-    // ── CSV parsing tests ─────────────────────────────────────────────
+    // ── XML parsing tests ─────────────────────────────────────────────
 
     [Fact]
-    public void ParseCsvOutput_ParsesAllConnectedMonitors()
+    public void ParseXmlOutput_ParsesAllConnectedMonitors()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors.Count.ShouldBe(3);
     }
 
     [Fact]
-    public void ParseCsvOutput_ParsesDisplayName()
+    public void ParseXmlOutput_ParsesDisplayName()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[0].Name.ShouldBe(@"\\.\DISPLAY1");
         monitors[1].Name.ShouldBe(@"\\.\DISPLAY2");
     }
 
     [Fact]
-    public void ParseCsvOutput_ParsesShortMonitorId()
+    public void ParseXmlOutput_ParsesShortMonitorId()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[0].MonitorId.ShouldBe("GSM59A4");
         monitors[1].MonitorId.ShouldBe("DEL4321");
     }
 
     [Fact]
-    public void ParseCsvOutput_ParsesFriendlyName()
+    public void ParseXmlOutput_ParsesFriendlyName()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[0].MonitorName.ShouldBe("LG ULTRAGEAR");
         monitors[1].MonitorName.ShouldBe("Dell U2723QE");
     }
 
     [Fact]
-    public void ParseCsvOutput_ParsesSerialNumber()
+    public void ParseXmlOutput_ParsesSerialNumber()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[0].SerialNumber.ShouldBe("ABC123");
         monitors[1].SerialNumber.ShouldBe("XYZ789");
     }
 
     [Fact]
-    public void ParseCsvOutput_EmptySerialNumber_ReturnsNull()
+    public void ParseXmlOutput_EmptySerialNumber_ReturnsNull()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[2].SerialNumber.ShouldBeNull();
     }
 
     [Fact]
-    public void ParseCsvOutput_ParsesResolution()
+    public void ParseXmlOutput_ParsesResolution()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[0].Width.ShouldBe(3840);
         monitors[0].Height.ShouldBe(2160);
@@ -209,9 +300,9 @@ public class MonitorServiceTests : IDisposable
     }
 
     [Fact]
-    public void ParseCsvOutput_ParsesDisplayFrequency()
+    public void ParseXmlOutput_ParsesDisplayFrequency()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[0].DisplayFrequency.ShouldBe(144);
         monitors[1].DisplayFrequency.ShouldBe(60);
@@ -219,9 +310,9 @@ public class MonitorServiceTests : IDisposable
     }
 
     [Fact]
-    public void ParseCsvOutput_IdentifiesPrimaryMonitor()
+    public void ParseXmlOutput_IdentifiesPrimaryMonitor()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors[0].IsPrimary.ShouldBeTrue();
         monitors[1].IsPrimary.ShouldBeFalse();
@@ -229,65 +320,127 @@ public class MonitorServiceTests : IDisposable
     }
 
     [Fact]
-    public void ParseCsvOutput_ActiveMonitors_HavePositiveResolution()
+    public void ParseXmlOutput_ActiveMonitors_AreActive()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         monitors.ShouldAllBe(m => m.IsActive);
     }
 
     [Fact]
-    public void ParseCsvOutput_FiltersDisconnectedMonitors()
+    public void ParseXmlOutput_FiltersDisconnectedMonitors()
     {
-        var monitors = MonitorService.ParseCsvOutput(CsvWithDisconnected);
+        var monitors = MonitorService.ParseXmlOutput(XmlWithDisconnected);
 
         monitors.Count.ShouldBe(1);
         monitors[0].Name.ShouldBe(@"\\.\DISPLAY1");
     }
 
     [Fact]
-    public void ParseCsvOutput_EmptyInput_ReturnsEmptyList()
+    public void ParseXmlOutput_EmptyInput_ReturnsEmptyList()
     {
-        var monitors = MonitorService.ParseCsvOutput("");
+        var monitors = MonitorService.ParseXmlOutput("");
 
         monitors.ShouldBeEmpty();
     }
 
     [Fact]
-    public void ParseCsvOutput_WhitespaceOnlyInput_ReturnsEmptyList()
+    public void ParseXmlOutput_WhitespaceOnlyInput_ReturnsEmptyList()
     {
-        var monitors = MonitorService.ParseCsvOutput("   \n  \n  ");
+        var monitors = MonitorService.ParseXmlOutput("   \n  \n  ");
 
         monitors.ShouldBeEmpty();
     }
 
     [Fact]
-    public void ParseCsvOutput_LineTooShort_IsSkipped()
+    public void ParseXmlOutput_ItemWithEmptyName_IsSkipped()
     {
-        var csv = @"\\.\DISPLAY1,GSM59A4,GSM59A4-1234";
-        var monitors = MonitorService.ParseCsvOutput(csv);
+        var xml = """
+            <?xml version="1.0" ?>
+            <monitors_list>
+              <item>
+                <name></name>
+                <short_monitor_id>X</short_monitor_id>
+                <resolution>1920 X 1080</resolution>
+                <active>Yes</active>
+                <disconnected>No</disconnected>
+              </item>
+            </monitors_list>
+            """;
+        var monitors = MonitorService.ParseXmlOutput(xml);
 
         monitors.ShouldBeEmpty();
     }
 
     [Fact]
-    public void ParseCsvOutput_WindowsLineEndings_ParsedCorrectly()
+    public void ParseXmlOutput_MissingOptionalElements_UsesDefaults()
     {
-        var csv = @"\\.\DISPLAY1,GSM59A4,GSM59A4-1234,Active,\\.\DISPLAY1\GSM59A4,LG ULTRAGEAR,ABC123,NVIDIA,3840x2160,0,3840,2160,32,144,Yes" + "\r\n"
-                + @"\\.\DISPLAY2,DEL4321,DEL4321-5678,Active,\\.\DISPLAY2\DEL4321,Dell U2723QE,XYZ789,NVIDIA,2560x1440,0,2560,1440,32,60,No" + "\r\n";
-        var monitors = MonitorService.ParseCsvOutput(csv);
-
-        monitors.Count.ShouldBe(2);
-    }
-
-    [Fact]
-    public void ParseCsvOutput_QuotedFieldsWithCommas_ParsedCorrectly()
-    {
-        var csv = @"\\.\DISPLAY1,GSM59A4,GSM59A4-1234,Active,""\\.\DISPLAY1, special"",""LG ULTRA, GEAR"",ABC123,NVIDIA,3840x2160,0,3840,2160,32,144,Yes";
-        var monitors = MonitorService.ParseCsvOutput(csv);
+        var xml = """
+            <?xml version="1.0" ?>
+            <monitors_list>
+              <item>
+                <name>\\.\DISPLAY1</name>
+              </item>
+            </monitors_list>
+            """;
+        var monitors = MonitorService.ParseXmlOutput(xml);
 
         monitors.Count.ShouldBe(1);
-        monitors[0].MonitorName.ShouldBe("LG ULTRA, GEAR");
+        monitors[0].MonitorId.ShouldBe("");
+        monitors[0].MonitorName.ShouldBe("");
+        monitors[0].SerialNumber.ShouldBeNull();
+        monitors[0].Width.ShouldBe(0);
+        monitors[0].Height.ShouldBe(0);
+        monitors[0].DisplayFrequency.ShouldBe(0);
+        monitors[0].IsActive.ShouldBeFalse();
+        monitors[0].IsPrimary.ShouldBeFalse();
+    }
+
+    // ── Resolution parsing tests ──────────────────────────────────────
+
+    [Fact]
+    public void ParseResolution_StandardFormat_ParsesCorrectly()
+    {
+        MonitorService.ParseResolution("1920 X 1200", out var w, out var h);
+
+        w.ShouldBe(1920);
+        h.ShouldBe(1200);
+    }
+
+    [Fact]
+    public void ParseResolution_4K_ParsesCorrectly()
+    {
+        MonitorService.ParseResolution("3840 X 2160", out var w, out var h);
+
+        w.ShouldBe(3840);
+        h.ShouldBe(2160);
+    }
+
+    [Fact]
+    public void ParseResolution_Null_ReturnsZeros()
+    {
+        MonitorService.ParseResolution(null, out var w, out var h);
+
+        w.ShouldBe(0);
+        h.ShouldBe(0);
+    }
+
+    [Fact]
+    public void ParseResolution_Empty_ReturnsZeros()
+    {
+        MonitorService.ParseResolution("", out var w, out var h);
+
+        w.ShouldBe(0);
+        h.ShouldBe(0);
+    }
+
+    [Fact]
+    public void ParseResolution_MalformedInput_ReturnsZeros()
+    {
+        MonitorService.ParseResolution("not a resolution", out var w, out var h);
+
+        w.ShouldBe(0);
+        h.ShouldBe(0);
     }
 
     // ── FindMonitor / ID matching tests ───────────────────────────────
@@ -295,7 +448,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public void FindMonitor_MatchByDisplayName_ReturnsMonitor()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         var result = MonitorService.FindMonitor(monitors, @"\\.\DISPLAY2");
 
@@ -305,7 +458,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public void FindMonitor_MatchByShortMonitorId_ReturnsMonitor()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         var result = MonitorService.FindMonitor(monitors, "DEL4321");
 
@@ -315,7 +468,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public void FindMonitor_MatchBySerialNumber_ReturnsMonitor()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         var result = MonitorService.FindMonitor(monitors, "XYZ789");
 
@@ -325,7 +478,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public void FindMonitor_CaseInsensitive_ReturnsMonitor()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         var result = MonitorService.FindMonitor(monitors, "gsm59a4");
 
@@ -335,7 +488,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public void FindMonitor_UnknownId_ThrowsKeyNotFoundException()
     {
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         Should.Throw<KeyNotFoundException>(
             () => MonitorService.FindMonitor(monitors, "UNKNOWN123"));
@@ -353,8 +506,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public void FindMonitor_NullSerialNotMatchedByEmptyString()
     {
-        // Samsung monitor has no serial — searching empty string should not match it
-        var monitors = MonitorService.ParseCsvOutput(SampleCsv);
+        var monitors = MonitorService.ParseXmlOutput(SampleXml);
 
         Should.Throw<KeyNotFoundException>(
             () => MonitorService.FindMonitor(monitors, ""));
@@ -365,7 +517,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task GetMonitorsAsync_CallsCliRunnerAndParsesOutput()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         var service = CreateService();
 
         var monitors = await service.GetMonitorsAsync();
@@ -374,14 +526,14 @@ public class MonitorServiceTests : IDisposable
         A.CallTo(() => _cliRunner.RunAsync(
             A<string>.That.EndsWith("MultiMonitorTool.exe"),
             A<IEnumerable<string>>.That.Matches(a =>
-                a.First() == "/scomma" && a.Last() != ""),
+                a.First() == "/sxml" && a.Last() != ""),
             A<int>._)).MustHaveHappenedOnceExactly();
     }
 
     [Fact]
     public async Task EnableMonitorAsync_ResolvesAndCallsCliRunner()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         var service = CreateService();
 
         await service.EnableMonitorAsync("DEL4321");
@@ -395,7 +547,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task DisableMonitorAsync_ResolvesAndCallsCliRunner()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         var service = CreateService();
 
         await service.DisableMonitorAsync("GSM59A4");
@@ -409,7 +561,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task SetPrimaryAsync_ResolvesAndCallsCliRunner()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         var service = CreateService();
 
         await service.SetPrimaryAsync("XYZ789");
@@ -423,7 +575,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task EnableMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         var service = CreateService();
 
         await Should.ThrowAsync<KeyNotFoundException>(
@@ -433,7 +585,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task SoloMonitorAsync_DisablesOthersAndEnablesTarget()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         var service = CreateService();
 
         await service.SoloMonitorAsync("DEL4321");
@@ -457,7 +609,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task SoloMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         var service = CreateService();
 
         await Should.ThrowAsync<KeyNotFoundException>(

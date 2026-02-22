@@ -87,12 +87,29 @@ public class AudioEndpointTests : EndpointTestBase
     [Fact]
     public async Task SetDefault_ReturnsOk()
     {
+        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/audio/set/Headphones", null);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task SetDefault_InvalidDevice_Returns404()
+    {
         A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .MustHaveHappenedOnceExactly();
+            .Returns(SampleCsv);
+        using var client = CreateClient();
+
+        var response = await client.PostAsync("/api/audio/set/NonExistent", null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse>(
+            AppJsonContext.Default.ApiResponse);
+        json.ShouldNotBeNull();
+        json.Success.ShouldBeFalse();
+        json.Message.ShouldContain("not found");
     }
 }

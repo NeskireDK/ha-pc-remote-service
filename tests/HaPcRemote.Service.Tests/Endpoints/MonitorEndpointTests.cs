@@ -8,18 +8,43 @@ namespace HaPcRemote.Service.Tests.Endpoints;
 
 public class MonitorEndpointTests : EndpointTestBase
 {
-    private const string SampleCsv =
-        @"\\.\DISPLAY1,GSM59A4,GSM59A4-1234,Active,\\.\DISPLAY1\GSM59A4,LG ULTRAGEAR,ABC123,NVIDIA,3840x2160,0,3840,2160,32,144,Yes" + "\n"
-      + @"\\.\DISPLAY2,DEL4321,DEL4321-5678,Active,\\.\DISPLAY2\DEL4321,Dell U2723QE,XYZ789,NVIDIA,2560x1440,0,2560,1440,32,60,No";
+    private const string SampleXml =
+        """
+        <?xml version="1.0" ?>
+        <monitors_list>
+        <item>
+        <resolution>3840 X 2160</resolution>
+        <active>Yes</active>
+        <disconnected>No</disconnected>
+        <primary>Yes</primary>
+        <frequency>144</frequency>
+        <name>\\.\DISPLAY1</name>
+        <short_monitor_id>GSM59A4</short_monitor_id>
+        <monitor_name>LG ULTRAGEAR</monitor_name>
+        <monitor_serial_number>ABC123</monitor_serial_number>
+        </item>
+        <item>
+        <resolution>2560 X 1440</resolution>
+        <active>Yes</active>
+        <disconnected>No</disconnected>
+        <primary>No</primary>
+        <frequency>60</frequency>
+        <name>\\.\DISPLAY2</name>
+        <short_monitor_id>DEL4321</short_monitor_id>
+        <monitor_name>Dell U2723QE</monitor_name>
+        <monitor_serial_number>XYZ789</monitor_serial_number>
+        </item>
+        </monitors_list>
+        """;
 
-    private void SetupCliRunnerWithCsv()
+    private void SetupCliRunnerWithXml()
     {
         A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
             .Invokes((string _, IEnumerable<string> args, int _) =>
             {
                 var argList = args.ToList();
-                if (argList.Count >= 2 && argList[0] == "/scomma" && !string.IsNullOrEmpty(argList[1]))
-                    File.WriteAllText(argList[1], SampleCsv);
+                if (argList.Count >= 2 && argList[0] == "/sxml" && !string.IsNullOrEmpty(argList[1]))
+                    File.WriteAllText(argList[1], SampleXml);
             })
             .Returns(string.Empty);
     }
@@ -27,7 +52,7 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetMonitors_ReturnsMonitorList()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/monitor/list");
@@ -42,7 +67,7 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task EnableMonitor_UnknownId_Returns404()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/monitor/enable/UNKNOWN", null);
@@ -53,7 +78,7 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task EnableMonitor_ValidId_ReturnsOk()
     {
-        SetupCliRunnerWithCsv();
+        SetupCliRunnerWithXml();
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/monitor/enable/DEL4321", null);

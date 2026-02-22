@@ -29,6 +29,10 @@ public class AudioService
 
     public async Task SetDefaultDeviceAsync(string deviceName)
     {
+        var devices = await GetDevicesAsync();
+        if (!devices.Exists(d => string.Equals(d.Name, deviceName, StringComparison.OrdinalIgnoreCase)))
+            throw new KeyNotFoundException($"Audio device '{deviceName}' not found.");
+
         await _cliRunner.RunAsync(GetExePath(), ["/SetDefault", deviceName, "1"]);
     }
 
