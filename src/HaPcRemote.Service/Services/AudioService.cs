@@ -17,7 +17,7 @@ public class AudioService
 
     public async Task<List<AudioDevice>> GetDevicesAsync()
     {
-        var output = await _cliRunner.RunAsync(GetExePath(), ["/scomma", "", "/Columns", "Name,Direction,Default,Volume Percent"]);
+        var output = await _cliRunner.RunAsync(GetExePath(), ["/scomma", "", "/Columns", "Type,Name,Direction,Default,Volume Percent"]);
         return ParseCsvOutput(output);
     }
 
@@ -59,23 +59,28 @@ public class AudioService
                 continue;
 
             var columns = CliRunner.SplitCsvLine(trimmed);
-            if (columns.Count < 4)
+            if (columns.Count < 5)
                 continue;
 
             // Columns selected via /Columns flag:
-            // [0] Name, [1] Direction, [2] Default (Console), [3] Volume Percent
+            // [0] Type, [1] Name, [2] Direction, [3] Default (Console), [4] Volume Percent
 
-            if (!string.Equals(columns[1], "Render", StringComparison.OrdinalIgnoreCase))
+            // Only include hardware sound card devices; exclude Application/Subunit entries
+            // (virtual audio devices created by apps, software mixers, etc.)
+            if (!string.Equals(columns[0], "Device", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (!seen.Add(columns[0]))
+            if (!string.Equals(columns[2], "Render", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!seen.Add(columns[1]))
                 continue;
 
             devices.Add(new AudioDevice
             {
-                Name = columns[0],
-                IsDefault = string.Equals(columns[2], "Render", StringComparison.OrdinalIgnoreCase),
-                Volume = ParseVolumePercent(columns[3])
+                Name = columns[1],
+                IsDefault = string.Equals(columns[3], "Render", StringComparison.OrdinalIgnoreCase),
+                Volume = ParseVolumePercent(columns[4])
             });
         }
         return devices;

@@ -8,15 +8,16 @@ namespace HaPcRemote.Service.Tests.Services;
 
 public class AudioServiceTests
 {
-    // SoundVolumeView /scomma with /Columns "Name,Direction,Default,Volume Percent"
-    // Columns: [0] Name, [1] Direction, [2] Default (Console), [3] Volume Percent
+    // SoundVolumeView /scomma with /Columns "Type,Name,Direction,Default,Volume Percent"
+    // Columns: [0] Type, [1] Name, [2] Direction, [3] Default (Console), [4] Volume Percent
+    // Type = "Device" for hardware sound card devices; "Application"/"Subunit" for virtual/software entries
     // Default column = "Render" for default render device, empty for non-default
     // This format matches SoundVolumeView v2.47+ on Windows 10/11
     private const string SampleCsv =
         """
-        Speakers,Render,Render,50.0%
-        Headphones,Render,,75.5%
-        Microphone,Capture,Capture,80.0%
+        Device,Speakers,Render,Render,50.0%
+        Device,Headphones,Render,,75.5%
+        Device,Microphone,Capture,Capture,80.0%
         """;
 
     private readonly ICliRunner _cliRunner = A.Fake<ICliRunner>();
@@ -88,7 +89,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_LineTooShort_IsSkipped()
     {
-        var csv = "Speakers,Render,Render";
+        var csv = "Device,Speakers,Render,Render";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.ShouldBeEmpty();
@@ -97,7 +98,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_CaptureDevicesExcluded()
     {
-        var csv = "Microphone,Capture,Capture,100.0%";
+        var csv = "Device,Microphone,Capture,Capture,100.0%";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.ShouldBeEmpty();
@@ -106,7 +107,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_NoDefaultDevice_AllIsDefaultFalse()
     {
-        var csv = "Speakers,Render,,50.0%";
+        var csv = "Device,Speakers,Render,,50.0%";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(1);
@@ -116,7 +117,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_VolumeWithoutPercent_ParsesAsZero()
     {
-        var csv = "Speakers,Render,Render,invalid";
+        var csv = "Device,Speakers,Render,Render,invalid";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices[0].Volume.ShouldBe(0);
@@ -125,7 +126,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_QuotedFieldsWithCommas_ParsedCorrectly()
     {
-        var csv = "\"Speakers, Front\",Render,Render,50.0%";
+        var csv = "Device,\"Speakers, Front\",Render,Render,50.0%";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(1);
@@ -135,7 +136,7 @@ public class AudioServiceTests
     [Fact]
     public void ParseCsvOutput_WindowsLineEndings_ParsedCorrectly()
     {
-        var csv = "Speakers,Render,Render,50.0%\r\nHeadphones,Render,,75.0%\r\n";
+        var csv = "Device,Speakers,Render,Render,50.0%\r\nDevice,Headphones,Render,,75.0%\r\n";
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(2);
@@ -145,16 +146,32 @@ public class AudioServiceTests
     public void ParseCsvOutput_DuplicateDeviceNames_DeduplicatedToFirst()
     {
         var csv = """
-            Speakers,Render,Render,50.0%
-            Speakers,Render,,30.0%
-            Speakers,Render,,20.0%
-            Headphones,Render,,75.0%
+            Device,Speakers,Render,Render,50.0%
+            Device,Speakers,Render,,30.0%
+            Device,Speakers,Render,,20.0%
+            Device,Headphones,Render,,75.0%
             """;
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(2);
         devices[0].Name.ShouldBe("Speakers");
         devices[0].Volume.ShouldBe(50); // keeps first entry
+        devices[1].Name.ShouldBe("Headphones");
+    }
+
+    [Fact]
+    public void ParseCsvOutput_VirtualAudioDevicesExcluded()
+    {
+        var csv = """
+            Device,Speakers,Render,Render,50.0%
+            Application,Discord,Render,,30.0%
+            Subunit,Steam Streaming Speakers,Render,,0.0%
+            Device,Headphones,Render,,75.0%
+            """;
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.Count.ShouldBe(2);
+        devices[0].Name.ShouldBe("Speakers");
         devices[1].Name.ShouldBe("Headphones");
     }
 
@@ -194,7 +211,7 @@ public class AudioServiceTests
     public async Task GetCurrentDeviceAsync_NoDefault_ReturnsNull()
     {
         A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns("Speakers,Render,,50.0%");
+            .Returns("Device,Speakers,Render,,50.0%");
         var service = CreateService();
 
         var device = await service.GetCurrentDeviceAsync();
@@ -255,7 +272,7 @@ public class AudioServiceTests
     public async Task SetVolumeAsync_NoDefaultDevice_ThrowsInvalidOperationException()
     {
         A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns("Speakers,Render,,50.0%"); // No default device
+            .Returns("Device,Speakers,Render,,50.0%"); // No default device
         var service = CreateService();
 
         await Should.ThrowAsync<InvalidOperationException>(
