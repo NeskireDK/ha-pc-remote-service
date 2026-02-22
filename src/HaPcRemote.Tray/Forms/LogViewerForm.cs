@@ -107,9 +107,11 @@ internal sealed class LogViewerForm : Form
 
     private void LoadExistingEntries()
     {
+        _logBox.SuspendLayout();
         _logBox.Clear();
         foreach (var entry in _provider.GetEntries())
             AppendEntry(entry);
+        _logBox.ResumeLayout();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

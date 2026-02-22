@@ -40,7 +40,10 @@ internal sealed class InMemoryLogProvider : ILoggerProvider
 
     public ILogger CreateLogger(string categoryName) => new InMemoryLogger(this, categoryName);
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        OnLogEntry = null;
+    }
 }
 
 // Logger that writes to the provider's buffer

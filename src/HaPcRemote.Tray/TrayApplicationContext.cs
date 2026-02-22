@@ -1,4 +1,3 @@
-using System.Reflection;
 using HaPcRemote.Shared.Ipc;
 using HaPcRemote.Tray.Forms;
 using HaPcRemote.Tray.Logging;
@@ -203,11 +202,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private static string GetVersionString()
     {
-        var info = Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (info is null) return "";
-        // Strip build metadata: "0.6.1+abc123" -> "v0.6.1"
-        return $"v{info.Split('+')[0]}";
+        var version = UpdateChecker.GetCurrentVersion();
+        return version is null ? "" : $"v{version.ToString(3)}";
     }
 
     private static Icon LoadAppIcon()

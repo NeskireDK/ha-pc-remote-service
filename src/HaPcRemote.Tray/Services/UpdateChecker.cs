@@ -86,20 +86,22 @@ internal sealed class UpdateChecker(ILogger<UpdateChecker> logger)
         }
     }
 
-    private static Version? GetCurrentVersion()
+    internal static Version? GetCurrentVersion()
     {
         var infoVersion = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (infoVersion is null) return null;
-        // Strip metadata (e.g., "0.6.1+abc123" -> "0.6.1")
         var versionPart = infoVersion.Split('+')[0];
-        return Version.TryParse(versionPart, out var v) ? v : null;
+        if (!Version.TryParse(versionPart, out var v)) return null;
+        return v.Build < 0 ? new Version(v.Major, v.Minor, 0) : v;
     }
 
     private static Version? ParseVersion(string tag)
     {
         var cleaned = tag.TrimStart('v');
-        return Version.TryParse(cleaned, out var v) ? v : null;
+        if (!Version.TryParse(cleaned, out var v)) return null;
+        // Normalize to 3-component so 0.7 == 0.7.0
+        return v.Build < 0 ? new Version(v.Major, v.Minor, 0) : v;
     }
 
     private static HttpClient CreateHttpClient()
