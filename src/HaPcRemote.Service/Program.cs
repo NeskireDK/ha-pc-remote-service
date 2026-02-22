@@ -1,6 +1,7 @@
 using HaPcRemote.Service;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Endpoints;
+using HaPcRemote.Service.Logging;
 using HaPcRemote.Shared.Configuration;
 using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
@@ -10,6 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Windows Service support
 builder.Host.UseWindowsService();
+
+// File logging — visible in tray log viewer
+builder.Logging.AddProvider(new FileLoggerProvider(ConfigPaths.GetLogFilePath()));
 
 // Writable config: use %ProgramData%\HaPcRemote so that runtime-generated
 // settings (API key) persist even when the exe is in a read-only location

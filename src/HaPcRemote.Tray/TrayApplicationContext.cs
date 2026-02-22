@@ -1,3 +1,4 @@
+using HaPcRemote.Shared.Configuration;
 using HaPcRemote.Shared.Ipc;
 using HaPcRemote.Tray.Forms;
 using HaPcRemote.Tray.Logging;
@@ -23,6 +24,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly InMemoryLogProvider _logProvider;
     private readonly UpdateChecker _updateChecker;
     private readonly System.Windows.Forms.Timer _updateTimer;
+    private readonly ServiceLogTailer _serviceLogTailer;
 
     private LogViewerForm? _logViewerForm;
     private ToolStripMenuItem? _updateMenuItem;
@@ -55,6 +57,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
 
         _ = Task.Run(() => RunIpcServerAsync(_cts.Token));
+
+        // Tail the service log file so the log viewer shows service output
+        _serviceLogTailer = new ServiceLogTailer(
+            ConfigPaths.GetLogFilePath(), _logProvider, _logger);
+        _serviceLogTailer.Start();
 
         // Check for updates after 30s, then every 4 hours
         _updateTimer = new System.Windows.Forms.Timer { Interval = 4 * 60 * 60 * 1000 };
@@ -177,8 +184,19 @@ internal sealed class TrayApplicationContext : ApplicationContext
             ToolTipIcon.Info);
     }
 
-    private void OnExit(object? sender, EventArgs e)
+    private async void OnExit(object? sender, EventArgs e)
     {
+        _logger.LogInformation("Shutting down...");
+
+        try
+        {
+            await Services.ServiceController.StopAsync(_logger);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not stop service");
+        }
+
         _cts.Cancel();
         _notifyIcon.Visible = false;
         Application.Exit();
@@ -216,6 +234,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (disposing)
         {
             _cts.Cancel();
+            _serviceLogTailer.Dispose();
             _updateTimer.Dispose();
             _logViewerForm?.Dispose();
             _notifyIcon.Visible = false;

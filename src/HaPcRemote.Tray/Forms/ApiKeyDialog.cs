@@ -5,9 +5,6 @@ namespace HaPcRemote.Tray.Forms;
 
 internal sealed class ApiKeyDialog : Form
 {
-    private readonly Button _copyButton;
-    private readonly TextBox _keyTextBox;
-
     public ApiKeyDialog()
     {
         Text = "API Key";
@@ -15,7 +12,7 @@ internal sealed class ApiKeyDialog : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(420, 160);
+        ClientSize = new Size(420, 130);
         BackColor = Color.FromArgb(45, 45, 48);
         ForeColor = Color.White;
         Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? SystemIcons.Application;
@@ -29,7 +26,7 @@ internal sealed class ApiKeyDialog : Form
 
         var apiKey = ReadApiKey();
 
-        _keyTextBox = new TextBox
+        var keyTextBox = new TextBox
         {
             Text = string.IsNullOrEmpty(apiKey) ? "No API key configured" : apiKey,
             ReadOnly = true,
@@ -39,24 +36,12 @@ internal sealed class ApiKeyDialog : Form
             BackColor = Color.FromArgb(30, 30, 30),
             ForeColor = Color.White
         };
-        _keyTextBox.Click += (_, _) => _keyTextBox.SelectAll();
-
-        _copyButton = new Button
-        {
-            Text = "Copy",
-            Location = new Point(216, 110),
-            Size = new Size(90, 32),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(60, 60, 65),
-            ForeColor = Color.White,
-            Enabled = !string.IsNullOrEmpty(apiKey)
-        };
-        _copyButton.Click += OnCopyClick;
+        keyTextBox.Click += (_, _) => keyTextBox.SelectAll();
 
         var closeButton = new Button
         {
             Text = "Close",
-            Location = new Point(314, 110),
+            Location = new Point(314, 84),
             Size = new Size(90, 32),
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(60, 60, 65),
@@ -65,22 +50,7 @@ internal sealed class ApiKeyDialog : Form
         };
 
         CancelButton = closeButton;
-        Controls.AddRange([label, _keyTextBox, _copyButton, closeButton]);
-    }
-
-    private async void OnCopyClick(object? sender, EventArgs e)
-    {
-        Clipboard.SetText(_keyTextBox.Text);
-        _copyButton.Text = "Copied!";
-        _copyButton.Enabled = false;
-
-        await Task.Delay(1500);
-
-        if (!IsDisposed)
-        {
-            _copyButton.Text = "Copy";
-            _copyButton.Enabled = true;
-        }
+        Controls.AddRange([label, keyTextBox, closeButton]);
     }
 
     private static string ReadApiKey()

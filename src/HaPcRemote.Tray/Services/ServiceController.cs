@@ -25,6 +25,21 @@ internal static class ServiceController
             logger.LogError("Failed to restart service");
     }
 
+    public static async Task<bool> StopAsync(ILogger logger, CancellationToken ct = default)
+    {
+        logger.LogInformation("Stopping service {ServiceName}...", ServiceName);
+
+        var cmd = $"Stop-Service -Name '{ServiceName}' -Force";
+        var result = await RunElevatedAsync(cmd, logger, ct);
+
+        if (result)
+            logger.LogInformation("Service stopped successfully");
+        else
+            logger.LogWarning("Failed to stop service");
+
+        return result;
+    }
+
     private static async Task<bool> RunElevatedAsync(string command, ILogger logger, CancellationToken ct)
     {
         try
