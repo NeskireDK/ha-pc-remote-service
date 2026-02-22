@@ -63,7 +63,7 @@ internal sealed class LogViewerForm : Form
 
     private void OnNewLogEntry(LogEntry entry)
     {
-        if (IsDisposed) return;
+        if (IsDisposed || !IsHandleCreated) return;
 
         try
         {

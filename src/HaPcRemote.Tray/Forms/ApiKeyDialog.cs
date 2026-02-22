@@ -85,9 +85,16 @@ internal sealed class ApiKeyDialog : Form
 
     private static string ReadApiKey()
     {
-        var path = ConfigPaths.GetWritableConfigPath();
-        if (!File.Exists(path)) return "";
-        var json = JsonNode.Parse(File.ReadAllText(path));
-        return json?["PcRemote"]?["Auth"]?["ApiKey"]?.GetValue<string>() ?? "";
+        try
+        {
+            var path = ConfigPaths.GetWritableConfigPath();
+            if (!File.Exists(path)) return "";
+            var json = JsonNode.Parse(File.ReadAllText(path));
+            return json?["PcRemote"]?["Auth"]?["ApiKey"]?.GetValue<string>() ?? "";
+        }
+        catch
+        {
+            return "";
+        }
     }
 }
