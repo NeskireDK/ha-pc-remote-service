@@ -141,6 +141,23 @@ public class AudioServiceTests
         devices.Count.ShouldBe(2);
     }
 
+    [Fact]
+    public void ParseCsvOutput_DuplicateDeviceNames_DeduplicatedToFirst()
+    {
+        var csv = """
+            Speakers,Render,Render,50.0%
+            Speakers,Render,,30.0%
+            Speakers,Render,,20.0%
+            Headphones,Render,,75.0%
+            """;
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.Count.ShouldBe(2);
+        devices[0].Name.ShouldBe("Speakers");
+        devices[0].Volume.ShouldBe(50); // keeps first entry
+        devices[1].Name.ShouldBe("Headphones");
+    }
+
     // ── Async method tests (mocked ICliRunner) ────────────────────────
 
     [Fact]
