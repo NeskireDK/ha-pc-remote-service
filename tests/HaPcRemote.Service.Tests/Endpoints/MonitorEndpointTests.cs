@@ -12,11 +12,22 @@ public class MonitorEndpointTests : EndpointTestBase
         @"\\.\DISPLAY1,GSM59A4,GSM59A4-1234,Active,\\.\DISPLAY1\GSM59A4,LG ULTRAGEAR,ABC123,NVIDIA,3840x2160,0,3840,2160,32,144,Yes" + "\n"
       + @"\\.\DISPLAY2,DEL4321,DEL4321-5678,Active,\\.\DISPLAY2\DEL4321,Dell U2723QE,XYZ789,NVIDIA,2560x1440,0,2560,1440,32,60,No";
 
+    private void SetupCliRunnerWithCsv()
+    {
+        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Invokes((string _, IEnumerable<string> args, int _) =>
+            {
+                var argList = args.ToList();
+                if (argList.Count >= 2 && argList[0] == "/scomma" && !string.IsNullOrEmpty(argList[1]))
+                    File.WriteAllText(argList[1], SampleCsv);
+            })
+            .Returns(string.Empty);
+    }
+
     [Fact]
     public async Task GetMonitors_ReturnsMonitorList()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/monitor/list");
@@ -31,8 +42,7 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task EnableMonitor_UnknownId_Returns404()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/monitor/enable/UNKNOWN", null);
@@ -43,8 +53,7 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task EnableMonitor_ValidId_ReturnsOk()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/monitor/enable/DEL4321", null);

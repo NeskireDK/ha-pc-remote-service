@@ -12,6 +12,18 @@ public class MonitorServiceTests : IDisposable
     private readonly string _tempDir;
     private readonly ICliRunner _cliRunner = A.Fake<ICliRunner>();
 
+    private void SetupCliRunnerWithCsv(string csv = SampleCsv)
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Invokes((string _, IEnumerable<string> args, int _) =>
+            {
+                var argList = args.ToList();
+                if (argList.Count >= 2 && argList[0] == "/scomma" && !string.IsNullOrEmpty(argList[1]))
+                    File.WriteAllText(argList[1], csv);
+            })
+            .Returns(string.Empty);
+    }
+
     // Realistic MultiMonitorTool /scomma output (14+ columns per line):
     // 0=Name, 1=Short Monitor ID, 2=Monitor ID, 3=Monitor Key, 4=Monitor String,
     // 5=Monitor Name, 6=Serial Number, 7=Adapter Name, 8=Resolution,
@@ -353,8 +365,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task GetMonitorsAsync_CallsCliRunnerAndParsesOutput()
     {
-        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         var service = CreateService();
 
         var monitors = await service.GetMonitorsAsync();
@@ -362,15 +373,15 @@ public class MonitorServiceTests : IDisposable
         monitors.Count.ShouldBe(3);
         A.CallTo(() => _cliRunner.RunAsync(
             A<string>.That.EndsWith("MultiMonitorTool.exe"),
-            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/scomma", "" }),
+            A<IEnumerable<string>>.That.Matches(a =>
+                a.First() == "/scomma" && a.Last() != ""),
             A<int>._)).MustHaveHappenedOnceExactly();
     }
 
     [Fact]
     public async Task EnableMonitorAsync_ResolvesAndCallsCliRunner()
     {
-        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         var service = CreateService();
 
         await service.EnableMonitorAsync("DEL4321");
@@ -384,8 +395,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task DisableMonitorAsync_ResolvesAndCallsCliRunner()
     {
-        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         var service = CreateService();
 
         await service.DisableMonitorAsync("GSM59A4");
@@ -399,8 +409,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task SetPrimaryAsync_ResolvesAndCallsCliRunner()
     {
-        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         var service = CreateService();
 
         await service.SetPrimaryAsync("XYZ789");
@@ -414,8 +423,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task EnableMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
-        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         var service = CreateService();
 
         await Should.ThrowAsync<KeyNotFoundException>(
@@ -425,8 +433,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task SoloMonitorAsync_DisablesOthersAndEnablesTarget()
     {
-        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         var service = CreateService();
 
         await service.SoloMonitorAsync("DEL4321");
@@ -450,8 +457,7 @@ public class MonitorServiceTests : IDisposable
     [Fact]
     public async Task SoloMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
-        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        SetupCliRunnerWithCsv();
         var service = CreateService();
 
         await Should.ThrowAsync<KeyNotFoundException>(
