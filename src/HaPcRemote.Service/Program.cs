@@ -6,6 +6,7 @@ using HaPcRemote.Shared.Configuration;
 using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -113,6 +114,31 @@ builder.Services.AddSingleton<ISteamPlatform, IpcSteamPlatform>();
 builder.Services.AddSingleton<SteamService>();
 
 var app = builder.Build();
+
+// Startup diagnostics — log resolved paths and what was found
+{
+    var startupLogger = app.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Startup");
+    var resolvedOptions = app.Services.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
+
+    var toolsExists = Directory.Exists(resolvedOptions.ToolsPath);
+    startupLogger.LogInformation("[Startup] ToolsPath: {Path} ({Status})",
+        resolvedOptions.ToolsPath, toolsExists ? "exists" : "NOT FOUND");
+
+    var profilesExists = Directory.Exists(resolvedOptions.ProfilesPath);
+    var profileCount = profilesExists
+        ? Directory.GetFiles(resolvedOptions.ProfilesPath, "*.cfg").Length
+        : 0;
+    var profilesStatus = profilesExists ? $"exists, {profileCount} profiles" : "NOT FOUND";
+    startupLogger.LogInformation("[Startup] ProfilesPath: {Path} ({Status})",
+        resolvedOptions.ProfilesPath, profilesStatus);
+
+    startupLogger.LogInformation("[Startup] LogFile: {Path}",
+        ConfigPaths.GetLogFilePath());
+
+    startupLogger.LogInformation("[Startup] Config: {Path}",
+        ConfigPaths.GetWritableConfigPath());
+}
 
 // Global exception handler
 app.Use(async (context, next) =>
