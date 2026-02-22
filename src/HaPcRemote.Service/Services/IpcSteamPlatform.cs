@@ -18,7 +18,9 @@ public sealed class IpcSteamPlatform : ISteamPlatform
     public string? GetSteamPath()
     {
         var response = Send(new IpcRequest { Type = "steamGetPath" });
-        return response?.Stdout;
+        if (response is null)
+            throw new InvalidOperationException("Tray app is not running.");
+        return response.Stdout;
     }
 
     public int GetRunningAppId()
