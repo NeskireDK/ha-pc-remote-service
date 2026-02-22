@@ -2,18 +2,56 @@
 
 A lightweight Windows Service (Native AOT) that exposes a REST API for controlling a Windows PC. Designed for use with the [ha-pc-remote](https://github.com/NeskireDK/ha-pc-remote) Home Assistant integration.
 
-## Quick Start
-
-1. Download the latest release from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
-2. Place [NirSoft tools](#nirsoft-tools) in a `tools/` folder next to the exe
-3. Run the exe once — it auto-generates `appsettings.json` with a random API key
-4. Install as a Windows Service:
-   ```powershell
-   sc create HaPcRemote binPath="C:\path\to\HaPcRemote.Service.exe"
-   sc start HaPcRemote
-   ```
-
 The service advertises itself via mDNS (`_pc-remote._tcp`) for auto-discovery by the HA integration.
+
+## Installation
+
+### Option A: Installer (Recommended)
+
+1. Download `HaPcRemoteService-Setup-x.x.x.exe` from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
+2. Run the installer
+
+The installer handles everything:
+- Installs to `C:\Program Files\HA PC Remote Service\`
+- Downloads [NirSoft tools](#nirsoft-tools) automatically
+- Registers and starts the Windows Service (auto-start on boot)
+- Adds a firewall rule for port 5000
+- Adds the system tray app to startup (all users)
+- Upgrades in-place — stops the existing service, updates files, restarts
+
+To uninstall, use **Add or Remove Programs**. The uninstaller removes the service, firewall rule, and tray startup entry.
+
+### Option B: Portable
+
+1. Download `HaPcRemote-win-x64.zip` (or `win-arm64`) from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
+2. Extract to a directory of your choice (e.g. `C:\HaPcRemote\`)
+3. Download [NirSoft tools](#nirsoft-tools) and place them in a `tools/` folder next to the exe
+4. Run `HaPcRemote.Service.exe` once — it auto-generates an API key in `%ProgramData%\HaPcRemote\appsettings.json`
+5. Register as a Windows Service and open the firewall:
+   ```powershell
+   sc create HaPcRemoteService binPath="C:\HaPcRemote\HaPcRemote.Service.exe" start=auto
+   sc start HaPcRemoteService
+   netsh advfirewall firewall add rule name="HA PC Remote Service" dir=in action=allow protocol=TCP localport=5000
+   ```
+6. Optionally start the tray app (`HaPcRemote.Tray.exe`) and add it to shell startup
+
+To uninstall:
+```powershell
+sc stop HaPcRemoteService
+sc delete HaPcRemoteService
+netsh advfirewall firewall delete rule name="HA PC Remote Service"
+```
+
+### System Tray App
+
+The tray app runs in the user session and provides:
+- **Log viewer** — shows live service logs (right-click → Show Log)
+- **API key display** — shows the auto-generated API key (right-click → Show API Key)
+- **Service restart** — restarts the Windows Service (requires UAC)
+- **Update notifications** — checks GitHub for new releases and can update in-place
+- **IPC bridge** — the service delegates CLI tool execution to the tray app so tools like MultiMonitorTool run in the user session (required for monitor detection)
+
+The tray app is required for monitor and audio features to work correctly when the service runs as a Windows Service.
 
 ## API Endpoints
 
@@ -122,10 +160,10 @@ Full example:
 
 ## NirSoft Tools
 
-Two free NirSoft tools are required. Place them in the `ToolsPath` directory (default: `./tools`).
+Two free NirSoft tools are required for audio and monitor features. The installer downloads them automatically. For portable installs, place them in the `ToolsPath` directory (default: `./tools`).
 
-- **[SoundVolumeView](https://www.nirsoft.net/utils/sound_volume_view.html)** — used for audio device listing, switching, and volume control
-- **[MultiMonitorTool](https://www.nirsoft.net/utils/multi_monitor_tool.html)** — used for monitor listing, enable/disable, and profile management
+- **[SoundVolumeView](https://www.nirsoft.net/utils/sound_volume_view.html)** — audio device listing, switching, and volume control
+- **[MultiMonitorTool](https://www.nirsoft.net/utils/multi_monitor_tool.html)** — monitor listing, enable/disable, and profile management
 
 ## Building
 
