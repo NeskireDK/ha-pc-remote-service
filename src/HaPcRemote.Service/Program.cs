@@ -1,6 +1,7 @@
 using HaPcRemote.Service;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Endpoints;
+using HaPcRemote.Shared.Configuration;
 using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
