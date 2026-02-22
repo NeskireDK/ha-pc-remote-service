@@ -53,8 +53,17 @@ public class MonitorService
 
     public async Task<List<MonitorInfo>> GetMonitorsAsync()
     {
-        var output = await _cliRunner.RunAsync(GetExePath(), ["/scomma", ""]);
-        return ParseCsvOutput(output);
+        var tempFile = Path.Combine(Path.GetTempPath(), $"mmt_{Guid.NewGuid():N}.csv");
+        try
+        {
+            await _cliRunner.RunAsync(GetExePath(), ["/scomma", tempFile]);
+            var output = await File.ReadAllTextAsync(tempFile);
+            return ParseCsvOutput(output);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { /* best-effort cleanup */ }
+        }
     }
 
     public async Task EnableMonitorAsync(string id)

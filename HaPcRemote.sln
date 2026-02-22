@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -14,6 +14,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HaPcRemote.Service.Tests", "tests\HaPcRemote.Service.Tests\HaPcRemote.Service.Tests.csproj", "{355646D7-EB4C-4D94-BF33-FC0197168016}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HaPcRemote.IntegrationTests", "tests\HaPcRemote.IntegrationTests\HaPcRemote.IntegrationTests.csproj", "{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -73,6 +75,18 @@ Global
 		{355646D7-EB4C-4D94-BF33-FC0197168016}.Release|x64.Build.0 = Release|Any CPU
 		{355646D7-EB4C-4D94-BF33-FC0197168016}.Release|x86.ActiveCfg = Release|Any CPU
 		{355646D7-EB4C-4D94-BF33-FC0197168016}.Release|x86.Build.0 = Release|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Debug|x64.Build.0 = Debug|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Debug|x86.Build.0 = Debug|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Release|x64.ActiveCfg = Release|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Release|x64.Build.0 = Release|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Release|x86.ActiveCfg = Release|Any CPU
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,5 +96,6 @@ Global
 		{B1C2D3E4-F5A6-47B8-9C0D-1E2F3A4B5C6D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{C2D3E4F5-A6B7-48C9-0D1E-2F3A4B5C6D7E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{355646D7-EB4C-4D94-BF33-FC0197168016} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{475DCCBA-E1DB-439C-971E-3EFE922E6AD7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
