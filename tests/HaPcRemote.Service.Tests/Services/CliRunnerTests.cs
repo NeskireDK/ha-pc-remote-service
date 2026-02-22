@@ -28,4 +28,62 @@ public class CliRunnerTests
 
         ex.Message.ShouldContain(fakePath);
     }
+
+    // ── SplitCsvLine tests ────────────────────────────────────────────
+
+    [Fact]
+    public void SplitCsvLine_SimpleFields_SplitsCorrectly()
+    {
+        var result = CliRunner.SplitCsvLine("a,b,c");
+
+        result.ShouldBe(new[] { "a", "b", "c" });
+    }
+
+    [Fact]
+    public void SplitCsvLine_QuotedField_RemovesQuotes()
+    {
+        var result = CliRunner.SplitCsvLine("\"hello world\",b");
+
+        result.ShouldBe(new[] { "hello world", "b" });
+    }
+
+    [Fact]
+    public void SplitCsvLine_QuotedFieldWithComma_PreservesComma()
+    {
+        var result = CliRunner.SplitCsvLine("\"a,b\",c");
+
+        result.ShouldBe(new[] { "a,b", "c" });
+    }
+
+    [Fact]
+    public void SplitCsvLine_EscapedQuote_PreservesQuote()
+    {
+        var result = CliRunner.SplitCsvLine("\"he said \"\"hi\"\"\",b");
+
+        result.ShouldBe(new[] { "he said \"hi\"", "b" });
+    }
+
+    [Fact]
+    public void SplitCsvLine_EmptyFields_ReturnsEmptyStrings()
+    {
+        var result = CliRunner.SplitCsvLine("a,,c,");
+
+        result.ShouldBe(new[] { "a", "", "c", "" });
+    }
+
+    [Fact]
+    public void SplitCsvLine_SingleField_ReturnsSingleElement()
+    {
+        var result = CliRunner.SplitCsvLine("hello");
+
+        result.ShouldBe(new[] { "hello" });
+    }
+
+    [Fact]
+    public void SplitCsvLine_EmptyString_ReturnsSingleEmptyElement()
+    {
+        var result = CliRunner.SplitCsvLine("");
+
+        result.ShouldBe(new[] { "" });
+    }
 }

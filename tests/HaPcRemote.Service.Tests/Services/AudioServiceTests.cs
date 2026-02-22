@@ -1,4 +1,7 @@
+using FakeItEasy;
+using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace HaPcRemote.Service.Tests.Services;
@@ -15,6 +18,20 @@ public class AudioServiceTests
         Headphones,Render,,75.5%
         Microphone,Capture,Capture,80.0%
         """;
+
+    private readonly ICliRunner _cliRunner = A.Fake<ICliRunner>();
+
+    private AudioService CreateService(string toolsPath = "./tools")
+    {
+        var monitor = A.Fake<IOptionsMonitor<PcRemoteOptions>>();
+        A.CallTo(() => monitor.CurrentValue).Returns(new PcRemoteOptions
+        {
+            ToolsPath = toolsPath
+        });
+        return new AudioService(monitor, _cliRunner);
+    }
+
+    // ── CSV parsing tests (static) ────────────────────────────────────
 
     [Fact]
     public void ParseCsvOutput_FiltersToRenderDevicesOnly()
@@ -122,5 +139,128 @@ public class AudioServiceTests
         var devices = AudioService.ParseCsvOutput(csv);
 
         devices.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void ParseCsvOutput_DuplicateDeviceNames_DeduplicatedToFirst()
+    {
+        var csv = """
+            Speakers,Render,Render,50.0%
+            Speakers,Render,,30.0%
+            Speakers,Render,,20.0%
+            Headphones,Render,,75.0%
+            """;
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.Count.ShouldBe(2);
+        devices[0].Name.ShouldBe("Speakers");
+        devices[0].Volume.ShouldBe(50); // keeps first entry
+        devices[1].Name.ShouldBe("Headphones");
+    }
+
+    // ── Async method tests (mocked ICliRunner) ────────────────────────
+
+    [Fact]
+    public async Task GetDevicesAsync_CallsCliRunnerWithCorrectArgs()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        var devices = await service.GetDevicesAsync();
+
+        devices.Count.ShouldBe(2);
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>.That.EndsWith("SoundVolumeView.exe"),
+            A<IEnumerable<string>>.That.Contains("/scomma"),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task GetCurrentDeviceAsync_ReturnsDefaultDevice()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        var device = await service.GetCurrentDeviceAsync();
+
+        device.ShouldNotBeNull();
+        device.Name.ShouldBe("Speakers");
+        device.IsDefault.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task GetCurrentDeviceAsync_NoDefault_ReturnsNull()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns("Speakers,Render,,50.0%");
+        var service = CreateService();
+
+        var device = await service.GetCurrentDeviceAsync();
+
+        device.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SetDefaultDeviceAsync_CallsCliRunnerWithDeviceName()
+    {
+        var service = CreateService();
+
+        await service.SetDefaultDeviceAsync("Headphones");
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>.That.EndsWith("SoundVolumeView.exe"),
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetDefault", "Headphones", "1" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task SetVolumeAsync_SetsVolumeAndUnmutes()
+    {
+        // First call returns devices (for GetCurrentDeviceAsync), subsequent calls are set/unmute
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await service.SetVolumeAsync(75);
+
+        // Should call: GetDevicesAsync, SetVolume, Unmute = 3 calls total
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .MustHaveHappened(3, Times.Exactly);
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetVolume", "Speakers", "75" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/Unmute", "Speakers" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task SetVolumeAsync_NoDefaultDevice_ThrowsInvalidOperationException()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns("Speakers,Render,,50.0%"); // No default device
+        var service = CreateService();
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => service.SetVolumeAsync(50));
+    }
+
+    [Fact]
+    public async Task GetDevicesAsync_UsesToolsPathFromOptions()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns("");
+        var service = CreateService("C:\\custom\\tools");
+
+        await service.GetDevicesAsync();
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>.That.StartsWith("C:\\custom\\tools"),
+            A<IEnumerable<string>>._,
+            A<int>._)).MustHaveHappenedOnceExactly();
     }
 }

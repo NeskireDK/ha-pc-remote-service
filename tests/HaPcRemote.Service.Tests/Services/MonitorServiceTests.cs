@@ -10,6 +10,7 @@ namespace HaPcRemote.Service.Tests.Services;
 public class MonitorServiceTests : IDisposable
 {
     private readonly string _tempDir;
+    private readonly ICliRunner _cliRunner = A.Fake<ICliRunner>();
 
     // Realistic MultiMonitorTool /scomma output (14+ columns per line):
     // 0=Name, 1=Short Monitor ID, 2=Monitor ID, 3=Monitor Key, 4=Monitor String,
@@ -53,9 +54,9 @@ public class MonitorServiceTests : IDisposable
     }
 
     private MonitorService CreateService(string? profilesPath = null) =>
-        new MonitorService(CreateOptions(profilesPath), A.Fake<ICliRunner>());
+        new MonitorService(CreateOptions(profilesPath), _cliRunner);
 
-    // ── Profile tests (existing) ─────────────────────────────────────
+    // ── Profile tests ─────────────────────────────────────────────────
 
     [Fact]
     public async Task GetProfilesAsync_WithCfgFiles_ReturnsProfileNames()
@@ -116,7 +117,21 @@ public class MonitorServiceTests : IDisposable
             () => service.ApplyProfileAsync(profileName));
     }
 
-    // ── CSV parsing tests ────────────────────────────────────────────
+    [Fact]
+    public async Task ApplyProfileAsync_ValidProfile_CallsCliRunner()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "gaming.cfg"), "");
+        var service = CreateService();
+
+        await service.ApplyProfileAsync("gaming");
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>.That.EndsWith("MultiMonitorTool.exe"),
+            A<IEnumerable<string>>.That.Contains("/LoadConfig"),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    // ── CSV parsing tests ─────────────────────────────────────────────
 
     [Fact]
     public void ParseCsvOutput_ParsesAllConnectedMonitors()
@@ -263,7 +278,7 @@ public class MonitorServiceTests : IDisposable
         monitors[0].MonitorName.ShouldBe("LG ULTRA, GEAR");
     }
 
-    // ── FindMonitor / ID matching tests ──────────────────────────────
+    // ── FindMonitor / ID matching tests ───────────────────────────────
 
     [Fact]
     public void FindMonitor_MatchByDisplayName_ReturnsMonitor()
@@ -331,5 +346,115 @@ public class MonitorServiceTests : IDisposable
 
         Should.Throw<KeyNotFoundException>(
             () => MonitorService.FindMonitor(monitors, ""));
+    }
+
+    // ── Async method tests (mocked ICliRunner) ────────────────────────
+
+    [Fact]
+    public async Task GetMonitorsAsync_CallsCliRunnerAndParsesOutput()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        var monitors = await service.GetMonitorsAsync();
+
+        monitors.Count.ShouldBe(3);
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>.That.EndsWith("MultiMonitorTool.exe"),
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/scomma", "" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task EnableMonitorAsync_ResolvesAndCallsCliRunner()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await service.EnableMonitorAsync("DEL4321");
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/enable", @"\\.\DISPLAY2" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task DisableMonitorAsync_ResolvesAndCallsCliRunner()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await service.DisableMonitorAsync("GSM59A4");
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/disable", @"\\.\DISPLAY1" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task SetPrimaryAsync_ResolvesAndCallsCliRunner()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await service.SetPrimaryAsync("XYZ789");
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetPrimary", @"\\.\DISPLAY2" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task EnableMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await Should.ThrowAsync<KeyNotFoundException>(
+            () => service.EnableMonitorAsync("UNKNOWN"));
+    }
+
+    [Fact]
+    public async Task SoloMonitorAsync_DisablesOthersAndEnablesTarget()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await service.SoloMonitorAsync("DEL4321");
+
+        // Should disable DISPLAY1 and DISPLAY3 (both active, not the target)
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/disable", @"\\.\DISPLAY1" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/disable", @"\\.\DISPLAY3" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+        // Should set target as primary
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetPrimary", @"\\.\DISPLAY2" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task SoloMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await Should.ThrowAsync<KeyNotFoundException>(
+            () => service.SoloMonitorAsync("UNKNOWN"));
     }
 }

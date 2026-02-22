@@ -138,3 +138,6 @@ app.MapAudioEndpoints();
 app.MapMonitorEndpoints();
 
 app.Run();
+
+// Make the implicit Program class accessible for WebApplicationFactory in tests
+public partial class Program { }

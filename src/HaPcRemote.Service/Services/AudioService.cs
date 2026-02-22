@@ -47,6 +47,7 @@ public class AudioService
     internal static List<AudioDevice> ParseCsvOutput(string csvOutput)
     {
         var devices = new List<AudioDevice>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var line in csvOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var trimmed = line.TrimEnd('\r');
@@ -61,6 +62,9 @@ public class AudioService
             // [0] Name, [1] Direction, [2] Default (Console), [3] Volume Percent
 
             if (!string.Equals(columns[1], "Render", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!seen.Add(columns[0]))
                 continue;
 
             devices.Add(new AudioDevice
