@@ -33,6 +33,9 @@ public static class ConfigPaths
     public static string GetWritableConfigPath()
         => Path.Combine(GetWritableConfigDir(), "appsettings.json");
 
+    public static string GetTraySettingsPath()
+        => Path.Combine(GetWritableConfigDir(), "tray-settings.json");
+
     public static string GetLogFilePath()
         => Path.Combine(GetWritableConfigDir(), "service.log");
 
