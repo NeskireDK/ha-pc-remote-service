@@ -7,7 +7,8 @@ namespace HaPcRemote.Shared.Ipc;
 public sealed class IpcRequest
 {
     /// <summary>
-    /// Message type: "runCli", "launchProcess", or "ping".
+    /// Message type: "runCli", "launchProcess", "ping",
+    /// "steamGetPath", "steamGetRunningId", "steamLaunchUrl", or "steamKillDir".
     /// </summary>
     public required string Type { get; init; }
 
@@ -17,7 +18,10 @@ public sealed class IpcRequest
     /// <summary>CLI arguments array (runCli).</summary>
     public string[]? Arguments { get; init; }
 
-    /// <summary>Process arguments string (launchProcess).</summary>
+    /// <summary>
+    /// Process arguments string (launchProcess).
+    /// Also used as the steam:// URL (steamLaunchUrl) or directory path (steamKillDir).
+    /// </summary>
     public string? ProcessArguments { get; init; }
 
     /// <summary>Timeout in milliseconds (runCli). Default 10000.</summary>

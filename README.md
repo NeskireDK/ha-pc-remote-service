@@ -33,7 +33,7 @@ To uninstall, use **Add or Remove Programs**. The uninstaller removes the servic
    sc start HaPcRemoteService
    netsh advfirewall firewall add rule name="HA PC Remote Service" dir=in action=allow protocol=TCP localport=5000
    ```
-6. Optionally start the tray app (`HaPcRemote.Tray.exe`) and add it to shell startup
+6. Start the tray app (`HaPcRemote.Tray.exe`) and add it to shell startup — required for audio, monitor, and Steam features
 
 To uninstall:
 ```powershell
@@ -49,9 +49,9 @@ The tray app runs in the user session and provides:
 - **API key display** — shows the auto-generated API key (right-click → Show API Key)
 - **Service restart** — restarts the Windows Service (requires UAC)
 - **Update notifications** — checks GitHub for new releases and can update in-place
-- **IPC bridge** — the service delegates CLI tool execution to the tray app so tools like MultiMonitorTool run in the user session (required for monitor detection)
+- **IPC bridge** — the service delegates CLI tool execution and Steam operations to the tray app so tools run in the user session (required for monitor, audio, and Steam features)
 
-The tray app is required for monitor and audio features to work correctly when the service runs as a Windows Service.
+The tray app is required for monitor, audio, and Steam features to work correctly. Portable installs must add `HaPcRemote.Tray.exe` to shell startup (e.g. the Windows Startup folder).
 
 ## API Endpoints
 

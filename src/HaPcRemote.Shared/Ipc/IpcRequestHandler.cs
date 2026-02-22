@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 
 namespace HaPcRemote.Shared.Ipc;
 
@@ -23,6 +24,10 @@ public sealed class IpcRequestHandler
             "ping" => IpcResponse.Ok(),
             "runCli" => await HandleRunCliAsync(request, ct),
             "launchProcess" => HandleLaunchProcess(request),
+            "steamGetPath" => HandleSteamGetPath(),
+            "steamGetRunningId" => HandleSteamGetRunningId(),
+            "steamLaunchUrl" => HandleSteamLaunchUrl(request),
+            "steamKillDir" => HandleSteamKillDir(request),
             _ => IpcResponse.Fail($"Unknown request type: {request.Type}")
         };
     }
@@ -96,6 +101,82 @@ public sealed class IpcRequestHandler
             if (!process.HasExited)
                 process.Kill(entireProcessTree: true);
         }
+    }
+
+    private IpcResponse HandleSteamGetPath()
+    {
+        if (!OperatingSystem.IsWindows())
+            return IpcResponse.Fail("Steam commands require Windows");
+
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Valve\Steam");
+            return IpcResponse.Ok(key?.GetValue("SteamPath") as string);
+        }
+        catch (Exception ex)
+        {
+            return IpcResponse.Fail($"Failed to read Steam path: {ex.Message}");
+        }
+    }
+
+    private IpcResponse HandleSteamGetRunningId()
+    {
+        if (!OperatingSystem.IsWindows())
+            return IpcResponse.Fail("Steam commands require Windows");
+
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Valve\Steam");
+            var appId = key?.GetValue("RunningAppID") is int id ? id : 0;
+            return IpcResponse.Ok(appId.ToString());
+        }
+        catch (Exception ex)
+        {
+            return IpcResponse.Fail($"Failed to read Steam running app ID: {ex.Message}");
+        }
+    }
+
+    private IpcResponse HandleSteamLaunchUrl(IpcRequest request)
+    {
+        if (string.IsNullOrEmpty(request.ProcessArguments))
+            return IpcResponse.Fail("ProcessArguments (URL) is required for steamLaunchUrl");
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(request.ProcessArguments) { UseShellExecute = true });
+            return IpcResponse.Ok();
+        }
+        catch (Exception ex)
+        {
+            return IpcResponse.Fail($"Failed to launch Steam URL: {ex.Message}");
+        }
+    }
+
+    private IpcResponse HandleSteamKillDir(IpcRequest request)
+    {
+        if (string.IsNullOrEmpty(request.ProcessArguments))
+            return IpcResponse.Fail("ProcessArguments (directory) is required for steamKillDir");
+
+        var directory = request.ProcessArguments;
+        foreach (var proc in Process.GetProcesses())
+        {
+            try
+            {
+                var path = proc.MainModule?.FileName;
+                if (path != null && path.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
+                    proc.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Access denied for system processes, or process already exited
+            }
+            finally
+            {
+                proc.Dispose();
+            }
+        }
+
+        return IpcResponse.Ok();
     }
 
     private IpcResponse HandleLaunchProcess(IpcRequest request)
