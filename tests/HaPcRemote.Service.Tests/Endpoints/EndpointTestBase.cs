@@ -15,6 +15,7 @@ public class EndpointTestBase : IDisposable
     protected readonly ICliRunner CliRunner = A.Fake<ICliRunner>();
     protected readonly IAppLauncher AppLauncher = A.Fake<IAppLauncher>();
     protected readonly IPowerService PowerService = A.Fake<IPowerService>();
+    protected readonly ISteamPlatform SteamPlatform = A.Fake<ISteamPlatform>();
 
     private WebApplicationFactory<Program>? _factory;
 
@@ -34,6 +35,7 @@ public class EndpointTestBase : IDisposable
                     services.Replace(ServiceDescriptor.Singleton(CliRunner));
                     services.Replace(ServiceDescriptor.Singleton(AppLauncher));
                     services.Replace(ServiceDescriptor.Singleton(PowerService));
+                    services.Replace(ServiceDescriptor.Singleton(SteamPlatform));
 
                     // Override options
                     services.Replace(ServiceDescriptor.Singleton<IOptionsMonitor<PcRemoteOptions>>(
