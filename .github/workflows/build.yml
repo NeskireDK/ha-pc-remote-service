@@ -24,10 +24,17 @@ jobs:
         run: dotnet tool install -g dotnet-reportgenerator-globaltool
 
       - name: Generate coverage report
-        run: reportgenerator -reports:"coverage/**/coverage.cobertura.xml" -targetdir:coverage/report "-reporttypes:HtmlSummary;TextSummary;Cobertura"
+        run: reportgenerator -reports:"coverage/**/coverage.cobertura.xml" -targetdir:coverage/report "-reporttypes:HtmlSummary;TextSummary;Cobertura;MarkdownSummaryGithub"
 
-      - name: Coverage summary
-        run: cat coverage/report/Summary.txt
+      - name: Write coverage to job summary
+        run: cat coverage/report/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: coverage/report/SummaryGithub.md
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
