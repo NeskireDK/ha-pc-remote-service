@@ -48,6 +48,8 @@ Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser
 [Code]
 const
   SERVICE_QUERY_CONFIG  = $0001;
+  DOTNET_DESKTOP_URL    = 'https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe';
+  DOTNET_REG_KEY        = 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
   SERVICE_ALL_ACCESS    = $F01FF;
   SC_MANAGER_ALL_ACCESS = $F003F;
   SERVICE_CONTROL_STOP  = $1;
@@ -174,11 +176,50 @@ begin
   Exec(ExpandConstant(FileName), Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
+function IsDotNet10DesktopInstalled: Boolean;
+var
+  Keys: TArrayOfString;
+  I: Integer;
+begin
+  Result := False;
+  if RegGetSubKeyNames(HKLM, DOTNET_REG_KEY, Keys) then
+    for I := 0 to High(Keys) do
+      if Copy(Keys[I], 1, 3) = '10.' then begin
+        Result := True;
+        Break;
+      end;
+end;
+
+function InstallDotNet10Desktop: Boolean;
+var
+  TmpExe: String;
+  ResultCode: Integer;
+begin
+  TmpExe := ExpandConstant('{tmp}\dotnet-runtime-win-x64.exe');
+  Result := RunPowerShell(
+    '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; ' +
+    'Invoke-WebRequest -UseBasicParsing -Uri ''' + DOTNET_DESKTOP_URL + ''' -OutFile ''' + TmpExe + '''');
+  if Result then
+    Result := Exec(TmpExe, '/install /quiet /norestart', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+      and (ResultCode = 0);
+end;
+
 // --- Install lifecycle ---
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
+
+  // Install .NET 10 Windows Desktop Runtime if missing (required by tray app)
+  if not IsDotNet10DesktopInstalled then begin
+    WizardForm.StatusLabel.Caption := 'Installing .NET 10 Desktop Runtime...';
+    if not InstallDotNet10Desktop then begin
+      Result := '.NET 10 Desktop Runtime is required but could not be installed. ' +
+        'Please install it manually from https://dotnet.microsoft.com/download/dotnet/10.0 and retry.';
+      Exit;
+    end;
+  end;
+
   // Stop tray app before upgrade
   KillTrayApp;
   if IsServiceInstalled then begin
