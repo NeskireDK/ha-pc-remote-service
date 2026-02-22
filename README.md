@@ -184,7 +184,18 @@ dotnet test HaPcRemote.sln
 dotnet publish src/HaPcRemote.Service -c Release -r win-x64 /p:PublishAot=true
 ```
 
-> **TODO:** Tray app installer is ~46 MB because `--self-contained` bundles the full .NET runtime. WinForms does not support trimming (`NETSDK1175`), so size cannot be reduced that way. Options: (1) framework-dependent publish + Inno Setup prerequisite to install .NET if missing; (2) accept current size.
+## Known Issues
+
+- **Steam: game launch silently no-ops if tray isn't running** — `IpcSteamPlatform.Send` returns `null` without error when the tray is not connected, and the endpoint still returns 200. No game launches, no error surfaces in HA. Fix: return 503 when IPC is unavailable.
+- **Steam: running game not highlighted on cold-start** — if the currently running game falls outside the top-20 recently-played list, `source` has a name that is absent from `source_list` and no entry is highlighted. Fix: always include the running game in the list regardless of rank.
+- **Monitor profiles shows empty list** — the profiles directory (`ProfilesPath`, default `./monitor-profiles`) must exist next to the service exe before the service starts. If it is missing, the endpoint returns an empty list. Create the directory and add `.cfg` files exported from MultiMonitorTool.
+
+## Roadmap
+
+- [ ] Debug mode toggle in log viewer — button next to Clear; switches service + tray logging from `Information` → `Debug` dynamically via IPC
+- [ ] Reduce installer size (~46 MB) — switch tray to framework-dependent publish and add .NET prerequisite check to Inno Setup
+- [ ] Linux support (systemd)
+- [ ] Submit brand icons to [home-assistant/brands](https://github.com/home-assistant/brands)
 
 ## License
 
