@@ -34,7 +34,13 @@ public sealed class IpcRequestHandler
         };
 
         if (response.Success)
-            _logger.LogDebug("IPC → {Type} ok stdout={Stdout}", request.Type, response.Stdout);
+        {
+            // Truncate stdout — runCli can return hundreds of KB from tools like SoundVolumeView
+            var preview = response.Stdout is { Length: > 120 }
+                ? response.Stdout[..120] + "…"
+                : response.Stdout;
+            _logger.LogDebug("IPC → {Type} ok stdout={Stdout}", request.Type, preview);
+        }
         else
             _logger.LogDebug("IPC → {Type} FAIL {Error}", request.Type, response.Error);
 

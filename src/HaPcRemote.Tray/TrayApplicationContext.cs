@@ -289,7 +289,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _serviceLogTailer.Dispose();
             _updateTimer.Dispose();
             _logViewerForm?.Dispose();
-            _debugMenuItem?.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             _loggerFactory.Dispose();
