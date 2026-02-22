@@ -205,6 +205,8 @@ public class AudioServiceTests
     [Fact]
     public async Task SetDefaultDeviceAsync_CallsCliRunnerWithDeviceName()
     {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
         var service = CreateService();
 
         await service.SetDefaultDeviceAsync("Headphones");
@@ -213,6 +215,17 @@ public class AudioServiceTests
             A<string>.That.EndsWith("SoundVolumeView.exe"),
             A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetDefault", "Headphones", "1" }),
             A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task SetDefaultDeviceAsync_InvalidDevice_ThrowsKeyNotFoundException()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await Should.ThrowAsync<KeyNotFoundException>(
+            () => service.SetDefaultDeviceAsync("NonExistentDevice"));
     }
 
     [Fact]

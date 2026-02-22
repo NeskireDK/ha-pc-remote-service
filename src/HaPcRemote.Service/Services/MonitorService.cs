@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Shared.Configuration;
@@ -68,12 +69,12 @@ public class MonitorService
 
             var dir = ConfigPaths.GetWritableConfigDir();
             Directory.CreateDirectory(dir);
-            var tempFile = Path.Combine(dir, $"mmt_{Guid.NewGuid():N}.csv");
+            var tempFile = Path.Combine(dir, $"mmt_{Guid.NewGuid():N}.xml");
             try
             {
-                await _cliRunner.RunAsync(GetExePath(), ["/scomma", tempFile]);
+                await _cliRunner.RunAsync(GetExePath(), ["/sxml", tempFile]);
                 var output = await File.ReadAllTextAsync(tempFile);
-                _cachedMonitors = ParseCsvOutput(output);
+                _cachedMonitors = ParseXmlOutput(output);
                 _cacheTime = DateTime.UtcNow;
                 return _cachedMonitors;
             }
@@ -130,67 +131,47 @@ public class MonitorService
         await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", target.Name]);
     }
 
-    // ── CSV parsing ──────────────────────────────────────────────────
+    // ── XML parsing ──────────────────────────────────────────────────
 
-    internal static List<MonitorInfo> ParseCsvOutput(string csvOutput)
+    internal static List<MonitorInfo> ParseXmlOutput(string xmlContent)
     {
         var monitors = new List<MonitorInfo>();
 
-        foreach (var line in csvOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        if (string.IsNullOrWhiteSpace(xmlContent))
+            return monitors;
+
+        var doc = XDocument.Parse(xmlContent);
+
+        foreach (var item in doc.Descendants("item"))
         {
-            var trimmed = line.TrimEnd('\r');
-            if (string.IsNullOrWhiteSpace(trimmed))
-                continue;
-
-            var columns = CliRunner.SplitCsvLine(trimmed);
-            if (columns.Count < 14)
-                continue;
-
-            // Column mapping (0-indexed):
-            // 0=Name, 1=Short Monitor ID, 2=Monitor ID, 3=Monitor Key,
-            // 4=Monitor String, 5=Monitor Name, 6=Serial Number,
-            // 7-8=scale info, 9=Orientation, 10=Width, 11=Height,
-            // 12=BitsPerPixel, 13=DisplayFrequency
-
-            // Filter out disconnected monitors — Name will be empty or state indicates disconnected
-            var name = columns[0];
+            var name = item.Element("name")?.Value;
             if (string.IsNullOrWhiteSpace(name))
                 continue;
 
-            // Check for "Disconnected" in the Monitor Key or other status indicators
-            if (columns[3].Contains("Disconnected", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(item.Element("disconnected")?.Value?.Trim(), "Yes", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var shortMonitorId = columns[1];
-            var monitorName = columns[5];
-            var serialNumber = columns[6];
+            ParseResolution(item.Element("resolution")?.Value, out var width, out var height);
+            int.TryParse(item.Element("frequency")?.Value, out var displayFrequency);
 
-            int.TryParse(columns[10], out var width);
-            int.TryParse(columns[11], out var height);
-            int.TryParse(columns[13], out var displayFrequency);
+            var isActive = string.Equals(
+                item.Element("active")?.Value?.Trim(),
+                "Yes",
+                StringComparison.OrdinalIgnoreCase);
 
-            // Active = has a valid width and height (connected + enabled)
-            var isActive = width > 0 && height > 0;
+            var isPrimary = string.Equals(
+                item.Element("primary")?.Value?.Trim(),
+                "Yes",
+                StringComparison.OrdinalIgnoreCase);
 
-            // Primary detection: check if any column indicates primary status.
-            // MultiMonitorTool typically has orientation at col 9.
-            // We check columns beyond 13 if available for additional flags.
-            var isPrimary = false;
-            for (var i = 14; i < columns.Count; i++)
-            {
-                if (string.Equals(columns[i].Trim(), "Yes", StringComparison.OrdinalIgnoreCase))
-                {
-                    isPrimary = true;
-                    break;
-                }
-            }
+            var serialNumber = item.Element("monitor_serial_number")?.Value;
 
             monitors.Add(new MonitorInfo
             {
                 Name = name,
-                MonitorId = shortMonitorId,
+                MonitorId = item.Element("short_monitor_id")?.Value ?? "",
                 SerialNumber = string.IsNullOrWhiteSpace(serialNumber) ? null : serialNumber,
-                MonitorName = monitorName,
+                MonitorName = item.Element("monitor_name")?.Value ?? "",
                 Width = width,
                 Height = height,
                 DisplayFrequency = displayFrequency,
@@ -200,6 +181,22 @@ public class MonitorService
         }
 
         return monitors;
+    }
+
+    internal static void ParseResolution(string? resolution, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+        if (string.IsNullOrWhiteSpace(resolution))
+            return;
+
+        // Format: "1920 X 1200"
+        var parts = resolution.Split('X', StringSplitOptions.TrimEntries);
+        if (parts.Length == 2)
+        {
+            int.TryParse(parts[0], out width);
+            int.TryParse(parts[1], out height);
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

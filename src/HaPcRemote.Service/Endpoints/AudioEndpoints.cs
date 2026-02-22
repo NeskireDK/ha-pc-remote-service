@@ -66,6 +66,13 @@ public static class AudioEndpoints
                     ApiResponse.Ok($"Default device set to '{deviceName}'"),
                     AppJsonContext.Default.ApiResponse);
             }
+            catch (KeyNotFoundException)
+            {
+                return Results.Json(
+                    ApiResponse.Fail($"Audio device '{deviceName}' not found"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to set default audio device '{DeviceName}'", deviceName);
