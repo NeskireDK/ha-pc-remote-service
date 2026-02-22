@@ -2,6 +2,7 @@ using FakeItEasy;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Shouldly;
 
@@ -157,7 +158,7 @@ public class MonitorServiceTests : IDisposable
     }
 
     private MonitorService CreateService(string? profilesPath = null) =>
-        new MonitorService(CreateOptions(profilesPath), _cliRunner);
+        new MonitorService(CreateOptions(profilesPath), _cliRunner, A.Fake<ILogger<MonitorService>>());
 
     // ── Profile tests ─────────────────────────────────────────────────
 

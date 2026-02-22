@@ -2,6 +2,7 @@ using System.Xml.Linq;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Shared.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
@@ -12,15 +13,17 @@ public class MonitorService
 
     private readonly IOptionsMonitor<PcRemoteOptions> _options;
     private readonly ICliRunner _cliRunner;
+    private readonly ILogger<MonitorService> _logger;
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
 
     private List<MonitorInfo>? _cachedMonitors;
     private DateTime _cacheTime;
 
-    public MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner)
+    public MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner, ILogger<MonitorService> logger)
     {
         _options = options;
         _cliRunner = cliRunner;
+        _logger = logger;
     }
 
     // ── Profile methods ──────────────────────────────────────────────
@@ -30,7 +33,12 @@ public class MonitorService
         var profilesPath = _options.CurrentValue.ProfilesPath;
 
         if (!Directory.Exists(profilesPath))
+        {
+            _logger.LogWarning("Monitor profiles directory not found: {Path}", profilesPath);
             return Task.FromResult(new List<MonitorProfile>());
+        }
+
+        _logger.LogDebug("Loading monitor profiles from: {Path}", profilesPath);
 
         var profiles = Directory.GetFiles(profilesPath, "*.cfg")
             .Select(f => new MonitorProfile
