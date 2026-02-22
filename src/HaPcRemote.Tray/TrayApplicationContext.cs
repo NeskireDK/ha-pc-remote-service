@@ -41,7 +41,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             builder.AddConsole();
             builder.AddProvider(_logProvider);
-            builder.SetMinimumLevel(LogLevel.Trace);
             builder.AddFilter((_, level) => level >= _minLogLevel);
         });
         _logger = _loggerFactory.CreateLogger<TrayApplicationContext>();
