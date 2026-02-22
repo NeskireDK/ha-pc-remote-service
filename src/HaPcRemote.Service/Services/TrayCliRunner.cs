@@ -6,16 +6,9 @@ namespace HaPcRemote.Service.Services;
 /// ICliRunner that delegates execution to the tray app via named pipe IPC.
 /// Falls back to direct execution if the tray is not running (dev mode).
 /// </summary>
-public sealed class TrayCliRunner : ICliRunner
+public sealed class TrayCliRunner(ILogger<TrayCliRunner> logger) : ICliRunner
 {
-    private readonly ICliRunner _fallback;
-    private readonly ILogger<TrayCliRunner> _logger;
-
-    public TrayCliRunner(ILogger<TrayCliRunner> logger)
-    {
-        _fallback = new CliRunner();
-        _logger = logger;
-    }
+    private readonly CliRunner _fallback = new();
 
     public async Task<string> RunAsync(string exePath, IEnumerable<string> arguments, int timeoutMs = 10000)
     {
@@ -32,7 +25,7 @@ public sealed class TrayCliRunner : ICliRunner
 
         if (response is null)
         {
-            _logger.LogWarning("Tray not connected, falling back to direct execution");
+            logger.LogWarning("Tray not connected, falling back to direct execution");
             return await _fallback.RunAsync(exePath, args, timeoutMs);
         }
 

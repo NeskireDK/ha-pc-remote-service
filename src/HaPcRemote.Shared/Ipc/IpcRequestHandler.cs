@@ -8,18 +8,12 @@ namespace HaPcRemote.Shared.Ipc;
 /// Handles IPC requests by dispatching to the appropriate handler method.
 /// Extracted from TrayApplicationContext so process execution logic is testable.
 /// </summary>
-public sealed class IpcRequestHandler
+public sealed class IpcRequestHandler(ILogger logger)
 {
-    private readonly ILogger _logger;
-
-    public IpcRequestHandler(ILogger logger)
-    {
-        _logger = logger;
-    }
 
     public async Task<IpcResponse> HandleAsync(IpcRequest request, CancellationToken ct)
     {
-        _logger.LogDebug("IPC ← {Type}", request.Type);
+        logger.LogDebug("IPC ← {Type}", request.Type);
 
         var response = request.Type switch
         {
@@ -39,10 +33,10 @@ public sealed class IpcRequestHandler
             var preview = response.Stdout is { Length: > 120 }
                 ? response.Stdout[..120] + "…"
                 : response.Stdout;
-            _logger.LogDebug("IPC → {Type} ok stdout={Stdout}", request.Type, preview);
+            logger.LogDebug("IPC → {Type} ok stdout={Stdout}", request.Type, preview);
         }
         else
-            _logger.LogDebug("IPC → {Type} FAIL {Error}", request.Type, response.Error);
+            logger.LogDebug("IPC → {Type} FAIL {Error}", request.Type, response.Error);
 
         return response;
     }

@@ -5,20 +5,11 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Middleware;
 
-public sealed class ApiKeyMiddleware
+public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddleware> logger)
 {
     private const string ApiKeyHeaderName = "X-Api-Key";
 
     private static readonly string[] ExemptPaths = ["/api/health"];
-
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ApiKeyMiddleware> _logger;
-
-    public ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddleware> logger)
-    {
-        _next = next;
-        _logger = logger;
-    }
 
     public async Task InvokeAsync(HttpContext context, IOptionsMonitor<PcRemoteOptions> options)
     {
@@ -26,7 +17,7 @@ public sealed class ApiKeyMiddleware
 
         if (!config.Auth.Enabled)
         {
-            await _next(context);
+            await next(context);
             return;
         }
 
@@ -34,14 +25,14 @@ public sealed class ApiKeyMiddleware
 
         if (ExemptPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)))
         {
-            await _next(context);
+            await next(context);
             return;
         }
 
         if (!context.Request.Headers.TryGetValue(ApiKeyHeaderName, out var providedKey) ||
             string.IsNullOrEmpty(providedKey))
         {
-            _logger.LogWarning("Request to {Path} missing API key", path);
+            logger.LogWarning("Request to {Path} missing API key", path);
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsJsonAsync(
                 ApiResponse.Fail("Missing API key"), AppJsonContext.Default.ApiResponse);
@@ -52,13 +43,13 @@ public sealed class ApiKeyMiddleware
                 System.Text.Encoding.UTF8.GetBytes(providedKey.ToString()),
                 System.Text.Encoding.UTF8.GetBytes(config.Auth.ApiKey)))
         {
-            _logger.LogWarning("Request to {Path} with invalid API key", path);
+            logger.LogWarning("Request to {Path} with invalid API key", path);
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsJsonAsync(
                 ApiResponse.Fail("Invalid API key"), AppJsonContext.Default.ApiResponse);
             return;
         }
 
-        await _next(context);
+        await next(context);
     }
 }

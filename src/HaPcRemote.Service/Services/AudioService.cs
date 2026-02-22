@@ -4,20 +4,11 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
 
-public class AudioService
+public class AudioService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner)
 {
-    private readonly IOptionsMonitor<PcRemoteOptions> _options;
-    private readonly ICliRunner _cliRunner;
-
-    public AudioService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner)
-    {
-        _options = options;
-        _cliRunner = cliRunner;
-    }
-
     public async Task<List<AudioDevice>> GetDevicesAsync()
     {
-        var output = await _cliRunner.RunAsync(GetExePath(), ["/scomma", "", "/Columns", "Type,Name,Direction,Default,Volume Percent"]);
+        var output = await cliRunner.RunAsync(GetExePath(), ["/scomma", "", "/Columns", "Type,Name,Direction,Default,Volume Percent"]);
         return ParseCsvOutput(output);
     }
 
@@ -33,7 +24,7 @@ public class AudioService
         if (!devices.Exists(d => string.Equals(d.Name, deviceName, StringComparison.OrdinalIgnoreCase)))
             throw new KeyNotFoundException($"Audio device '{deviceName}' not found.");
 
-        await _cliRunner.RunAsync(GetExePath(), ["/SetDefault", deviceName, "1"]);
+        await cliRunner.RunAsync(GetExePath(), ["/SetDefault", deviceName, "1"]);
     }
 
     public async Task SetVolumeAsync(int level)
@@ -41,12 +32,12 @@ public class AudioService
         var current = await GetCurrentDeviceAsync()
             ?? throw new InvalidOperationException("No default audio device found.");
 
-        await _cliRunner.RunAsync(GetExePath(), ["/SetVolume", current.Name, level.ToString()]);
-        await _cliRunner.RunAsync(GetExePath(), ["/Unmute", current.Name]);
+        await cliRunner.RunAsync(GetExePath(), ["/SetVolume", current.Name, level.ToString()]);
+        await cliRunner.RunAsync(GetExePath(), ["/Unmute", current.Name]);
     }
 
     private string GetExePath() =>
-        Path.Combine(_options.CurrentValue.ToolsPath, "SoundVolumeView.exe");
+        Path.Combine(options.CurrentValue.ToolsPath, "SoundVolumeView.exe");
 
     internal static List<AudioDevice> ParseCsvOutput(string csvOutput)
     {

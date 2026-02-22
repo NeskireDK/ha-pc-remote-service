@@ -14,7 +14,7 @@ namespace HaPcRemote.Service.Services;
 /// _pc-remote._tcp.local. with SRV, TXT, and A records.
 /// No external dependencies - fully Native AOT compatible.
 /// </summary>
-public sealed class MdnsAdvertiserService : IHostedService, IDisposable
+public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> options, ILogger<MdnsAdvertiserService> logger) : IHostedService, IDisposable
 {
     private const int MdnsPort = 5353;
     private const string ServiceType = "_pc-remote._tcp.local.";
@@ -23,29 +23,19 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
     private static readonly IPAddress MdnsMulticastAddress = IPAddress.Parse("224.0.0.251");
     private static readonly IPEndPoint MdnsEndpoint = new(MdnsMulticastAddress, MdnsPort);
 
-    private readonly ILogger<MdnsAdvertiserService> _logger;
-    private readonly string _hostname;
-    private readonly string _instanceName;
-    private readonly int _servicePort;
-    private readonly Dictionary<string, string> _txtRecords;
+    private readonly int _servicePort = options.CurrentValue.Port;
+    private readonly string _hostname = GetHostname();
+    private readonly string _instanceName = $"{Environment.MachineName}._pc-remote._tcp.local.";
+    private readonly Dictionary<string, string> _txtRecords = new()
+    {
+        ["txtvers"] = "1",
+        ["version"] = GetVersion(),
+        ["machine_name"] = Environment.MachineName
+    };
 
     private UdpClient? _udpClient;
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
-
-    public MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> options, ILogger<MdnsAdvertiserService> logger)
-    {
-        _logger = logger;
-        _servicePort = options.CurrentValue.Port;
-        _hostname = GetHostname();
-        _instanceName = $"{Environment.MachineName}._pc-remote._tcp.local.";
-        _txtRecords = new Dictionary<string, string>
-        {
-            ["txtvers"] = "1",
-            ["version"] = GetVersion(),
-            ["machine_name"] = Environment.MachineName
-        };
-    }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -55,14 +45,14 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
         {
             _udpClient = CreateUdpClient();
             _listenTask = ListenAsync(_cts.Token);
-            _logger.LogInformation("mDNS advertiser started: {Instance} on port {Port}", _instanceName, _servicePort);
+            logger.LogInformation("mDNS advertiser started: {Instance} on port {Port}", _instanceName, _servicePort);
 
             // Send an initial unsolicited announcement
             _ = Task.Run(() => SendAnnouncementAsync(), cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to start mDNS advertiser. Discovery will not be available");
+            logger.LogWarning(ex, "Failed to start mDNS advertiser. Discovery will not be available");
         }
 
         return Task.CompletedTask;
@@ -70,7 +60,7 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("mDNS advertiser stopping");
+        logger.LogInformation("mDNS advertiser stopping");
 
         // Send goodbye packet (TTL=0) before shutting down per RFC 6762 §10.1
         if (_udpClient is not null)
@@ -82,7 +72,7 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Failed to send mDNS goodbye packet");
+                logger.LogDebug(ex, "Failed to send mDNS goodbye packet");
             }
         }
 
@@ -145,7 +135,7 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Error receiving mDNS packet");
+                logger.LogDebug(ex, "Error receiving mDNS packet");
             }
         }
     }
@@ -200,7 +190,7 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Error during mDNS announcement");
+            logger.LogDebug(ex, "Error during mDNS announcement");
         }
     }
 
@@ -213,7 +203,7 @@ public sealed class MdnsAdvertiserService : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to send mDNS response");
+            logger.LogDebug(ex, "Failed to send mDNS response");
         }
     }
 

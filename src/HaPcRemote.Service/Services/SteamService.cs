@@ -3,24 +3,18 @@ using ValveKeyValue;
 
 namespace HaPcRemote.Service.Services;
 
-public class SteamService
+public class SteamService(ISteamPlatform platform)
 {
-    private readonly ISteamPlatform _platform;
     private List<SteamGame>? _cachedGames;
     private DateTime _cacheExpiry;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
-
-    public SteamService(ISteamPlatform platform)
-    {
-        _platform = platform;
-    }
 
     public Task<List<SteamGame>> GetGamesAsync()
     {
         if (_cachedGames != null && DateTime.UtcNow < _cacheExpiry)
             return Task.FromResult(_cachedGames);
 
-        var steamPath = _platform.GetSteamPath()
+        var steamPath = platform.GetSteamPath()
             ?? throw new InvalidOperationException("Steam is not installed.");
 
         var games = LoadInstalledGames(steamPath);
@@ -31,7 +25,7 @@ public class SteamService
 
     public Task<SteamRunningGame?> GetRunningGameAsync()
     {
-        var appId = _platform.GetRunningAppId();
+        var appId = platform.GetRunningAppId();
         if (appId == 0)
             return Task.FromResult<SteamRunningGame?>(null);
 
@@ -41,29 +35,29 @@ public class SteamService
 
     public async Task LaunchGameAsync(int appId)
     {
-        var runningAppId = _platform.GetRunningAppId();
+        var runningAppId = platform.GetRunningAppId();
         if (runningAppId == appId)
             return; // Already running
 
         if (runningAppId != 0)
             await StopGameAsync();
 
-        _platform.LaunchSteamUrl($"steam://rungameid/{appId}");
+        platform.LaunchSteamUrl($"steam://rungameid/{appId}");
     }
 
     public Task StopGameAsync()
     {
-        var appId = _platform.GetRunningAppId();
+        var appId = platform.GetRunningAppId();
         if (appId == 0)
             return Task.CompletedTask;
 
-        var steamPath = _platform.GetSteamPath();
+        var steamPath = platform.GetSteamPath();
         if (steamPath == null)
             return Task.CompletedTask;
 
         var installDir = GetGameInstallDir(steamPath, appId);
         if (installDir != null)
-            _platform.KillProcessesInDirectory(installDir);
+            platform.KillProcessesInDirectory(installDir);
 
         return Task.CompletedTask;
     }

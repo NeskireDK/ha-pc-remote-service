@@ -7,38 +7,28 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
 
-public class MonitorService
+public class MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner, ILogger<MonitorService> logger)
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(60);
 
-    private readonly IOptionsMonitor<PcRemoteOptions> _options;
-    private readonly ICliRunner _cliRunner;
-    private readonly ILogger<MonitorService> _logger;
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
 
     private List<MonitorInfo>? _cachedMonitors;
     private DateTime _cacheTime;
 
-    public MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner, ILogger<MonitorService> logger)
-    {
-        _options = options;
-        _cliRunner = cliRunner;
-        _logger = logger;
-    }
-
     // ── Profile methods ──────────────────────────────────────────────
 
     public Task<List<MonitorProfile>> GetProfilesAsync()
     {
-        var profilesPath = _options.CurrentValue.ProfilesPath;
+        var profilesPath = options.CurrentValue.ProfilesPath;
 
         if (!Directory.Exists(profilesPath))
         {
-            _logger.LogWarning("Monitor profiles directory not found: {Path}", profilesPath);
+            logger.LogWarning("Monitor profiles directory not found: {Path}", profilesPath);
             return Task.FromResult(new List<MonitorProfile>());
         }
 
-        _logger.LogDebug("Loading monitor profiles from: {Path}", profilesPath);
+        logger.LogDebug("Loading monitor profiles from: {Path}", profilesPath);
 
         var profiles = Directory.GetFiles(profilesPath, "*.cfg")
             .Select(f => new MonitorProfile
@@ -56,13 +46,13 @@ public class MonitorService
         if (profileName.Contains('/') || profileName.Contains('\\') || profileName.Contains(".."))
             throw new ArgumentException($"Invalid profile name: '{profileName}'");
 
-        var config = _options.CurrentValue;
+        var config = options.CurrentValue;
         var profilePath = Path.Combine(config.ProfilesPath, $"{profileName}.cfg");
 
         if (!File.Exists(profilePath))
             throw new KeyNotFoundException($"Monitor profile '{profileName}' not found.");
 
-        await _cliRunner.RunAsync(GetExePath(), ["/LoadConfig", profilePath]);
+        await cliRunner.RunAsync(GetExePath(), ["/LoadConfig", profilePath]);
     }
 
     // ── Monitor control methods ──────────────────────────────────────
@@ -80,7 +70,7 @@ public class MonitorService
             var tempFile = Path.Combine(dir, $"mmt_{Guid.NewGuid():N}.xml");
             try
             {
-                await _cliRunner.RunAsync(GetExePath(), ["/sxml", tempFile]);
+                await cliRunner.RunAsync(GetExePath(), ["/sxml", tempFile]);
                 var output = await File.ReadAllTextAsync(tempFile);
                 _cachedMonitors = ParseXmlOutput(output);
                 _cacheTime = DateTime.UtcNow;
@@ -105,21 +95,21 @@ public class MonitorService
     public async Task EnableMonitorAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
-        await _cliRunner.RunAsync(GetExePath(), ["/enable", monitor.Name]);
+        await cliRunner.RunAsync(GetExePath(), ["/enable", monitor.Name]);
         InvalidateCache();
     }
 
     public async Task DisableMonitorAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
-        await _cliRunner.RunAsync(GetExePath(), ["/disable", monitor.Name]);
+        await cliRunner.RunAsync(GetExePath(), ["/disable", monitor.Name]);
         InvalidateCache();
     }
 
     public async Task SetPrimaryAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
-        await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", monitor.Name]);
+        await cliRunner.RunAsync(GetExePath(), ["/SetPrimary", monitor.Name]);
         InvalidateCache();
     }
 
@@ -131,12 +121,12 @@ public class MonitorService
         // Step 1: enable the target so it is active before becoming primary
         if (!target.IsActive)
         {
-            await _cliRunner.RunAsync(GetExePath(), ["/enable", target.Name]);
+            await cliRunner.RunAsync(GetExePath(), ["/enable", target.Name]);
             await Task.Delay(500);
         }
 
         // Step 2: set the target as primary (must be active first)
-        await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", target.Name]);
+        await cliRunner.RunAsync(GetExePath(), ["/SetPrimary", target.Name]);
         await Task.Delay(500);
 
         // Step 3: disable all other monitors
@@ -144,7 +134,7 @@ public class MonitorService
         {
             if (m.IsActive)
             {
-                await _cliRunner.RunAsync(GetExePath(), ["/disable", m.Name]);
+                await cliRunner.RunAsync(GetExePath(), ["/disable", m.Name]);
                 await Task.Delay(500);
             }
         }
@@ -223,7 +213,7 @@ public class MonitorService
     // ── Helpers ───────────────────────────────────────────────────────
 
     private string GetExePath() =>
-        Path.Combine(_options.CurrentValue.ToolsPath, "MultiMonitorTool.exe");
+        Path.Combine(options.CurrentValue.ToolsPath, "MultiMonitorTool.exe");
 
     private async Task<MonitorInfo> ResolveMonitorAsync(string id)
     {

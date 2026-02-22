@@ -81,7 +81,7 @@ public class AudioEndpointTests : EndpointTestBase
             AppJsonContext.Default.ApiResponse);
         json.ShouldNotBeNull();
         json.Success.ShouldBeFalse();
-        json.Message.ShouldContain("between 0 and 100");
+        json.Message!.ShouldContain("between 0 and 100");
     }
 
     [Fact]
@@ -110,6 +110,6 @@ public class AudioEndpointTests : EndpointTestBase
             AppJsonContext.Default.ApiResponse);
         json.ShouldNotBeNull();
         json.Success.ShouldBeFalse();
-        json.Message.ShouldContain("not found");
+        json.Message!.ShouldContain("not found");
     }
 }

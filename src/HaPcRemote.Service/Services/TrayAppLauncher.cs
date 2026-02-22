@@ -7,15 +7,8 @@ namespace HaPcRemote.Service.Services;
 /// Delegates process launches to the tray app via IPC.
 /// Falls back to direct Process.Start if the tray is not connected.
 /// </summary>
-public sealed class TrayAppLauncher : IAppLauncher
+public sealed class TrayAppLauncher(ILogger<TrayAppLauncher> logger) : IAppLauncher
 {
-    private readonly ILogger<TrayAppLauncher> _logger;
-
-    public TrayAppLauncher(ILogger<TrayAppLauncher> logger)
-    {
-        _logger = logger;
-    }
-
     public async Task LaunchAsync(string exePath, string? arguments = null)
     {
         var client = new IpcClient();
@@ -28,7 +21,7 @@ public sealed class TrayAppLauncher : IAppLauncher
 
         if (response is null)
         {
-            _logger.LogWarning("Tray not connected, launching process directly");
+            logger.LogWarning("Tray not connected, launching process directly");
             var startInfo = new ProcessStartInfo
             {
                 FileName = exePath,

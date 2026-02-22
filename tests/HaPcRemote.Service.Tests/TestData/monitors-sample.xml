@@ -1,0 +1,75 @@
+<?xml version="1.0" ?>
+<monitors_list>
+<item>
+<resolution>3840 X 2160</resolution>
+<left-top>0, 0</left-top>
+<right-bottom>3840, 2160</right-bottom>
+<active>Yes</active>
+<disconnected>No</disconnected>
+<primary>Yes</primary>
+<colors>32</colors>
+<frequency>144</frequency>
+<orientation>Default</orientation>
+<maximum_resolution>3840 X 2160</maximum_resolution>
+<current_scale>100%</current_scale>
+<maximum_scale>200%</maximum_scale>
+<name>\\.\DISPLAY1</name>
+<adapter>NVIDIA GeForce</adapter>
+<device_id>PCI\VEN_10DE</device_id>
+<device_key>\Registry\Machine\System\CurrentControlSet\Control\Video\{ABC}\0000</device_key>
+<monitor_id>MONITOR\GSM59A4\{4d36e96e-e325-11ce-bfc1-08002be10318}\0001</monitor_id>
+<short_monitor_id>GSM59A4</short_monitor_id>
+<monitor_key>\Registry\Machine\System\CurrentControlSet\Control\Class\{4d36e96e}\0001</monitor_key>
+<monitor_string>LG ULTRAGEAR</monitor_string>
+<monitor_name>LG ULTRAGEAR</monitor_name>
+<monitor_serial_number>ABC123</monitor_serial_number>
+</item>
+<item>
+<resolution>2560 X 1440</resolution>
+<left-top>3840, 0</left-top>
+<right-bottom>6400, 1440</right-bottom>
+<active>Yes</active>
+<disconnected>No</disconnected>
+<primary>No</primary>
+<colors>32</colors>
+<frequency>60</frequency>
+<orientation>Default</orientation>
+<maximum_resolution>2560 X 1440</maximum_resolution>
+<current_scale>100%</current_scale>
+<maximum_scale>200%</maximum_scale>
+<name>\\.\DISPLAY2</name>
+<adapter>NVIDIA GeForce</adapter>
+<device_id>PCI\VEN_10DE</device_id>
+<device_key>\Registry\Machine\System\CurrentControlSet\Control\Video\{DEF}\0001</device_key>
+<monitor_id>MONITOR\DEL4321\{4d36e96e-e325-11ce-bfc1-08002be10318}\0002</monitor_id>
+<short_monitor_id>DEL4321</short_monitor_id>
+<monitor_key>\Registry\Machine\System\CurrentControlSet\Control\Class\{4d36e96e}\0002</monitor_key>
+<monitor_string>Dell U2723QE</monitor_string>
+<monitor_name>Dell U2723QE</monitor_name>
+<monitor_serial_number>XYZ789</monitor_serial_number>
+</item>
+<item>
+<resolution>1920 X 1080</resolution>
+<left-top>6400, 0</left-top>
+<right-bottom>8320, 1080</right-bottom>
+<active>Yes</active>
+<disconnected>No</disconnected>
+<primary>No</primary>
+<colors>32</colors>
+<frequency>240</frequency>
+<orientation>Default</orientation>
+<maximum_resolution>1920 X 1080</maximum_resolution>
+<current_scale>100%</current_scale>
+<maximum_scale>200%</maximum_scale>
+<name>\\.\DISPLAY3</name>
+<adapter>NVIDIA GeForce</adapter>
+<device_id>PCI\VEN_10DE</device_id>
+<device_key>\Registry\Machine\System\CurrentControlSet\Control\Video\{GHI}\0002</device_key>
+<monitor_id>MONITOR\SAM0F00\{4d36e96e-e325-11ce-bfc1-08002be10318}\0003</monitor_id>
+<short_monitor_id>SAM0F00</short_monitor_id>
+<monitor_key>\Registry\Machine\System\CurrentControlSet\Control\Class\{4d36e96e}\0003</monitor_key>
+<monitor_string>Samsung Odyssey</monitor_string>
+<monitor_name>Samsung Odyssey</monitor_name>
+<monitor_serial_number></monitor_serial_number>
+</item>
+</monitors_list>
