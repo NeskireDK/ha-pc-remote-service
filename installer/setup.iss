@@ -43,7 +43,7 @@ Name: "{app}\monitor-profiles"
 Name: "{commonstartup}\HA PC Remote Tray"; Filename: "{app}\{#TrayExeName}"; Comment: "HA PC Remote system tray helper"
 
 [Run]
-Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser skipifsilent
+Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser
 
 [Code]
 const
