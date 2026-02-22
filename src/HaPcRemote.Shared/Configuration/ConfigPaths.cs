@@ -1,6 +1,6 @@
-namespace HaPcRemote.Service.Configuration;
+namespace HaPcRemote.Shared.Configuration;
 
-internal static class ConfigPaths
+public static class ConfigPaths
 {
     private const string AppName = "HaPcRemote";
 
