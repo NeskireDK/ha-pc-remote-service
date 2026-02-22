@@ -42,6 +42,9 @@ Name: "{app}\monitor-profiles"
 [Icons]
 Name: "{commonstartup}\HA PC Remote Tray"; Filename: "{app}\{#TrayExeName}"; Comment: "HA PC Remote system tray helper"
 
+[Run]
+Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser skipifsilent
+
 [Code]
 const
   SERVICE_QUERY_CONFIG  = $0001;
@@ -186,13 +189,11 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ToolsDir, ExePath, TrayPath: String;
-  ResultCode: Integer;
+  ToolsDir, ExePath: String;
 begin
   if CurStep = ssPostInstall then begin
     ToolsDir := ExpandConstant('{app}\tools');
     ExePath := ExpandConstant('{app}\{#MyAppExeName}');
-    TrayPath := ExpandConstant('{app}\{#TrayExeName}');
 
     // Download NirSoft tools
     WizardForm.StatusLabel.Caption := 'Downloading SoundVolumeView...';
@@ -224,10 +225,6 @@ begin
     // Start service
     WizardForm.StatusLabel.Caption := 'Starting service...';
     ExecHidden('{sys}\sc.exe', 'start {#ServiceName}');
-
-    // Launch tray app for current user
-    WizardForm.StatusLabel.Caption := 'Starting tray app...';
-    Exec(TrayPath, '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
   end;
 end;
 

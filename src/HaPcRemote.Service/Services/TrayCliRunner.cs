@@ -21,7 +21,7 @@ public sealed class TrayCliRunner : ICliRunner
     {
         var args = arguments as string[] ?? arguments.ToArray();
 
-        using var client = new IpcClient();
+        var client = new IpcClient();
         var response = await client.SendAsync(new IpcRequest
         {
             Type = "runCli",
@@ -32,7 +32,7 @@ public sealed class TrayCliRunner : ICliRunner
 
         if (response is null)
         {
-            _logger.LogDebug("Tray not connected, falling back to direct execution");
+            _logger.LogWarning("Tray not connected, falling back to direct execution");
             return await _fallback.RunAsync(exePath, args, timeoutMs);
         }
 

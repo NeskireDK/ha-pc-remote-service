@@ -18,7 +18,7 @@ public sealed class TrayAppLauncher : IAppLauncher
 
     public async Task LaunchAsync(string exePath, string? arguments = null)
     {
-        using var client = new IpcClient();
+        var client = new IpcClient();
         var response = await client.SendAsync(new IpcRequest
         {
             Type = "launchProcess",
@@ -28,7 +28,7 @@ public sealed class TrayAppLauncher : IAppLauncher
 
         if (response is null)
         {
-            _logger.LogDebug("Tray not connected, launching process directly");
+            _logger.LogWarning("Tray not connected, launching process directly");
             var startInfo = new ProcessStartInfo
             {
                 FileName = exePath,

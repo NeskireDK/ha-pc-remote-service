@@ -29,7 +29,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _notifyIcon = new NotifyIcon
         {
-            Icon = LoadEmbeddedIcon(),
+            Icon = LoadAppIcon(),
             Text = "HA PC Remote",
             Visible = true,
             ContextMenuStrip = BuildContextMenu()
@@ -110,39 +110,47 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         process.Start();
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = process.StandardError.ReadToEndAsync(ct);
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(timeout);
-
         try
         {
-            await process.WaitForExitAsync(cts.Token);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            process.Kill(entireProcessTree: true);
-            return IpcResponse.Fail(
-                $"Process '{request.ExePath}' timed out after {timeout.TotalSeconds}s.");
-        }
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
+            var stderrTask = process.StandardError.ReadToEndAsync(ct);
 
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
 
-        if (process.ExitCode != 0)
-        {
-            return new IpcResponse
+            try
             {
-                Success = false,
-                Error = $"Process exited with code {process.ExitCode}: {stderr}",
-                Stdout = stdout,
-                Stderr = stderr,
-                ExitCode = process.ExitCode
-            };
-        }
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                process.Kill(entireProcessTree: true);
+                return IpcResponse.Fail(
+                    $"Process '{request.ExePath}' timed out after {timeout.TotalSeconds}s.");
+            }
 
-        return IpcResponse.Ok(stdout, stderr, process.ExitCode);
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+
+            if (process.ExitCode != 0)
+            {
+                return new IpcResponse
+                {
+                    Success = false,
+                    Error = $"Process exited with code {process.ExitCode}: {stderr}",
+                    Stdout = stdout,
+                    Stderr = stderr,
+                    ExitCode = process.ExitCode
+                };
+            }
+
+            return IpcResponse.Ok(stdout, stderr, process.ExitCode);
+        }
+        finally
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
     }
 
     private IpcResponse HandleLaunchProcess(IpcRequest request)
@@ -171,12 +179,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private static Icon LoadEmbeddedIcon()
+    private static Icon LoadAppIcon()
     {
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "app.ico");
-        return File.Exists(iconPath)
-            ? new Icon(iconPath)
-            : SystemIcons.Application;
+        return Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? SystemIcons.Application;
     }
 
     protected override void Dispose(bool disposing)

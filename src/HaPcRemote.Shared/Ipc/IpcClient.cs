@@ -6,7 +6,7 @@ namespace HaPcRemote.Shared.Ipc;
 /// Named pipe client used by the service to delegate commands to the tray app.
 /// Creates a new connection per request for simplicity.
 /// </summary>
-public sealed class IpcClient : IDisposable
+public sealed class IpcClient
 {
     private readonly int _connectTimeoutMs;
 
@@ -39,15 +39,4 @@ public sealed class IpcClient : IDisposable
         }
     }
 
-    /// <summary>Check if the tray app is running by sending a ping.</summary>
-    public async Task<bool> IsConnectedAsync(CancellationToken ct = default)
-    {
-        var response = await SendAsync(new IpcRequest { Type = "ping" }, ct);
-        return response is { Success: true };
-    }
-
-    public void Dispose()
-    {
-        // No persistent resources to dispose with per-request connections
-    }
 }
