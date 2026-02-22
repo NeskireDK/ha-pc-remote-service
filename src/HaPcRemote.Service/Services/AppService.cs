@@ -5,20 +5,11 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
 
-public class AppService
+public class AppService(IOptionsMonitor<PcRemoteOptions> options, IAppLauncher appLauncher)
 {
-    private readonly IOptionsMonitor<PcRemoteOptions> _options;
-    private readonly IAppLauncher _appLauncher;
-
-    public AppService(IOptionsMonitor<PcRemoteOptions> options, IAppLauncher appLauncher)
-    {
-        _options = options;
-        _appLauncher = appLauncher;
-    }
-
     public Task<List<AppInfo>> GetAllStatusesAsync()
     {
-        var apps = _options.CurrentValue.Apps;
+        var apps = options.CurrentValue.Apps;
         if (apps is null || apps.Count == 0)
             return Task.FromResult(new List<AppInfo>());
 
@@ -39,7 +30,7 @@ public class AppService
     public async Task LaunchAsync(string appKey)
     {
         var definition = GetDefinition(appKey);
-        await _appLauncher.LaunchAsync(definition.ExePath, definition.Arguments);
+        await appLauncher.LaunchAsync(definition.ExePath, definition.Arguments);
     }
 
     public Task KillAsync(string appKey)
@@ -72,7 +63,7 @@ public class AppService
 
     private AppDefinitionOptions GetDefinition(string appKey)
     {
-        var apps = _options.CurrentValue.Apps;
+        var apps = options.CurrentValue.Apps;
         if (!apps.TryGetValue(appKey, out var definition))
             throw new KeyNotFoundException($"App '{appKey}' is not configured.");
 

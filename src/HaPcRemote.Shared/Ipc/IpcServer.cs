@@ -9,22 +9,14 @@ namespace HaPcRemote.Shared.Ipc;
 /// Named pipe server used by the tray app to accept commands from the service.
 /// Runs a loop that accepts one connection at a time and dispatches to a handler.
 /// </summary>
-public sealed class IpcServer
+public sealed class IpcServer(
+    Func<IpcRequest, CancellationToken, Task<IpcResponse>> handler,
+    ILogger logger)
 {
-    private readonly Func<IpcRequest, CancellationToken, Task<IpcResponse>> _handler;
-    private readonly ILogger _logger;
-
-    public IpcServer(
-        Func<IpcRequest, CancellationToken, Task<IpcResponse>> handler,
-        ILogger logger)
-    {
-        _handler = handler;
-        _logger = logger;
-    }
 
     public async Task RunAsync(CancellationToken ct)
     {
-        _logger.LogInformation("IPC server starting on pipe '{PipeName}'", IpcProtocol.PipeName);
+        logger.LogInformation("IPC server starting on pipe '{PipeName}'", IpcProtocol.PipeName);
 
         while (!ct.IsCancellationRequested)
         {
@@ -43,12 +35,12 @@ public sealed class IpcServer
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error accepting IPC connection");
+                logger.LogError(ex, "Error accepting IPC connection");
                 await pipe.DisposeAsync();
             }
         }
 
-        _logger.LogInformation("IPC server stopped");
+        logger.LogInformation("IPC server stopped");
     }
 
     private async Task HandleConnectionAsync(NamedPipeServerStream pipe, CancellationToken ct)
@@ -63,7 +55,7 @@ public sealed class IpcServer
                 if (request is null)
                     return;
 
-                var response = await _handler(request, ct);
+                var response = await handler(request, ct);
                 await IpcProtocol.WriteMessageAsync(
                     pipe, response, IpcJsonContext.Default.IpcResponse, ct);
             }
@@ -73,7 +65,7 @@ public sealed class IpcServer
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling IPC request");
+                logger.LogError(ex, "Error handling IPC request");
             }
         }
     }

@@ -6,15 +6,8 @@ namespace HaPcRemote.Service.Services;
 /// ISteamPlatform implementation that delegates all Steam operations to the tray app via IPC.
 /// The tray runs in the user session and has access to HKCU registry and user-session process launch.
 /// </summary>
-public sealed class IpcSteamPlatform : ISteamPlatform
+public sealed class IpcSteamPlatform(ILogger<IpcSteamPlatform> logger) : ISteamPlatform
 {
-    private readonly ILogger<IpcSteamPlatform> _logger;
-
-    public IpcSteamPlatform(ILogger<IpcSteamPlatform> logger)
-    {
-        _logger = logger;
-    }
-
     public string? GetSteamPath()
     {
         var response = Send(new IpcRequest { Type = "steamGetPath" });
@@ -54,7 +47,7 @@ public sealed class IpcSteamPlatform : ISteamPlatform
         var client = new IpcClient();
         var response = client.SendAsync(request, CancellationToken.None).GetAwaiter().GetResult();
         if (response is null)
-            _logger.LogWarning("Tray not connected — Steam IPC call '{Type}' skipped", request.Type);
+            logger.LogWarning("Tray not connected — Steam IPC call '{Type}' skipped", request.Type);
         return response;
     }
 }

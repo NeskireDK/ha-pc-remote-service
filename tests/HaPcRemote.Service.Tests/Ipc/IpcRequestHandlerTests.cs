@@ -28,7 +28,7 @@ public class IpcRequestHandlerTests
         var request = new IpcRequest { Type = "unknown_type" };
         var response = await _handler.HandleAsync(request, CancellationToken.None);
         response.Success.ShouldBeFalse();
-        response.Error.ShouldContain("Unknown request type");
+        response.Error!.ShouldContain("Unknown request type");
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public class IpcRequestHandlerTests
         var request = new IpcRequest { Type = "runCli" };
         var response = await _handler.HandleAsync(request, CancellationToken.None);
         response.Success.ShouldBeFalse();
-        response.Error.ShouldContain("ExePath is required");
+        response.Error!.ShouldContain("ExePath is required");
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class IpcRequestHandlerTests
         var request = new IpcRequest { Type = "runCli", ExePath = "/nonexistent/tool.exe" };
         var response = await _handler.HandleAsync(request, CancellationToken.None);
         response.Success.ShouldBeFalse();
-        response.Error.ShouldContain("not found");
+        response.Error!.ShouldContain("not found");
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class IpcRequestHandlerTests
         var request = new IpcRequest { Type = "launchProcess" };
         var response = await _handler.HandleAsync(request, CancellationToken.None);
         response.Success.ShouldBeFalse();
-        response.Error.ShouldContain("ExePath is required");
+        response.Error!.ShouldContain("ExePath is required");
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class IpcRequestHandlerTests
             // Registry may not have Steam installed in CI — Success with null Stdout is valid
             response.Success.ShouldBeTrue();
         else
-            response.Error.ShouldContain("Windows");
+            response.Error!.ShouldContain("Windows");
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class IpcRequestHandlerTests
         }
         else
         {
-            response.Error.ShouldContain("Windows");
+            response.Error!.ShouldContain("Windows");
         }
     }
 
@@ -92,7 +92,7 @@ public class IpcRequestHandlerTests
         var request = new IpcRequest { Type = "steamLaunchUrl" };
         var response = await _handler.HandleAsync(request, CancellationToken.None);
         response.Success.ShouldBeFalse();
-        response.Error.ShouldContain("ProcessArguments");
+        response.Error!.ShouldContain("ProcessArguments");
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class IpcRequestHandlerTests
         var request = new IpcRequest { Type = "steamKillDir" };
         var response = await _handler.HandleAsync(request, CancellationToken.None);
         response.Success.ShouldBeFalse();
-        response.Error.ShouldContain("ProcessArguments");
+        response.Error!.ShouldContain("ProcessArguments");
     }
 
     [Fact]

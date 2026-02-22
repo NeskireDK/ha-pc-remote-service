@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<monitors_list>
+<item>
+<resolution>3840 X 2160</resolution>
+<active>Yes</active>
+<disconnected>No</disconnected>
+<primary>Yes</primary>
+<frequency>144</frequency>
+<name>\\.\DISPLAY1</name>
+<short_monitor_id>GSM59A4</short_monitor_id>
+<monitor_name>LG ULTRAGEAR</monitor_name>
+<monitor_serial_number>ABC123</monitor_serial_number>
+</item>
+<item>
+<resolution>2560 X 1440</resolution>
+<active>No</active>
+<disconnected>No</disconnected>
+<primary>No</primary>
+<frequency>60</frequency>
+<name>\\.\DISPLAY2</name>
+<short_monitor_id>DEL4321</short_monitor_id>
+<monitor_name>Dell U2723QE</monitor_name>
+<monitor_serial_number>XYZ789</monitor_serial_number>
+</item>
+</monitors_list>

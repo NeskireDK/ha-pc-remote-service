@@ -6,40 +6,6 @@ namespace HaPcRemote.Service.Tests.Services;
 
 public class SteamServiceTests
 {
-    private const string SampleLibraryFolders = """
-        "libraryfolders"
-        {
-            "0"
-            {
-                "path"      "C:\\Program Files (x86)\\Steam"
-                "apps"
-                {
-                    "730"       "35241502720"
-                    "570"       "28000000000"
-                }
-            }
-            "1"
-            {
-                "path"      "D:\\SteamLibrary"
-                "apps"
-                {
-                    "292030"    "50000000000"
-                }
-            }
-        }
-        """;
-
-    private const string SampleAppManifest = """
-        "AppState"
-        {
-            "appid"         "730"
-            "name"          "Counter-Strike 2"
-            "StateFlags"    "4"
-            "installdir"    "Counter-Strike Global Offensive"
-            "LastUpdated"   "1700000000"
-        }
-        """;
-
     private readonly ISteamPlatform _platform = A.Fake<ISteamPlatform>();
 
     private SteamService CreateService() => new(_platform);
@@ -49,7 +15,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseLibraryFolders_ValidVdf_ReturnsLibraryPaths()
     {
-        var paths = SteamService.ParseLibraryFolders(SampleLibraryFolders);
+        var paths = SteamService.ParseLibraryFolders(TestData.Load("library-folders.vdf"));
 
         paths.Count.ShouldBe(2);
         paths[0].ShouldBe(@"C:\Program Files (x86)\Steam");
@@ -75,7 +41,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseAppManifest_ValidAcf_ReturnsGameInfo()
     {
-        var game = SteamService.ParseAppManifest(SampleAppManifest);
+        var game = SteamService.ParseAppManifest(TestData.Load("app-manifest-730.acf"));
 
         game.ShouldNotBeNull();
         game.AppId.ShouldBe(730);
@@ -153,7 +119,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseInstallDir_ValidAcf_ReturnsInstallDir()
     {
-        var installDir = SteamService.ParseInstallDir(SampleAppManifest);
+        var installDir = SteamService.ParseInstallDir(TestData.Load("app-manifest-730.acf"));
 
         installDir.ShouldBe("Counter-Strike Global Offensive");
     }
