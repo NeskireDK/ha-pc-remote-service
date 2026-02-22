@@ -82,8 +82,9 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenAnyIP(pcRemoteConfig.Port);
 });
 
-// Application services
-builder.Services.AddSingleton<ICliRunner, CliRunner>();
+// Application services — delegate CLI and app launch to tray app (user session)
+builder.Services.AddSingleton<ICliRunner, TrayCliRunner>();
+builder.Services.AddSingleton<IAppLauncher, TrayAppLauncher>();
 builder.Services.AddSingleton<AppService>();
 builder.Services.AddSingleton<AudioService>();
 builder.Services.AddSingleton<MonitorService>();
