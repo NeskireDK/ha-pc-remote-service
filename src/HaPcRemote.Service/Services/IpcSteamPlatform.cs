@@ -18,7 +18,9 @@ public sealed class IpcSteamPlatform : ISteamPlatform
     public string? GetSteamPath()
     {
         var response = Send(new IpcRequest { Type = "steamGetPath" });
-        return response?.Stdout;
+        if (response is null)
+            throw new InvalidOperationException("Tray app is not running.");
+        return response.Stdout;
     }
 
     public int GetRunningAppId()
@@ -32,14 +34,18 @@ public sealed class IpcSteamPlatform : ISteamPlatform
     public void LaunchSteamUrl(string url)
     {
         var response = Send(new IpcRequest { Type = "steamLaunchUrl", ProcessArguments = url });
-        if (response is not null && !response.Success)
+        if (response is null)
+            throw new InvalidOperationException("Tray app is not running. Cannot launch Steam game.");
+        if (!response.Success)
             throw new InvalidOperationException(response.Error ?? "steamLaunchUrl IPC call failed");
     }
 
     public void KillProcessesInDirectory(string directory)
     {
         var response = Send(new IpcRequest { Type = "steamKillDir", ProcessArguments = directory });
-        if (response is not null && !response.Success)
+        if (response is null)
+            throw new InvalidOperationException("Tray app is not running. Cannot kill game processes.");
+        if (!response.Success)
             throw new InvalidOperationException(response.Error ?? "steamKillDir IPC call failed");
     }
 

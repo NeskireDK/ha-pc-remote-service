@@ -29,7 +29,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private LogViewerForm? _logViewerForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _restartMenuItem;
+    private ToolStripMenuItem? _debugMenuItem;
     private UpdateChecker.ReleaseInfo? _pendingRelease;
+    private LogLevel _minLogLevel = LogLevel.Information;
 
     public TrayApplicationContext()
     {
@@ -39,7 +41,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             builder.AddConsole();
             builder.AddProvider(_logProvider);
-            builder.SetMinimumLevel(LogLevel.Information);
+            builder.AddFilter((_, level) => level >= _minLogLevel);
         });
         _logger = _loggerFactory.CreateLogger<TrayApplicationContext>();
 
@@ -88,6 +90,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _restartMenuItem.Click += OnRestartService;
         menu.Items.Add(_restartMenuItem);
 
+        _debugMenuItem = new ToolStripMenuItem("Debug Logging") { CheckOnClick = true };
+        _debugMenuItem.CheckedChanged += OnDebugLoggingToggled;
+        menu.Items.Add(_debugMenuItem);
+
         menu.Items.Add(new ToolStripSeparator());
 
         _updateMenuItem = new ToolStripMenuItem("Check for updates");
@@ -129,6 +135,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 _restartMenuItem.Enabled = true;
             }
         }
+    }
+
+    private void OnDebugLoggingToggled(object? sender, EventArgs e)
+    {
+        _minLogLevel = _debugMenuItem!.Checked ? LogLevel.Debug : LogLevel.Information;
+        _logger.LogInformation("Debug logging {State}", _debugMenuItem.Checked ? "enabled" : "disabled");
     }
 
     private async void OnCheckForUpdatesClick(object? sender, EventArgs e)

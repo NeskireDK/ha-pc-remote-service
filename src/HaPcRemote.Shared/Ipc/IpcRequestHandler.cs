@@ -19,7 +19,9 @@ public sealed class IpcRequestHandler
 
     public async Task<IpcResponse> HandleAsync(IpcRequest request, CancellationToken ct)
     {
-        return request.Type switch
+        _logger.LogDebug("IPC ← {Type}", request.Type);
+
+        var response = request.Type switch
         {
             "ping" => IpcResponse.Ok(),
             "runCli" => await HandleRunCliAsync(request, ct),
@@ -30,6 +32,19 @@ public sealed class IpcRequestHandler
             "steamKillDir" => HandleSteamKillDir(request),
             _ => IpcResponse.Fail($"Unknown request type: {request.Type}")
         };
+
+        if (response.Success)
+        {
+            // Truncate stdout — runCli can return hundreds of KB from tools like SoundVolumeView
+            var preview = response.Stdout is { Length: > 120 }
+                ? response.Stdout[..120] + "…"
+                : response.Stdout;
+            _logger.LogDebug("IPC → {Type} ok stdout={Stdout}", request.Type, preview);
+        }
+        else
+            _logger.LogDebug("IPC → {Type} FAIL {Error}", request.Type, response.Error);
+
+        return response;
     }
 
     private async Task<IpcResponse> HandleRunCliAsync(IpcRequest request, CancellationToken ct)
