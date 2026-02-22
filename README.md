@@ -94,7 +94,7 @@ Requires `MultiMonitorTool.exe` in `ToolsPath`.
 | `POST` | `/api/monitor/disable/{id}` | Disable a monitor |
 | `POST` | `/api/monitor/primary/{id}` | Set a monitor as primary |
 
-> **TODO:** `POST /api/monitor/solo/{id}` should also set the selected monitor as primary (currently it only disables the others). Selecting a monitor should mean: enable + set as primary + disable all others. The inverse (re-enabling a previously disabled monitor) should restore it without changing the primary.
+> **TODO:** Monitor switching is unreliable across repeated toggling. Known symptoms: (1) first switch — both monitors stay on; (2) switching back — correctly disables monitor 2; (3) re-enabling monitor 2 as primary — does nothing. Root cause likely a race or state issue in MultiMonitorTool when called in rapid succession, or incorrect sequencing of enable/primary/disable operations. Also, `solo/{id}` should set the selected monitor as primary; selecting a monitor should mean: enable + set as primary + disable all others.
 
 ### Monitors — Profiles
 
