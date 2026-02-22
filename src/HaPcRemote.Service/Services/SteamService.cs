@@ -156,17 +156,29 @@ public class SteamService
 
     private static string? GetGameInstallDir(string steamPath, int appId)
     {
-        var mainSteamApps = Path.Combine(steamPath, "steamapps");
-        var manifestPath = Path.Combine(mainSteamApps, $"appmanifest_{appId}.acf");
-
-        if (!File.Exists(manifestPath))
+        // Search all library folders, not just the main Steam path
+        var libraryFoldersPath = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
+        if (!File.Exists(libraryFoldersPath))
             return null;
 
-        var content = File.ReadAllText(manifestPath);
-        var installDir = ParseInstallDir(content);
+        var vdfContent = File.ReadAllText(libraryFoldersPath);
+        var libraryPaths = ParseLibraryFolders(vdfContent);
 
-        return string.IsNullOrEmpty(installDir)
-            ? null
-            : Path.Combine(mainSteamApps, "common", installDir);
+        foreach (var libPath in libraryPaths)
+        {
+            var steamAppsDir = Path.Combine(libPath, "steamapps");
+            var manifestPath = Path.Combine(steamAppsDir, $"appmanifest_{appId}.acf");
+
+            if (!File.Exists(manifestPath))
+                continue;
+
+            var content = File.ReadAllText(manifestPath);
+            var installDir = ParseInstallDir(content);
+
+            if (!string.IsNullOrEmpty(installDir))
+                return Path.Combine(steamAppsDir, "common", installDir);
+        }
+
+        return null;
     }
 }
