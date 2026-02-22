@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using HaPcRemote.Shared.Ipc;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +13,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly CancellationTokenSource _cts = new();
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
+    private readonly IpcRequestHandler _requestHandler;
     private readonly IpcServer _ipcServer;
 
     public TrayApplicationContext()
@@ -25,7 +25,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         });
         _logger = _loggerFactory.CreateLogger<TrayApplicationContext>();
 
-        _ipcServer = new IpcServer(HandleRequestAsync, _logger);
+        _requestHandler = new IpcRequestHandler(_logger);
+        _ipcServer = new IpcServer(_requestHandler.HandleAsync, _logger);
 
         _notifyIcon = new NotifyIcon
         {
@@ -68,114 +69,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         catch (Exception ex)
         {
             _logger.LogError(ex, "IPC server crashed");
-        }
-    }
-
-    private async Task<IpcResponse> HandleRequestAsync(IpcRequest request, CancellationToken ct)
-    {
-        return request.Type switch
-        {
-            "ping" => IpcResponse.Ok(),
-            "runCli" => await HandleRunCliAsync(request, ct),
-            "launchProcess" => HandleLaunchProcess(request),
-            _ => IpcResponse.Fail($"Unknown request type: {request.Type}")
-        };
-    }
-
-    private async Task<IpcResponse> HandleRunCliAsync(IpcRequest request, CancellationToken ct)
-    {
-        if (string.IsNullOrEmpty(request.ExePath))
-            return IpcResponse.Fail("ExePath is required for runCli");
-
-        if (!File.Exists(request.ExePath))
-            return IpcResponse.Fail($"CLI tool not found: {request.ExePath}");
-
-        var timeout = TimeSpan.FromMilliseconds(request.TimeoutMs);
-
-        using var process = new Process();
-        process.StartInfo = new ProcessStartInfo
-        {
-            FileName = request.ExePath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        if (request.Arguments is not null)
-        {
-            foreach (var arg in request.Arguments)
-                process.StartInfo.ArgumentList.Add(arg);
-        }
-
-        process.Start();
-
-        try
-        {
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
-            var stderrTask = process.StandardError.ReadToEndAsync(ct);
-
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(timeout);
-
-            try
-            {
-                await process.WaitForExitAsync(cts.Token);
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                process.Kill(entireProcessTree: true);
-                return IpcResponse.Fail(
-                    $"Process '{request.ExePath}' timed out after {timeout.TotalSeconds}s.");
-            }
-
-            var stdout = await stdoutTask;
-            var stderr = await stderrTask;
-
-            if (process.ExitCode != 0)
-            {
-                return new IpcResponse
-                {
-                    Success = false,
-                    Error = $"Process exited with code {process.ExitCode}: {stderr}",
-                    Stdout = stdout,
-                    Stderr = stderr,
-                    ExitCode = process.ExitCode
-                };
-            }
-
-            return IpcResponse.Ok(stdout, stderr, process.ExitCode);
-        }
-        finally
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-        }
-    }
-
-    private IpcResponse HandleLaunchProcess(IpcRequest request)
-    {
-        if (string.IsNullOrEmpty(request.ExePath))
-            return IpcResponse.Fail("ExePath is required for launchProcess");
-
-        try
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = request.ExePath,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            if (!string.IsNullOrEmpty(request.ProcessArguments))
-                startInfo.Arguments = request.ProcessArguments;
-
-            Process.Start(startInfo);
-            return IpcResponse.Ok();
-        }
-        catch (Exception ex)
-        {
-            return IpcResponse.Fail($"Failed to launch process: {ex.Message}");
         }
     }
 

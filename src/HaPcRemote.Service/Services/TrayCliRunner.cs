@@ -28,7 +28,7 @@ public sealed class TrayCliRunner : ICliRunner
             ExePath = exePath,
             Arguments = args,
             TimeoutMs = timeoutMs
-        });
+        }, CancellationToken.None);
 
         if (response is null)
         {

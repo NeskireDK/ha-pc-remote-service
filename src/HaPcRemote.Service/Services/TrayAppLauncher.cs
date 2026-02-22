@@ -24,7 +24,7 @@ public sealed class TrayAppLauncher : IAppLauncher
             Type = "launchProcess",
             ExePath = exePath,
             ProcessArguments = arguments
-        });
+        }, CancellationToken.None);
 
         if (response is null)
         {

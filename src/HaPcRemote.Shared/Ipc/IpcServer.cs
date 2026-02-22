@@ -1,4 +1,6 @@
 using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Microsoft.Extensions.Logging;
 
 namespace HaPcRemote.Shared.Ipc;
@@ -26,12 +28,7 @@ public sealed class IpcServer
 
         while (!ct.IsCancellationRequested)
         {
-            var pipe = new NamedPipeServerStream(
-                IpcProtocol.PipeName,
-                PipeDirection.InOut,
-                NamedPipeServerStream.MaxAllowedServerInstances,
-                PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous);
+            var pipe = CreatePipe();
 
             try
             {
@@ -79,5 +76,39 @@ public sealed class IpcServer
                 _logger.LogError(ex, "Error handling IPC request");
             }
         }
+    }
+
+    private static NamedPipeServerStream CreatePipe()
+    {
+        if (OperatingSystem.IsWindows())
+            return CreatePipeWithAcl();
+
+        return new NamedPipeServerStream(
+            IpcProtocol.PipeName,
+            PipeDirection.InOut,
+            NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous);
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static NamedPipeServerStream CreatePipeWithAcl()
+    {
+        var security = new PipeSecurity();
+        security.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            PipeAccessRights.FullControl, AccessControlType.Allow));
+        security.AddAccessRule(new PipeAccessRule(
+            WindowsIdentity.GetCurrent().User!,
+            PipeAccessRights.FullControl, AccessControlType.Allow));
+
+        return NamedPipeServerStreamAcl.Create(
+            IpcProtocol.PipeName,
+            PipeDirection.InOut,
+            NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous,
+            0, 0,
+            security);
     }
 }
