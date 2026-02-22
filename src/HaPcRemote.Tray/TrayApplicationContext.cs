@@ -29,7 +29,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private LogViewerForm? _logViewerForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _restartMenuItem;
-    private EventHandler? _updateClickHandler;
+    private UpdateChecker.ReleaseInfo? _pendingRelease;
 
     public TrayApplicationContext()
     {
@@ -65,7 +65,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         // Check for updates after 30s, then every 4 hours
         _updateTimer = new System.Windows.Forms.Timer { Interval = 4 * 60 * 60 * 1000 };
-        _updateTimer.Tick += async (_, _) => await SafeCheckForUpdateAsync();
+        _updateTimer.Tick += async (_, _) => await SafeCheckForUpdateAsync(showProgress: false);
         _updateTimer.Start();
         _ = Task.Run(async () =>
         {
@@ -89,6 +89,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(_restartMenuItem);
 
         menu.Items.Add(new ToolStripSeparator());
+
+        _updateMenuItem = new ToolStripMenuItem("Check for updates");
+        _updateMenuItem.Click += OnCheckForUpdatesClick;
+        menu.Items.Add(_updateMenuItem);
+
         menu.Items.Add("Exit", null, OnExit);
         return menu;
     }
@@ -126,62 +131,97 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private async Task SafeCheckForUpdateAsync()
+    private async void OnCheckForUpdatesClick(object? sender, EventArgs e)
+    {
+        if (_pendingRelease is not null)
+        {
+            await HandleDownloadAsync(_pendingRelease);
+        }
+        else
+        {
+            await SafeCheckForUpdateAsync(showProgress: true);
+        }
+    }
+
+    private async Task SafeCheckForUpdateAsync(bool showProgress = false)
     {
         try
         {
-            await CheckForUpdateAsync();
+            await CheckForUpdateAsync(showProgress);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Update check failed unexpectedly");
+            if (showProgress && _updateMenuItem is not null)
+            {
+                _updateMenuItem.Text = "Check for updates";
+                _updateMenuItem.Enabled = true;
+            }
         }
     }
 
-    private async Task CheckForUpdateAsync()
+    private async Task CheckForUpdateAsync(bool showProgress = false)
     {
-        var release = await _updateChecker.CheckAsync(_cts.Token);
-        if (release is null) return;
+        if (_updateMenuItem is null) return;
 
-        // Add or update the menu item
-        if (_updateMenuItem is null)
+        if (showProgress)
         {
-            _updateMenuItem = new ToolStripMenuItem
-            {
-                Name = "update",
-                BackColor = Color.FromArgb(50, 80, 50)
-            };
-            _notifyIcon.ContextMenuStrip!.Items.Insert(2, _updateMenuItem);
+            _updateMenuItem.Enabled = false;
+            _updateMenuItem.BackColor = default;
+            _updateMenuItem.Text = "Checking...";
         }
 
-        _updateMenuItem.Text = $"Update to {release.TagName}";
+        var release = await _updateChecker.CheckAsync(_cts.Token);
 
-        // Remove previous handler (stored reference so -= works correctly)
-        if (_updateClickHandler is not null)
-            _updateMenuItem.Click -= _updateClickHandler;
-
-        _updateClickHandler = async (_, _) =>
+        if (release is null)
         {
-            _updateMenuItem!.Enabled = false;
-            _updateMenuItem.Text = "Downloading...";
+            if (showProgress)
+            {
+                _updateMenuItem.Text = "Up to date";
+                var resetTimer = new System.Windows.Forms.Timer { Interval = 3000 };
+                resetTimer.Tick += (_, _) =>
+                {
+                    resetTimer.Stop();
+                    resetTimer.Dispose();
+                    if (_updateMenuItem is not null && _pendingRelease is null)
+                    {
+                        _updateMenuItem.Text = "Check for updates";
+                        _updateMenuItem.Enabled = true;
+                    }
+                };
+                resetTimer.Start();
+            }
+            return;
+        }
 
-            if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
-            {
-                Application.Exit();
-            }
-            else
-            {
-                _updateMenuItem.Text = $"Update to {release.TagName}";
-                _updateMenuItem.Enabled = true;
-            }
-        };
-        _updateMenuItem.Click += _updateClickHandler;
+        _pendingRelease = release;
+        _updateMenuItem.Text = $"Update to {release.TagName}";
+        _updateMenuItem.BackColor = Color.FromArgb(50, 80, 50);
+        _updateMenuItem.Enabled = true;
 
         _notifyIcon.ShowBalloonTip(
             5000,
             "Update Available",
             $"HA PC Remote {release.TagName} is available. Right-click the tray icon to update.",
             ToolTipIcon.Info);
+    }
+
+    private async Task HandleDownloadAsync(UpdateChecker.ReleaseInfo release)
+    {
+        if (_updateMenuItem is null) return;
+
+        _updateMenuItem.Enabled = false;
+        _updateMenuItem.Text = "Downloading...";
+
+        if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
+        {
+            Application.Exit();
+        }
+        else
+        {
+            _updateMenuItem.Text = $"Update to {release.TagName}";
+            _updateMenuItem.Enabled = true;
+        }
     }
 
     private async void OnExit(object? sender, EventArgs e)
