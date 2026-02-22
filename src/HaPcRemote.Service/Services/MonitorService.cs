@@ -1,13 +1,20 @@
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
+using HaPcRemote.Shared.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
 
 public class MonitorService
 {
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(60);
+
     private readonly IOptionsMonitor<PcRemoteOptions> _options;
     private readonly ICliRunner _cliRunner;
+    private readonly SemaphoreSlim _cacheLock = new(1, 1);
+
+    private List<MonitorInfo>? _cachedMonitors;
+    private DateTime _cacheTime;
 
     public MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner)
     {
@@ -53,17 +60,37 @@ public class MonitorService
 
     public async Task<List<MonitorInfo>> GetMonitorsAsync()
     {
-        var tempFile = Path.Combine(Path.GetTempPath(), $"mmt_{Guid.NewGuid():N}.csv");
+        await _cacheLock.WaitAsync();
         try
         {
-            await _cliRunner.RunAsync(GetExePath(), ["/scomma", tempFile]);
-            var output = await File.ReadAllTextAsync(tempFile);
-            return ParseCsvOutput(output);
+            if (_cachedMonitors is not null && DateTime.UtcNow - _cacheTime < CacheDuration)
+                return _cachedMonitors;
+
+            var dir = ConfigPaths.GetWritableConfigDir();
+            Directory.CreateDirectory(dir);
+            var tempFile = Path.Combine(dir, $"mmt_{Guid.NewGuid():N}.csv");
+            try
+            {
+                await _cliRunner.RunAsync(GetExePath(), ["/scomma", tempFile]);
+                var output = await File.ReadAllTextAsync(tempFile);
+                _cachedMonitors = ParseCsvOutput(output);
+                _cacheTime = DateTime.UtcNow;
+                return _cachedMonitors;
+            }
+            finally
+            {
+                try { File.Delete(tempFile); } catch { /* best-effort cleanup */ }
+            }
         }
         finally
         {
-            try { File.Delete(tempFile); } catch { /* best-effort cleanup */ }
+            _cacheLock.Release();
         }
+    }
+
+    public void InvalidateCache()
+    {
+        _cachedMonitors = null;
     }
 
     public async Task EnableMonitorAsync(string id)

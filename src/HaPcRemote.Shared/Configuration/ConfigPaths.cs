@@ -16,7 +16,15 @@ public static class ConfigPaths
     {
         var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         if (!string.IsNullOrEmpty(commonData))
-            return Path.Combine(commonData, AppName);
+        {
+            var dir = Path.Combine(commonData, AppName);
+
+            // On non-Windows platforms, CommonApplicationData may resolve to a
+            // system directory (e.g. /usr/share) that isn't writable by the
+            // current user.  Only use it when we can actually write there.
+            if (OperatingSystem.IsWindows() || IsDirectoryWritable(dir))
+                return dir;
+        }
 
         // Fallback for platforms where CommonApplicationData is not available
         return AppContext.BaseDirectory;
@@ -27,4 +35,17 @@ public static class ConfigPaths
 
     public static string GetLogFilePath()
         => Path.Combine(GetWritableConfigDir(), "service.log");
+
+    private static bool IsDirectoryWritable(string path)
+    {
+        try
+        {
+            Directory.CreateDirectory(path);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
