@@ -23,6 +23,11 @@ namespace HaPcRemote.Service;
 [JsonSerializable(typeof(ApiResponse<List<MonitorInfo>>))]
 [JsonSerializable(typeof(MacAddressInfo))]
 [JsonSerializable(typeof(List<MacAddressInfo>))]
+[JsonSerializable(typeof(SteamGame))]
+[JsonSerializable(typeof(List<SteamGame>))]
+[JsonSerializable(typeof(ApiResponse<List<SteamGame>>))]
+[JsonSerializable(typeof(SteamRunningGame))]
+[JsonSerializable(typeof(ApiResponse<SteamRunningGame>))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]

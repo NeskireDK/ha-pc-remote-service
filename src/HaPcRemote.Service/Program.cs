@@ -101,12 +101,16 @@ builder.Services.AddHostedService<MdnsAdvertiserService>();
 if (OperatingSystem.IsWindows())
 {
     builder.Services.AddSingleton<IPowerService, WindowsPowerService>();
+    builder.Services.AddSingleton<ISteamPlatform, WindowsSteamPlatform>();
 }
 else
 {
     builder.Services.AddSingleton<IPowerService>(_ =>
         throw new NotSupportedException("Power management is only supported on Windows."));
+    builder.Services.AddSingleton<ISteamPlatform>(_ =>
+        throw new NotSupportedException("Steam integration is only supported on Windows."));
 }
+builder.Services.AddSingleton<SteamService>();
 
 var app = builder.Build();
 
@@ -141,6 +145,7 @@ app.MapSystemEndpoints();
 app.MapAppEndpoints();
 app.MapAudioEndpoints();
 app.MapMonitorEndpoints();
+app.MapSteamEndpoints();
 
 app.Run();
 
