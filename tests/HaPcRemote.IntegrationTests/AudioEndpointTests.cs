@@ -101,10 +101,10 @@ public class AudioEndpointTests : IntegrationTestBase
 
     [Fact]
     [Trait("Category", "Mutating")]
-    public async Task SetDefaultDevice_InvalidDevice_Returns500()
+    public async Task SetDefaultDevice_InvalidDevice_Returns404()
     {
         var response = await PostRawAsync("/api/audio/set/NonexistentDevice123");
 
-        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.InternalServerError);
+        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
     }
 }

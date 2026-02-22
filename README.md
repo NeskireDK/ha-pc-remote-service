@@ -112,6 +112,17 @@ Apps are defined in `appsettings.json` under `PcRemote.Apps`.
 | `POST` | `/api/app/launch/{appKey}` | Launch a configured app |
 | `POST` | `/api/app/kill/{appKey}` | Kill a configured app |
 
+### Steam
+
+Requires Steam to be installed. Returns the top 20 most recently played games.
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api/steam/games` | List installed games (sorted by last played, top 20) |
+| `GET` | `/api/steam/running` | Currently running game, or `null` if none |
+| `POST` | `/api/steam/run/{appId}` | Launch a game by Steam app ID |
+| `POST` | `/api/steam/stop` | Stop the currently running game |
+
 ## Configuration
 
 Runtime-generated settings (API key) are stored in `%ProgramData%\HaPcRemote\appsettings.json` so the service works correctly when installed in read-only locations like `C:\Program Files`. Static configuration is read from `appsettings.json` next to the executable; the ProgramData file overrides matching values.
