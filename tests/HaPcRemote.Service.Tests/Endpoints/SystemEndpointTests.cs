@@ -22,7 +22,8 @@ public class SystemEndpointTests : EndpointTestBase
     [Fact]
     public async Task Sleep_ServiceThrows_Returns500()
     {
-        A.CallTo(() => PowerService.SleepAsync()).Throws<InvalidOperationException>();
+        A.CallTo(() => PowerService.SleepAsync())
+            .Returns(Task.FromException(new InvalidOperationException()));
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/system/sleep", null);
