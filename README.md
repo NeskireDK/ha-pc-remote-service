@@ -80,8 +80,6 @@ Requires `SoundVolumeView.exe` in `ToolsPath`.
 | `POST` | `/api/audio/set/{deviceName}` | Switch default output device |
 | `POST` | `/api/audio/volume/{level}` | Set master volume (0-100) |
 
-> **TODO:** Filter `GET /api/audio/devices` to return only hardware sound card output devices. Currently, virtual audio devices created by applications (e.g. communication apps) appear in the list alongside real output devices.
-
 ### Monitors — Direct Control
 
 Requires `MultiMonitorTool.exe` in `ToolsPath`.
@@ -89,12 +87,10 @@ Requires `MultiMonitorTool.exe` in `ToolsPath`.
 | Method | Route | Description |
 |--------|-------|-------------|
 | `GET` | `/api/monitor/list` | List connected monitors |
-| `POST` | `/api/monitor/solo/{id}` | Enable only this monitor, disable all others |
+| `POST` | `/api/monitor/solo/{id}` | Enable this monitor, set as primary, disable all others |
 | `POST` | `/api/monitor/enable/{id}` | Enable a monitor |
 | `POST` | `/api/monitor/disable/{id}` | Disable a monitor |
 | `POST` | `/api/monitor/primary/{id}` | Set a monitor as primary |
-
-> **TODO:** `POST /api/monitor/solo/{id}` should also set the selected monitor as primary (currently it only disables the others). Selecting a monitor should mean: enable + set as primary + disable all others. The inverse (re-enabling a previously disabled monitor) should restore it without changing the primary.
 
 ### Monitors — Profiles
 
@@ -187,6 +183,8 @@ dotnet build HaPcRemote.sln
 dotnet test HaPcRemote.sln
 dotnet publish src/HaPcRemote.Service -c Release -r win-x64 /p:PublishAot=true
 ```
+
+> **TODO:** Tray app installer is ~46 MB because `--self-contained` bundles the full .NET runtime. WinForms does not support trimming (`NETSDK1175`), so size cannot be reduced that way. Options: (1) framework-dependent publish + Inno Setup prerequisite to install .NET if missing; (2) accept current size.
 
 ## License
 

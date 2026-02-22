@@ -98,18 +98,21 @@ public class MonitorService
     {
         var monitor = await ResolveMonitorAsync(id);
         await _cliRunner.RunAsync(GetExePath(), ["/enable", monitor.Name]);
+        InvalidateCache();
     }
 
     public async Task DisableMonitorAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
         await _cliRunner.RunAsync(GetExePath(), ["/disable", monitor.Name]);
+        InvalidateCache();
     }
 
     public async Task SetPrimaryAsync(string id)
     {
         var monitor = await ResolveMonitorAsync(id);
         await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", monitor.Name]);
+        InvalidateCache();
     }
 
     public async Task SoloMonitorAsync(string id)
@@ -117,18 +120,28 @@ public class MonitorService
         var monitors = await GetMonitorsAsync();
         var target = FindMonitor(monitors, id);
 
-        // Disable all monitors except the target
+        // Step 1: enable the target so it is active before becoming primary
+        if (!target.IsActive)
+        {
+            await _cliRunner.RunAsync(GetExePath(), ["/enable", target.Name]);
+            await Task.Delay(500);
+        }
+
+        // Step 2: set the target as primary (must be active first)
+        await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", target.Name]);
+        await Task.Delay(500);
+
+        // Step 3: disable all other monitors
         foreach (var m in monitors.Where(m => !MatchesId(m, id)))
         {
             if (m.IsActive)
+            {
                 await _cliRunner.RunAsync(GetExePath(), ["/disable", m.Name]);
+                await Task.Delay(500);
+            }
         }
 
-        // Enable target and set as primary
-        if (!target.IsActive)
-            await _cliRunner.RunAsync(GetExePath(), ["/enable", target.Name]);
-
-        await _cliRunner.RunAsync(GetExePath(), ["/SetPrimary", target.Name]);
+        InvalidateCache();
     }
 
     // ── XML parsing ──────────────────────────────────────────────────

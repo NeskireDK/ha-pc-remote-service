@@ -8,7 +8,7 @@ namespace HaPcRemote.Service.Tests.Endpoints;
 
 public class AudioEndpointTests : EndpointTestBase
 {
-    private const string SampleCsv = "Speakers,Render,Render,50.0%\nHeadphones,Render,,75.0%";
+    private const string SampleCsv = "Device,Speakers,Render,Render,50.0%\nDevice,Headphones,Render,,75.0%";
 
     [Fact]
     public async Task GetDevices_ReturnsDeviceList()
@@ -47,7 +47,7 @@ public class AudioEndpointTests : EndpointTestBase
     public async Task GetCurrent_NoDefault_Returns404()
     {
         A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns("Speakers,Render,,50.0%"); // No default
+            .Returns("Device,Speakers,Render,,50.0%"); // No default
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/audio/current");

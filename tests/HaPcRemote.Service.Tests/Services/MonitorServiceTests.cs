@@ -583,27 +583,100 @@ public class MonitorServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SoloMonitorAsync_DisablesOthersAndEnablesTarget()
+    public async Task SoloMonitorAsync_TargetAlreadyActive_SetsPrimaryThenDisablesOthers()
     {
-        SetupCliRunnerWithXml();
+        // DEL4321 (DISPLAY2) is already active in SampleXml
+        var calls = new List<string[]>();
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Invokes((string _, IEnumerable<string> args, int _) =>
+            {
+                var argList = args.ToList();
+                if (argList.Count >= 2 && argList[0] == "/sxml" && !string.IsNullOrEmpty(argList[1]))
+                    File.WriteAllText(argList[1], SampleXml);
+                else
+                    calls.Add(argList.ToArray());
+            })
+            .Returns(string.Empty);
+
         var service = CreateService();
 
         await service.SoloMonitorAsync("DEL4321");
 
-        // Should disable DISPLAY1 and DISPLAY3 (both active, not the target)
-        A.CallTo(() => _cliRunner.RunAsync(
-            A<string>._,
-            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/disable", @"\\.\DISPLAY1" }),
-            A<int>._)).MustHaveHappenedOnceExactly();
-        A.CallTo(() => _cliRunner.RunAsync(
-            A<string>._,
-            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/disable", @"\\.\DISPLAY3" }),
-            A<int>._)).MustHaveHappenedOnceExactly();
-        // Should set target as primary
-        A.CallTo(() => _cliRunner.RunAsync(
-            A<string>._,
-            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetPrimary", @"\\.\DISPLAY2" }),
-            A<int>._)).MustHaveHappenedOnceExactly();
+        // Must NOT enable the target (it is already active)
+        calls.ShouldNotContain(c => c[0] == "/enable" && c[1] == @"\\.\DISPLAY2");
+
+        // First mutating call must be SetPrimary on the target
+        calls[0][0].ShouldBe("/SetPrimary");
+        calls[0][1].ShouldBe(@"\\.\DISPLAY2");
+
+        // Then disables of the other active monitors (DISPLAY1 and DISPLAY3)
+        calls.ShouldContain(c => c[0] == "/disable" && c[1] == @"\\.\DISPLAY1");
+        calls.ShouldContain(c => c[0] == "/disable" && c[1] == @"\\.\DISPLAY3");
+
+        // No disable on the target
+        calls.ShouldNotContain(c => c[0] == "/disable" && c[1] == @"\\.\DISPLAY2");
+    }
+
+    [Fact]
+    public async Task SoloMonitorAsync_TargetInactive_EnablesThenSetsPrimaryThenDisablesOthers()
+    {
+        // Use XML where DISPLAY2 is inactive so the enable step fires
+        const string xmlWithInactiveTarget =
+            """
+            <?xml version="1.0" ?>
+            <monitors_list>
+            <item>
+            <resolution>3840 X 2160</resolution>
+            <active>Yes</active>
+            <disconnected>No</disconnected>
+            <primary>Yes</primary>
+            <frequency>144</frequency>
+            <name>\\.\DISPLAY1</name>
+            <short_monitor_id>GSM59A4</short_monitor_id>
+            <monitor_name>LG ULTRAGEAR</monitor_name>
+            <monitor_serial_number>ABC123</monitor_serial_number>
+            </item>
+            <item>
+            <resolution>2560 X 1440</resolution>
+            <active>No</active>
+            <disconnected>No</disconnected>
+            <primary>No</primary>
+            <frequency>60</frequency>
+            <name>\\.\DISPLAY2</name>
+            <short_monitor_id>DEL4321</short_monitor_id>
+            <monitor_name>Dell U2723QE</monitor_name>
+            <monitor_serial_number>XYZ789</monitor_serial_number>
+            </item>
+            </monitors_list>
+            """;
+
+        var calls = new List<string[]>();
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Invokes((string _, IEnumerable<string> args, int _) =>
+            {
+                var argList = args.ToList();
+                if (argList.Count >= 2 && argList[0] == "/sxml" && !string.IsNullOrEmpty(argList[1]))
+                    File.WriteAllText(argList[1], xmlWithInactiveTarget);
+                else
+                    calls.Add(argList.ToArray());
+            })
+            .Returns(string.Empty);
+
+        var service = CreateService();
+
+        await service.SoloMonitorAsync("DEL4321");
+
+        // Order: enable target, set primary, disable others
+        calls[0][0].ShouldBe("/enable");
+        calls[0][1].ShouldBe(@"\\.\DISPLAY2");
+
+        calls[1][0].ShouldBe("/SetPrimary");
+        calls[1][1].ShouldBe(@"\\.\DISPLAY2");
+
+        calls[2][0].ShouldBe("/disable");
+        calls[2][1].ShouldBe(@"\\.\DISPLAY1");
+
+        calls.Count.ShouldBe(3);
     }
 
     [Fact]
