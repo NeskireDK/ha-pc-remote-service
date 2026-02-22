@@ -8,10 +8,12 @@ namespace HaPcRemote.Service.Services;
 public class AppService
 {
     private readonly IOptionsMonitor<PcRemoteOptions> _options;
+    private readonly IAppLauncher _appLauncher;
 
-    public AppService(IOptionsMonitor<PcRemoteOptions> options)
+    public AppService(IOptionsMonitor<PcRemoteOptions> options, IAppLauncher appLauncher)
     {
         _options = options;
+        _appLauncher = appLauncher;
     }
 
     public Task<List<AppInfo>> GetAllStatusesAsync()
@@ -34,22 +36,10 @@ public class AppService
         return Task.FromResult(result);
     }
 
-    public Task LaunchAsync(string appKey)
+    public async Task LaunchAsync(string appKey)
     {
         var definition = GetDefinition(appKey);
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = definition.ExePath,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        if (!string.IsNullOrEmpty(definition.Arguments))
-            startInfo.Arguments = definition.Arguments;
-
-        Process.Start(startInfo);
-        return Task.CompletedTask;
+        await _appLauncher.LaunchAsync(definition.ExePath, definition.Arguments);
     }
 
     public Task KillAsync(string appKey)

@@ -6,6 +6,7 @@
 #define MyAppPublisher "NeskireDK"
 #define MyAppURL "https://github.com/NeskireDK/ha-pc-remote-service"
 #define MyAppExeName "HaPcRemote.Service.exe"
+#define TrayExeName "HaPcRemote.Tray.exe"
 #define ServiceName "HaPcRemoteService"
 #define ServiceDisplayName "HA PC Remote Service"
 #define ServiceDescription "Home Assistant PC Remote Service"
@@ -31,11 +32,18 @@ WizardStyle=modern
 
 [Files]
 Source: "..\publish\win-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\tray\{#TrayExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\src\HaPcRemote.Service\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
 
 [Dirs]
 Name: "{app}\tools"
 Name: "{app}\monitor-profiles"
+
+[Icons]
+Name: "{commonstartup}\HA PC Remote Tray"; Filename: "{app}\{#TrayExeName}"; Comment: "HA PC Remote system tray helper"
+
+[Run]
+Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser skipifsilent
 
 [Code]
 const
@@ -129,6 +137,14 @@ begin
   end;
 end;
 
+procedure KillTrayApp;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'),
+    '/F /IM {#TrayExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 function RunPowerShell(const Cmd: String): Boolean;
 var
   ResultCode: Integer;
@@ -163,6 +179,8 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
+  // Stop tray app before upgrade
+  KillTrayApp;
   if IsServiceInstalled then begin
     if not StopServiceAndWait then
       Result := 'Could not stop the existing service. Please stop it manually and retry.';
@@ -215,6 +233,7 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then begin
+    KillTrayApp;
     if IsServiceInstalled then begin
       StopServiceAndWait;
       RemoveServiceEntry;

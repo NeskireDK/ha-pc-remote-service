@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\HaPcRemote.Shared\HaPcRemote.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="HaPcRemote.Service.Tests" />
   </ItemGroup>
 

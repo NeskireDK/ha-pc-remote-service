@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HaPcRemote.Service\HaPcRemote.Service.csproj" />
+    <ProjectReference Include="..\..\src\HaPcRemote.Shared\HaPcRemote.Shared.csproj" />
   </ItemGroup>
 
 </Project>

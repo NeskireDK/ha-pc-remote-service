@@ -22,7 +22,7 @@ public class AppServiceTests
     [Fact]
     public async Task LaunchAsync_UnknownKey_ThrowsKeyNotFoundException()
     {
-        var service = new AppService(CreateOptions());
+        var service = new AppService(CreateOptions(), A.Fake<IAppLauncher>());
 
         await Should.ThrowAsync<KeyNotFoundException>(
             () => service.LaunchAsync("nonexistent"));
@@ -31,7 +31,7 @@ public class AppServiceTests
     [Fact]
     public async Task KillAsync_UnknownKey_ThrowsKeyNotFoundException()
     {
-        var service = new AppService(CreateOptions());
+        var service = new AppService(CreateOptions(), A.Fake<IAppLauncher>());
 
         await Should.ThrowAsync<KeyNotFoundException>(
             () => service.KillAsync("nonexistent"));
@@ -40,7 +40,7 @@ public class AppServiceTests
     [Fact]
     public async Task GetStatusAsync_UnknownKey_ThrowsKeyNotFoundException()
     {
-        var service = new AppService(CreateOptions());
+        var service = new AppService(CreateOptions(), A.Fake<IAppLauncher>());
 
         await Should.ThrowAsync<KeyNotFoundException>(
             () => service.GetStatusAsync("nonexistent"));
@@ -64,7 +64,7 @@ public class AppServiceTests
                 ProcessName = "calc_test_unlikely_running_12345"
             }
         };
-        var service = new AppService(CreateOptions(apps));
+        var service = new AppService(CreateOptions(apps), A.Fake<IAppLauncher>());
 
         var result = await service.GetAllStatusesAsync();
 
@@ -76,7 +76,7 @@ public class AppServiceTests
     [Fact]
     public async Task GetAllStatusesAsync_EmptyConfig_ReturnsEmptyList()
     {
-        var service = new AppService(CreateOptions());
+        var service = new AppService(CreateOptions(), A.Fake<IAppLauncher>());
 
         var result = await service.GetAllStatusesAsync();
 
@@ -95,7 +95,7 @@ public class AppServiceTests
                 ProcessName = "myapp_test_unlikely_running_12345"
             }
         };
-        var service = new AppService(CreateOptions(apps));
+        var service = new AppService(CreateOptions(apps), A.Fake<IAppLauncher>());
 
         var result = await service.GetStatusAsync("myapp");
 
