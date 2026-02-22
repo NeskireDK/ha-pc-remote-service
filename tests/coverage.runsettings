@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <Exclude>
+            [HaPcRemote.Service]HaPcRemote.Service.AppJsonContext*,
+            [HaPcRemote.Service]Microsoft.AspNetCore.Http.Generated*,
+            [HaPcRemote.Service]HaPcRemote.Service.Configuration.ConfigPaths,
+            [HaPcRemote.Service]HaPcRemote.Service.Services.WindowsPowerService,
+            [HaPcRemote.Service]HaPcRemote.Service.Services.MdnsAdvertiserService,
+            [HaPcRemote.Service]HaPcRemote.Service.Services.CliRunner,
+            [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcJsonContext*,
+            [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcServer,
+            [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcClient,
+            [HaPcRemote.Tray]*
+          </Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

@@ -103,4 +103,47 @@ public class AppServiceTests
         result.DisplayName.ShouldBe("My App");
         result.IsRunning.ShouldBeFalse();
     }
+
+    [Fact]
+    public async Task LaunchAsync_KnownKey_CallsAppLauncherWithCorrectArgs()
+    {
+        var launcher = A.Fake<IAppLauncher>();
+        var apps = new Dictionary<string, AppDefinitionOptions>
+        {
+            ["notepad"] = new()
+            {
+                DisplayName = "Notepad",
+                ExePath = @"C:\Windows\notepad.exe",
+                Arguments = "--new-window",
+                ProcessName = "notepad"
+            }
+        };
+        var service = new AppService(CreateOptions(apps), launcher);
+
+        await service.LaunchAsync("notepad");
+
+        A.CallTo(() => launcher.LaunchAsync(@"C:\Windows\notepad.exe", "--new-window"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task LaunchAsync_NullArguments_PassesNullToLauncher()
+    {
+        var launcher = A.Fake<IAppLauncher>();
+        var apps = new Dictionary<string, AppDefinitionOptions>
+        {
+            ["calc"] = new()
+            {
+                DisplayName = "Calculator",
+                ExePath = "calc.exe",
+                ProcessName = "calc"
+            }
+        };
+        var service = new AppService(CreateOptions(apps), launcher);
+
+        await service.LaunchAsync("calc");
+
+        A.CallTo(() => launcher.LaunchAsync("calc.exe", null))
+            .MustHaveHappenedOnceExactly();
+    }
 }
