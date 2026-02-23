@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using HaPcRemote.Service.Logging;
 using HaPcRemote.Service.Services;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Tray.Forms;
@@ -35,7 +36,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private LogViewerForm? _logViewerForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _autoUpdateMenuItem;
-    private ToolStripMenuItem? _debugLoggingMenuItem;
     private UpdateChecker.ReleaseInfo? _pendingRelease;
 
     public TrayApplicationContext(IServiceProvider webServices, CancellationTokenSource webCts, InMemoryLogProvider logProvider)
@@ -53,7 +53,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _updateChecker = new UpdateChecker(loggerFactory.CreateLogger<UpdateChecker>());
 
         var settings = TraySettings.Load();
-        InMemoryLogProvider.DebugEnabled = settings.DebugLogging;
+        var logLevel = ParseLogLevel(settings.LogLevel);
+        InMemoryLogProvider.MinimumLevel = logLevel;
+        FileLoggerProvider.MinimumLevel = logLevel;
 
         var appIcon = LoadAppIcon();
         _defaultIcon = appIcon;
@@ -104,9 +106,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _autoUpdateMenuItem.CheckedChanged += OnAutoUpdateToggled;
         menu.Items.Add(_autoUpdateMenuItem);
 
-        _debugLoggingMenuItem = new ToolStripMenuItem("Debug Logging") { CheckOnClick = true, Checked = settings.DebugLogging };
-        _debugLoggingMenuItem.CheckedChanged += OnDebugLoggingToggled;
-        menu.Items.Add(_debugLoggingMenuItem);
+        var loggingMenu = new ToolStripMenuItem("Logging");
+        var levels = new[] { ("Error", LogLevel.Error), ("Warning", LogLevel.Warning), ("Info", LogLevel.Information), ("Verbose", LogLevel.Debug) };
+        foreach (var (label, level) in levels)
+        {
+            var item = new ToolStripMenuItem(label) { CheckOnClick = false, Checked = false };
+            item.Click += (_, _) => OnLogLevelSelected(loggingMenu, level);
+            loggingMenu.DropDownItems.Add(item);
+        }
+        menu.Items.Add(loggingMenu);
+        ApplyLogLevelToMenu(loggingMenu, ParseLogLevel(settings.LogLevel));
 
         menu.Items.Add("Exit", null, OnExit);
         return menu;
@@ -153,7 +162,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 ? $"HA PC Remote {VersionString} — {running!.Name}"
                 : $"HA PC Remote {VersionString}";
         }
-        catch { /* ignore poll errors */ }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Steam poll error");
+        }
     }
 
     private Icon GetPlayingIcon()
@@ -177,13 +189,38 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _logger.LogInformation("Auto update {State}", s.AutoUpdate ? "enabled" : "disabled");
     }
 
-    private void OnDebugLoggingToggled(object? sender, EventArgs e)
+    private static LogLevel ParseLogLevel(string level) => level switch
+    {
+        "Error"   => LogLevel.Error,
+        "Info"    => LogLevel.Information,
+        "Verbose" => LogLevel.Debug,
+        _         => LogLevel.Warning
+    };
+
+    private static string LogLevelToString(LogLevel level) => level switch
+    {
+        LogLevel.Error       => "Error",
+        LogLevel.Information => "Info",
+        LogLevel.Debug       => "Verbose",
+        _                    => "Warning"
+    };
+
+    private static void ApplyLogLevelToMenu(ToolStripMenuItem loggingMenu, LogLevel active)
+    {
+        foreach (ToolStripMenuItem item in loggingMenu.DropDownItems)
+            item.Checked = item.Text == LogLevelToString(active) ||
+                           (item.Text == "Warning" && active == LogLevel.Warning);
+    }
+
+    private void OnLogLevelSelected(ToolStripMenuItem loggingMenu, LogLevel level)
     {
         var s = TraySettings.Load();
-        s.DebugLogging = _debugLoggingMenuItem!.Checked;
+        s.LogLevel = LogLevelToString(level);
         s.Save();
-        InMemoryLogProvider.DebugEnabled = s.DebugLogging;
-        _logger.LogInformation("Debug logging {State}", s.DebugLogging ? "enabled" : "disabled");
+        InMemoryLogProvider.MinimumLevel = level;
+        FileLoggerProvider.MinimumLevel = level;
+        ApplyLogLevelToMenu(loggingMenu, level);
+        _logger.LogInformation("Log level set to {Level}", level);
     }
 
     private static int GetUpdateTimerInterval(bool autoUpdate)

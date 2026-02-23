@@ -7,7 +7,7 @@ namespace HaPcRemote.Tray.Models;
 internal sealed class TraySettings
 {
     public bool AutoUpdate { get; set; } = false;
-    public bool DebugLogging { get; set; } = false;
+    public string LogLevel { get; set; } = "Warning";
 
     public static TraySettings Load()
     {

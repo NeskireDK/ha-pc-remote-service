@@ -8,7 +8,7 @@ internal sealed record LogEntry(DateTime Timestamp, LogLevel Level, string Categ
 // Logger provider that stores entries in a ring buffer
 internal sealed class InMemoryLogProvider : ILoggerProvider
 {
-    public static bool DebugEnabled { get; set; }
+    public static Microsoft.Extensions.Logging.LogLevel MinimumLevel { get; set; } = Microsoft.Extensions.Logging.LogLevel.Warning;
 
     private readonly int _maxEntries;
     private readonly List<LogEntry> _entries = [];
@@ -53,8 +53,7 @@ internal sealed class InMemoryLogger(InMemoryLogProvider provider, string catego
 {
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel) =>
-        logLevel >= (InMemoryLogProvider.DebugEnabled ? LogLevel.Debug : LogLevel.Information);
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= InMemoryLogProvider.MinimumLevel;
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {

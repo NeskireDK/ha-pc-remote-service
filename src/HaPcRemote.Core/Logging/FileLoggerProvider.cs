@@ -8,6 +8,8 @@ namespace HaPcRemote.Service.Logging;
 /// </summary>
 internal sealed class FileLoggerProvider : ILoggerProvider
 {
+    public static Microsoft.Extensions.Logging.LogLevel MinimumLevel { get; set; } = Microsoft.Extensions.Logging.LogLevel.Warning;
+
     private readonly string _filePath;
     private readonly long _maxFileSize;
     private readonly Lock _lock = new();
@@ -77,7 +79,7 @@ internal sealed class FileLogger(FileLoggerProvider provider, string category) :
 {
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= FileLoggerProvider.MinimumLevel;
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
         Func<TState, Exception?, string> formatter)
