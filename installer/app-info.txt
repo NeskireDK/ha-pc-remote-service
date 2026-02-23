@@ -1,0 +1,27 @@
+HA PC Remote Service
+
+This application runs as a Windows system tray app and exposes a local REST API that lets Home Assistant control your PC remotely.
+
+Features:
+  - Sleep / wake-on-LAN
+  - Audio device and volume control
+  - Monitor layout switching via saved profiles
+  - Steam game tracking and launch
+
+Companion Integration Required
+-------------------------------
+To use this service you need the "PC Remote" custom integration for Home Assistant,
+available via HACS or at:
+
+  https://github.com/NeskireDK/ha-pc-remote
+
+After installing, go to Settings > Devices & Services > Add Integration and search
+for "PC Remote". If your PC is on the same network, it will be discovered automatically
+via mDNS.
+
+What this installer does:
+  - Installs HA PC Remote to your chosen directory
+  - Downloads SoundVolumeView and MultiMonitorTool (NirSoft, freeware)
+  - Adds a firewall rule for the local API (port 5000)
+  - Installs .NET 10 Desktop Runtime if not already present
+  - Adds the tray app to Windows startup

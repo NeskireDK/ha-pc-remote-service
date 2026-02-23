@@ -1,57 +1,64 @@
 # ha-pc-remote-service
 
-A lightweight Windows Service (Native AOT) that exposes a REST API for controlling a Windows PC. Designed for use with the [ha-pc-remote](https://github.com/NeskireDK/ha-pc-remote) Home Assistant integration.
+A Windows system tray application (and Linux headless daemon) that embeds a Kestrel REST API for controlling a PC remotely. Designed for use with the [ha-pc-remote](https://github.com/NeskireDK/ha-pc-remote) Home Assistant integration.
 
-The service advertises itself via mDNS (`_pc-remote._tcp`) for auto-discovery by the HA integration.
+The app advertises itself via mDNS (`_pc-remote._tcp`) for auto-discovery by the HA integration.
 
 ## Installation
 
-### Option A: Installer (Recommended)
+### Windows — Installer (Recommended)
 
 1. Download `HaPcRemoteService-Setup-x.x.x.exe` from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
-2. Run the installer
+2. Run the installer — choose your install directory (default: `C:\Program Files\HA PC Remote\`)
 
 The installer handles everything:
-- Installs to `C:\Program Files\HA PC Remote Service\`
 - Downloads [NirSoft tools](#nirsoft-tools) automatically
-- Registers and starts the Windows Service (auto-start on boot)
+- Adds the tray app to startup
 - Adds a firewall rule for port 5000
-- Adds the system tray app to startup (all users)
-- Upgrades in-place — stops the existing service, updates files, restarts
+- Installs .NET 10 Desktop Runtime if missing
+- Upgrades in-place — stops the running tray, updates files, restarts
+- Config and monitor profiles are stored in `%AppData%\HaPcRemote\`
 
-To uninstall, use **Add or Remove Programs**. The uninstaller removes the service, firewall rule, and tray startup entry.
+To uninstall, use **Add or Remove Programs**. The uninstaller removes the tray startup entry and firewall rule.
 
-### Option B: Portable
+### Windows — Portable
 
-1. Download `HaPcRemote-win-x64.zip` (or `win-arm64`) from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
+1. Download `HaPcRemote-win-x64.zip` from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
 2. Extract to a directory of your choice (e.g. `C:\HaPcRemote\`)
 3. Download [NirSoft tools](#nirsoft-tools) and place them in a `tools/` folder next to the exe
-4. Run `HaPcRemote.Service.exe` once — it auto-generates an API key in `%ProgramData%\HaPcRemote\appsettings.json`
-5. Register as a Windows Service and open the firewall:
+4. Run `HaPcRemote.Tray.exe` — it auto-generates an API key in `%AppData%\HaPcRemote\appsettings.json`
+5. Add `HaPcRemote.Tray.exe` to your shell startup (e.g. the Windows Startup folder or Task Scheduler)
+6. Open the firewall:
    ```powershell
-   sc create HaPcRemoteService binPath="C:\HaPcRemote\HaPcRemote.Service.exe" start=auto
-   sc start HaPcRemoteService
-   netsh advfirewall firewall add rule name="HA PC Remote Service" dir=in action=allow protocol=TCP localport=5000
+   netsh advfirewall firewall add rule name="HA PC Remote" dir=in action=allow protocol=TCP localport=5000 program="C:\HaPcRemote\HaPcRemote.Tray.exe" enable=yes
    ```
-6. Start the tray app (`HaPcRemote.Tray.exe`) and add it to shell startup — required for audio, monitor, and Steam features
 
 To uninstall:
 ```powershell
-sc stop HaPcRemoteService
-sc delete HaPcRemoteService
-netsh advfirewall firewall delete rule name="HA PC Remote Service"
+netsh advfirewall firewall delete rule name="HA PC Remote"
 ```
 
-### System Tray App
+### Linux — Headless
 
-The tray app runs in the user session and provides:
+1. Download `HaPcRemote-linux-x64.tar.gz` (or `arm64`) from [Releases](https://github.com/NeskireDK/ha-pc-remote-service/releases)
+2. Extract and place the binary at `~/.local/bin/ha-pc-remote`
+3. Install the systemd user service:
+   ```bash
+   cp installer/ha-pc-remote.service ~/.config/systemd/user/
+   systemctl --user enable --now ha-pc-remote
+   ```
+
+Config is stored in `~/.config/HaPcRemote/appsettings.json`.
+
+### System Tray App (Windows)
+
+The tray app is the main process — it hosts the HTTP server (Kestrel) directly. It must be running for any API feature to work.
+
+Features:
 - **Log viewer** — shows live service logs (right-click → Show Log)
 - **API key display** — shows the auto-generated API key (right-click → Show API Key)
-- **Service restart** — restarts the Windows Service (requires UAC)
-- **Update notifications** — checks GitHub for new releases and can update in-place
-- **IPC bridge** — the service delegates CLI tool execution and Steam operations to the tray app so tools run in the user session (required for monitor, audio, and Steam features)
-
-The tray app is required for monitor, audio, and Steam features to work correctly. Portable installs must add `HaPcRemote.Tray.exe` to shell startup (e.g. the Windows Startup folder).
+- **Log level** — configurable: Error / Warning / Info / Verbose (right-click → Logging)
+- **Auto-update** — checks GitHub for new releases, downloads and runs the installer
 
 ## API Endpoints
 
@@ -94,7 +101,7 @@ Requires `MultiMonitorTool.exe` in `ToolsPath`.
 
 ### Monitors — Profiles
 
-Profile `.cfg` files are saved in `ProfilesPath` (created with MultiMonitorTool).
+Profile `.cfg` files are stored in `ProfilesPath` (`%AppData%\HaPcRemote\monitor-profiles` by default), exported from MultiMonitorTool.
 
 | Method | Route | Description |
 |--------|-------|-------------|
@@ -125,7 +132,7 @@ Requires Steam to be installed. Returns the top 20 most recently played games.
 
 ## Configuration
 
-Runtime-generated settings (API key) are stored in `%ProgramData%\HaPcRemote\appsettings.json` so the service works correctly when installed in read-only locations like `C:\Program Files`. Static configuration is read from `appsettings.json` next to the executable; the ProgramData file overrides matching values.
+Settings are stored in `%AppData%\HaPcRemote\appsettings.json`. The file is auto-generated on first run. Static config next to the exe overrides matching values.
 
 Full example:
 
@@ -138,7 +145,7 @@ Full example:
       "ApiKey": "<auto-generated>"
     },
     "ToolsPath": "./tools",
-    "ProfilesPath": "./monitor-profiles",
+    "ProfilesPath": "%AppData%\\HaPcRemote\\monitor-profiles",
     "Apps": {
       "steam-bigpicture": {
         "DisplayName": "Steam Big Picture",
@@ -157,7 +164,7 @@ Full example:
 | `Auth.Enabled` | `true` | Require `X-Api-Key` header |
 | `Auth.ApiKey` | (generated) | API key, auto-generated on first run |
 | `ToolsPath` | `./tools` | Directory containing NirSoft executables |
-| `ProfilesPath` | `./monitor-profiles` | Directory containing monitor profile `.cfg` files |
+| `ProfilesPath` | `%AppData%\HaPcRemote\monitor-profiles` | Directory containing monitor profile `.cfg` files |
 | `Apps` | `{}` | Map of app key to app definition |
 
 ### App Definition
@@ -181,30 +188,15 @@ Two free NirSoft tools are required for audio and monitor features. The installe
 ```bash
 dotnet build HaPcRemote.sln
 dotnet test HaPcRemote.sln
-dotnet publish src/HaPcRemote.Service -c Release -r win-x64 /p:PublishAot=true
+dotnet publish src/HaPcRemote.Tray -c Release -r win-x64
 ```
-
-## Known Issues
-- **Monitor Profile List seems to have issues with loading / showing cfg's despite successfull response**:
-```[18.31.09] [INF] Diagnostics - Request starting HTTP/1.1 GET http://192.168.1.232:5000/api/monitor/profiles - - -
-[18.31.09] [INF] EndpointMiddleware - Executing endpoint 'HTTP: GET /api/monitor/profiles'
-[18.31.09] [INF] JsonResult - Writing value of type 'ApiResponse`1' as Json.
-[18.31.09] [INF] EndpointMiddleware - Executed endpoint 'HTTP: GET /api/monitor/profiles'
-[18.31.09] [INF] Diagnostics - Request finished HTTP/1.1 GET http://192.168.1.232:5000/api/monitor/profiles - 200 - application/json;+charset=utf-8 6.9362ms
-```
-- **Whlist stopping of games work, launching them doesnt, no logs found**
-- **Missing menu item in Tray to go to monitor profile folder**
-- **Startup logging doesnt show path for settings nor monitor profiles**
-- **What is playing Icon isnt implemented yet**
-- **Tools arent cleaned up after uninstall, neither is folder in install path**
-- **Steam: game launch silently no-ops if tray isn't running** — `IpcSteamPlatform.Send` returns `null` without error when the tray is not connected, and the endpoint still returns 200. No game launches, no error surfaces in HA. Fix: return 503 when IPC is unavailable.
-- **Steam: running game not highlighted on cold-start** — if the currently running game falls outside the top-20 recently-played list, `source` has a name that is absent from `source_list` and no entry is highlighted. Fix: always include the running game in the list regardless of rank.
-- **Monitor profiles shows empty list** — the profiles directory (`ProfilesPath`, default `./monitor-profiles`) must exist next to the service exe before the service starts. If it is missing, the endpoint returns an empty list. Create the directory and add `.cfg` files exported from MultiMonitorTool.
 
 ## Roadmap
 
-- [ ] Logging level option in tray menu, allowing change logging between Info, debug, error
-- [ ] Linux support (systemd)
+- [x] Debug logging toggle in tray menu *(v0.9.2)*
+- [x] Configurable log levels: Error / Warning / Info / Verbose *(v0.9.4)*
+- [x] Linux headless daemon + systemd user service *(v0.9.5)*
+- [ ] PC Mode endpoint + HA select entity *(v1.0)*
 - [ ] Submit brand icons to [home-assistant/brands](https://github.com/home-assistant/brands)
 
 ## License
