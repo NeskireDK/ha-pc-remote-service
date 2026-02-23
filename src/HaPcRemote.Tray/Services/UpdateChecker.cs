@@ -64,13 +64,22 @@ internal sealed class UpdateChecker(ILogger<UpdateChecker> logger)
             file.Close();
 
             logger.LogInformation("Launching installer from {Path}", tempPath);
-            Process.Start(new ProcessStartInfo
+            var process = Process.Start(new ProcessStartInfo
             {
                 FileName = tempPath,
                 Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS",
                 UseShellExecute = true,
                 Verb = "runas"
             });
+
+            if (process == null) return false;
+
+            await process.WaitForExitAsync(ct);
+            if (process.ExitCode != 0)
+            {
+                logger.LogError("Installer exited with code {Code}", process.ExitCode);
+                return false;
+            }
 
             return true;
         }
