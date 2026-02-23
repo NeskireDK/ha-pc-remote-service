@@ -196,7 +196,6 @@ dotnet publish src/HaPcRemote.Service -c Release -r win-x64 /p:PublishAot=true
 - **Missing menu item in Tray to go to monitor profile folder**
 - **Startup logging doesnt show path for settings nor monitor profiles**
 - **What is playing Icon isnt implemented yet**
-- **Logging level option is non-funcitonal and doesnt show in tray menu, cant change between Info, debug, error**
 - **Tools arent cleaned up after uninstall, neither is folder in install path**
 - **Steam: game launch silently no-ops if tray isn't running** — `IpcSteamPlatform.Send` returns `null` without error when the tray is not connected, and the endpoint still returns 200. No game launches, no error surfaces in HA. Fix: return 503 when IPC is unavailable.
 - **Steam: running game not highlighted on cold-start** — if the currently running game falls outside the top-20 recently-played list, `source` has a name that is absent from `source_list` and no entry is highlighted. Fix: always include the running game in the list regardless of rank.
@@ -204,8 +203,7 @@ dotnet publish src/HaPcRemote.Service -c Release -r win-x64 /p:PublishAot=true
 
 ## Roadmap
 
-- [ ] Debug mode toggle in log viewer — button next to Clear; switches service + tray logging from `Information` → `Debug` dynamically via IPC
-- [ ] Reduce installer size (~46 MB) — switch tray to framework-dependent publish and add .NET prerequisite check to Inno Setup
+- [ ] Logging level option in tray menu, allowing change logging between Info, debug, error
 - [ ] Linux support (systemd)
 - [ ] Submit brand icons to [home-assistant/brands](https://github.com/home-assistant/brands)
 
