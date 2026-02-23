@@ -39,6 +39,9 @@ Name: "{commonstartup}\HA PC Remote Tray"; Filename: "{app}\{#TrayExeName}"; Com
 [Run]
 Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\tools"
+
 [Code]
 const
   DOTNET_DESKTOP_URL = 'https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe';
