@@ -1,8 +1,10 @@
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
+using HaPcRemote.Service.Endpoints;
+using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Services;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -17,38 +19,58 @@ public class EndpointTestBase : IDisposable
     protected readonly IPowerService PowerService = A.Fake<IPowerService>();
     protected readonly ISteamPlatform SteamPlatform = A.Fake<ISteamPlatform>();
 
-    private WebApplicationFactory<Program>? _factory;
+    private WebApplication? _app;
 
     protected HttpClient CreateClient(PcRemoteOptions? options = null)
     {
         options ??= new PcRemoteOptions { Auth = new AuthOptions { Enabled = false } };
 
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.ConfigureServices(services =>
-                {
-                    // Remove the hosted mDNS service so it doesn't try to bind UDP sockets
-                    services.RemoveAll<IHostedService>();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Logging.ClearProviders();
 
-                    // Replace real services with fakes
-                    services.Replace(ServiceDescriptor.Singleton(CliRunner));
-                    services.Replace(ServiceDescriptor.Singleton(AppLauncher));
-                    services.Replace(ServiceDescriptor.Singleton(PowerService));
-                    services.Replace(ServiceDescriptor.Singleton(SteamPlatform));
+        // JSON serialization
+        builder.Services.ConfigureHttpJsonOptions(opts =>
+            opts.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 
-                    // Override options
-                    services.Replace(ServiceDescriptor.Singleton<IOptionsMonitor<PcRemoteOptions>>(
-                        new StaticOptionsMonitor(options)));
-                });
-            });
+        // Configuration
+        builder.Services.Configure<PcRemoteOptions>(_ => { });
+        builder.Services.Replace(ServiceDescriptor.Singleton<IOptionsMonitor<PcRemoteOptions>>(
+            new StaticOptionsMonitor(options)));
 
-        return _factory.CreateClient();
+        // Fakes
+        builder.Services.AddSingleton(CliRunner);
+        builder.Services.AddSingleton(AppLauncher);
+        builder.Services.AddSingleton(PowerService);
+        builder.Services.AddSingleton(SteamPlatform);
+
+        // Real services that delegate to fakes
+        builder.Services.AddSingleton<AppService>();
+        builder.Services.AddSingleton<AudioService>();
+        builder.Services.AddSingleton<MonitorService>();
+        builder.Services.AddSingleton<SteamService>();
+        // MdnsAdvertiserService excluded — avoids UDP socket binding in tests
+
+        _app = builder.Build();
+
+        _app.UseMiddleware<ApiKeyMiddleware>();
+        _app.MapHealthEndpoints();
+        _app.MapSystemEndpoints();
+        _app.MapAppEndpoints();
+        _app.MapAudioEndpoints();
+        _app.MapMonitorEndpoints();
+        _app.MapSteamEndpoints();
+
+        _app.StartAsync().GetAwaiter().GetResult();
+
+        return _app.GetTestClient();
     }
 
     public void Dispose()
     {
-        _factory?.Dispose();
+        _app?.StopAsync().GetAwaiter().GetResult();
+        _app?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        GC.SuppressFinalize(this);
     }
 
     private sealed class StaticOptionsMonitor(PcRemoteOptions value) : IOptionsMonitor<PcRemoteOptions>

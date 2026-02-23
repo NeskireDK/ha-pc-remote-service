@@ -55,24 +55,6 @@ public class SteamEndpointTests : EndpointTestBase
     }
 
     [Fact]
-    public async Task Run_TrayNotRunning_Returns503()
-    {
-        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
-        A.CallTo(() => SteamPlatform.LaunchSteamUrl(A<string>._))
-            .Throws(new TrayUnavailableException("Tray app is not running. Cannot launch Steam game."));
-        using var client = CreateClient();
-
-        var response = await client.PostAsync("/api/steam/run/730", null);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
-        var json = await response.Content.ReadFromJsonAsync<ApiResponse>(
-            AppJsonContext.Default.ApiResponse);
-        json.ShouldNotBeNull();
-        json.Success.ShouldBeFalse();
-        json.Message.ShouldBe("Tray not running");
-    }
-
-    [Fact]
     public async Task Stop_NoGameRunning_Returns200()
     {
         A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);

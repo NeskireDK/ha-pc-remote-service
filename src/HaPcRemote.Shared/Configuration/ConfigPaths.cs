@@ -5,28 +5,31 @@ public static class ConfigPaths
     private const string AppName = "HaPcRemote";
 
     /// <summary>
-    /// Returns a writable directory for storing runtime-generated configuration
-    /// (API keys, etc.) that survives updates and works in read-only install
-    /// locations like C:\Program Files.
-    ///
-    /// Windows: %ProgramData%\HaPcRemote
-    /// Fallback: exe directory (portable / development)
+    /// Returns a writable directory for storing runtime-generated configuration.
+    /// Windows: %AppData%\HaPcRemote
+    /// Linux: $XDG_CONFIG_HOME/HaPcRemote or ~/.config/HaPcRemote
+    /// Fallback: exe directory
     /// </summary>
     public static string GetWritableConfigDir()
     {
-        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (!string.IsNullOrEmpty(commonData))
+        if (OperatingSystem.IsWindows())
         {
-            var dir = Path.Combine(commonData, AppName);
-
-            // On non-Windows platforms, CommonApplicationData may resolve to a
-            // system directory (e.g. /usr/share) that isn't writable by the
-            // current user.  Only use it when we can actually write there.
-            if (OperatingSystem.IsWindows() || IsDirectoryWritable(dir))
-                return dir;
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            if (!string.IsNullOrEmpty(appData))
+                return Path.Combine(appData, AppName);
         }
 
-        // Fallback for platforms where CommonApplicationData is not available
+        if (OperatingSystem.IsLinux())
+        {
+            var xdgConfigHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+            if (!string.IsNullOrEmpty(xdgConfigHome))
+                return Path.Combine(xdgConfigHome, AppName);
+
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrEmpty(home))
+                return Path.Combine(home, ".config", AppName);
+        }
+
         return AppContext.BaseDirectory;
     }
 
@@ -38,17 +41,4 @@ public static class ConfigPaths
 
     public static string GetLogFilePath()
         => Path.Combine(GetWritableConfigDir(), "service.log");
-
-    private static bool IsDirectoryWritable(string path)
-    {
-        try
-        {
-            Directory.CreateDirectory(path);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }

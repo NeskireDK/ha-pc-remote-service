@@ -1,15 +1,11 @@
-#define MyAppName "HA PC Remote Service"
+#define MyAppName "HA PC Remote"
 #define MyAppVersion GetEnv("APP_VERSION")
 #if MyAppVersion == ""
   #define MyAppVersion "0.0.0"
 #endif
 #define MyAppPublisher "NeskireDK"
 #define MyAppURL "https://github.com/NeskireDK/ha-pc-remote-service"
-#define MyAppExeName "HaPcRemote.Service.exe"
 #define TrayExeName "HaPcRemote.Tray.exe"
-#define ServiceName "HaPcRemoteService"
-#define ServiceDisplayName "HA PC Remote Service"
-#define ServiceDescription "Home Assistant PC Remote Service"
 #define ServicePort "5000"
 
 [Setup]
@@ -27,117 +23,26 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 SetupIconFile=..\resources\windows\pcremote.ico
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\{#TrayExeName}
 WizardStyle=modern
 
 [Files]
-Source: "..\publish\win-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\publish\tray\{#TrayExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\src\HaPcRemote.Service\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+Source: "..\publish\win-x64\{#TrayExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\tools"
 Name: "{app}\monitor-profiles"
 
 [Icons]
-Name: "{commonstartup}\HA PC Remote Tray"; Filename: "{app}\{#TrayExeName}"; Comment: "HA PC Remote system tray helper"
+Name: "{commonstartup}\HA PC Remote Tray"; Filename: "{app}\{#TrayExeName}"; Comment: "HA PC Remote system tray"
 
 [Run]
 Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser
 
 [Code]
 const
-  SERVICE_QUERY_CONFIG  = $0001;
-  DOTNET_DESKTOP_URL    = 'https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe';
-  DOTNET_REG_KEY        = 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
-  SERVICE_ALL_ACCESS    = $F01FF;
-  SC_MANAGER_ALL_ACCESS = $F003F;
-  SERVICE_CONTROL_STOP  = $1;
-  SERVICE_STOPPED       = $1;
-
-type
-  SERVICE_STATUS = record
-    dwServiceType: DWORD;
-    dwCurrentState: DWORD;
-    dwControlsAccepted: DWORD;
-    dwWin32ExitCode: DWORD;
-    dwServiceSpecificExitCode: DWORD;
-    dwCheckPoint: DWORD;
-    dwWaitHint: DWORD;
-  end;
-
-function OpenSCManager(lpMachineName, lpDatabaseName: String;
-  dwDesiredAccess: DWORD): THandle;
-  external 'OpenSCManagerW@advapi32.dll stdcall';
-function OpenService(hSCManager: THandle; lpServiceName: String;
-  dwDesiredAccess: DWORD): THandle;
-  external 'OpenServiceW@advapi32.dll stdcall';
-function CloseServiceHandle(hSCObject: THandle): Boolean;
-  external 'CloseServiceHandle@advapi32.dll stdcall';
-function ControlService(hService: THandle; dwControl: DWORD;
-  var lpServiceStatus: SERVICE_STATUS): Boolean;
-  external 'ControlService@advapi32.dll stdcall';
-function QueryServiceStatus(hService: THandle;
-  var lpServiceStatus: SERVICE_STATUS): Boolean;
-  external 'QueryServiceStatus@advapi32.dll stdcall';
-function DeleteService(hService: THandle): Boolean;
-  external 'DeleteService@advapi32.dll stdcall';
-
-function IsServiceInstalled: Boolean;
-var
-  hSCM, hSvc: THandle;
-begin
-  Result := False;
-  hSCM := OpenSCManager('', '', SC_MANAGER_ALL_ACCESS);
-  if hSCM <> 0 then begin
-    hSvc := OpenService(hSCM, '{#ServiceName}', SERVICE_QUERY_CONFIG);
-    if hSvc <> 0 then begin
-      Result := True;
-      CloseServiceHandle(hSvc);
-    end;
-    CloseServiceHandle(hSCM);
-  end;
-end;
-
-function StopServiceAndWait: Boolean;
-var
-  hSCM, hSvc: THandle;
-  Status: SERVICE_STATUS;
-  Attempts: Integer;
-begin
-  Result := False;
-  hSCM := OpenSCManager('', '', SC_MANAGER_ALL_ACCESS);
-  if hSCM <> 0 then begin
-    hSvc := OpenService(hSCM, '{#ServiceName}', SERVICE_ALL_ACCESS);
-    if hSvc <> 0 then begin
-      ControlService(hSvc, SERVICE_CONTROL_STOP, Status);
-      Attempts := 0;
-      repeat
-        Sleep(1000);
-        QueryServiceStatus(hSvc, Status);
-        Inc(Attempts);
-      until (Status.dwCurrentState = SERVICE_STOPPED) or (Attempts >= 30);
-      Result := (Status.dwCurrentState = SERVICE_STOPPED);
-      CloseServiceHandle(hSvc);
-    end;
-    CloseServiceHandle(hSCM);
-  end;
-end;
-
-procedure RemoveServiceEntry;
-var
-  hSCM, hSvc: THandle;
-begin
-  hSCM := OpenSCManager('', '', SC_MANAGER_ALL_ACCESS);
-  if hSCM <> 0 then begin
-    hSvc := OpenService(hSCM, '{#ServiceName}', SERVICE_ALL_ACCESS);
-    if hSvc <> 0 then begin
-      DeleteService(hSvc);
-      CloseServiceHandle(hSvc);
-    end;
-    CloseServiceHandle(hSCM);
-  end;
-end;
+  DOTNET_DESKTOP_URL = 'https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe';
+  DOTNET_REG_KEY     = 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
 
 procedure KillTrayApp;
 var
@@ -204,13 +109,26 @@ begin
       and (ResultCode = 0);
 end;
 
+procedure MigrateConfigIfNeeded;
+var
+  OldConfig, NewConfigDir, NewConfig: String;
+begin
+  // Migrate config from %ProgramData%\HaPcRemote to %AppData%\HaPcRemote (pre-0.9.4 upgrade)
+  OldConfig := ExpandConstant('{commonappdata}\HaPcRemote\appsettings.json');
+  NewConfigDir := ExpandConstant('{userappdata}\HaPcRemote');
+  NewConfig := NewConfigDir + '\appsettings.json';
+  if FileExists(OldConfig) and not FileExists(NewConfig) then begin
+    CreateDir(NewConfigDir);
+    FileCopy(OldConfig, NewConfig, False);
+  end;
+end;
+
 // --- Install lifecycle ---
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
 
-  // Install .NET 10 Windows Desktop Runtime if missing (required by tray app)
   if not IsDotNet10DesktopInstalled then begin
     WizardForm.StatusLabel.Caption := 'Installing .NET 10 Desktop Runtime...';
     if not InstallDotNet10Desktop then begin
@@ -220,23 +138,17 @@ begin
     end;
   end;
 
-  // Stop tray app before upgrade
   KillTrayApp;
-  if IsServiceInstalled then begin
-    if not StopServiceAndWait then
-      Result := 'Could not stop the existing service. Please stop it manually and retry.';
-  end;
+  MigrateConfigIfNeeded;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ToolsDir, ExePath: String;
+  ToolsDir: String;
 begin
   if CurStep = ssPostInstall then begin
     ToolsDir := ExpandConstant('{app}\tools');
-    ExePath := ExpandConstant('{app}\{#MyAppExeName}');
 
-    // Download NirSoft tools
     WizardForm.StatusLabel.Caption := 'Downloading SoundVolumeView...';
     DownloadAndExtract(
       'https://www.nirsoft.net/utils/soundvolumeview-x64.zip',
@@ -247,25 +159,12 @@ begin
       'https://www.nirsoft.net/utils/multimonitortool-x64.zip',
       'multimonitortool-x64.zip', ToolsDir);
 
-    // Register Windows Service
-    WizardForm.StatusLabel.Caption := 'Registering service...';
-    if not IsServiceInstalled then begin
-      ExecHidden('{sys}\sc.exe',
-        'create {#ServiceName} start= auto binPath= "' + ExePath + '"');
-      ExecHidden('{sys}\sc.exe',
-        'description {#ServiceName} "{#ServiceDescription}"');
-    end;
-
-    // Firewall rule
+    // Firewall rule for Tray's Kestrel server
     WizardForm.StatusLabel.Caption := 'Adding firewall rule...';
     ExecHidden('{sys}\netsh.exe',
-      'advfirewall firewall add rule name="{#ServiceDisplayName}"' +
+      'advfirewall firewall add rule name="{#MyAppName}"' +
       ' dir=in action=allow protocol=TCP localport={#ServicePort}' +
-      ' program="' + ExePath + '" enable=yes');
-
-    // Start service
-    WizardForm.StatusLabel.Caption := 'Starting service...';
-    ExecHidden('{sys}\sc.exe', 'start {#ServiceName}');
+      ' program="' + ExpandConstant('{app}\{#TrayExeName}') + '" enable=yes');
   end;
 end;
 
@@ -275,11 +174,7 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then begin
     KillTrayApp;
-    if IsServiceInstalled then begin
-      StopServiceAndWait;
-      RemoveServiceEntry;
-    end;
     ExecHidden('{sys}\netsh.exe',
-      'advfirewall firewall delete rule name="{#ServiceDisplayName}"');
+      'advfirewall firewall delete rule name="{#MyAppName}"');
   end;
 end;

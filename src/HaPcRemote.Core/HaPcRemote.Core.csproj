@@ -4,15 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <PublishAot>true</PublishAot>
-    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ApplicationIcon>app.ico</ApplicationIcon>
+    <OutputType>Library</OutputType>
     <RootNamespace>HaPcRemote.Service</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.3" />
     <PackageReference Include="ValveKeyValue" Version="0.20.0.417" />
   </ItemGroup>
 
@@ -21,7 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="HaPcRemote.Service" />
     <InternalsVisibleTo Include="HaPcRemote.Service.Tests" />
+    <InternalsVisibleTo Include="HaPcRemote.Headless" />
+    <InternalsVisibleTo Include="HaPcRemote.Tray" />
   </ItemGroup>
 
 </Project>

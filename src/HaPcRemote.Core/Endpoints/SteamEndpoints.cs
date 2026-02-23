@@ -58,14 +58,6 @@ public static class SteamEndpoints
                     ApiResponse.Ok($"Launched Steam game {appId}"),
                     AppJsonContext.Default.ApiResponse);
             }
-            catch (TrayUnavailableException ex)
-            {
-                logger.LogWarning(ex, "Tray not running — cannot launch Steam game {AppId}", appId);
-                return Results.Json(
-                    ApiResponse.Fail("Tray not running"),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
-            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to launch Steam game {AppId}", appId);
