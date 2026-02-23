@@ -35,14 +35,14 @@ internal static class TrayWebHost
         builder.Services.Configure<PcRemoteOptions>(
             builder.Configuration.GetSection(PcRemoteOptions.SectionName));
 
-        // Resolve relative paths against exe directory
+        // Resolve relative paths: tools against exe dir, profiles against user config dir
         builder.Services.PostConfigure<PcRemoteOptions>(options =>
         {
             var baseDir = AppContext.BaseDirectory;
             if (!Path.IsPathRooted(options.ToolsPath))
                 options.ToolsPath = Path.GetFullPath(options.ToolsPath, baseDir);
             if (!Path.IsPathRooted(options.ProfilesPath))
-                options.ProfilesPath = Path.GetFullPath(options.ProfilesPath, baseDir);
+                options.ProfilesPath = Path.GetFullPath(options.ProfilesPath, ConfigPaths.GetWritableConfigDir());
             foreach (var app in options.Apps.Values)
             {
                 if (!string.IsNullOrEmpty(app.ExePath) && !Path.IsPathRooted(app.ExePath))

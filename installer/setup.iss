@@ -111,15 +111,33 @@ end;
 
 procedure MigrateConfigIfNeeded;
 var
-  OldConfig, NewConfigDir, NewConfig: String;
+  OldConfig, OldProfilesDir, NewConfigDir, NewConfig, NewProfilesDir: String;
+  ProfileRec: TFindRec;
 begin
+  NewConfigDir := ExpandConstant('{userappdata}\HaPcRemote');
+  NewProfilesDir := NewConfigDir + '\monitor-profiles';
+  CreateDir(NewConfigDir);
+  CreateDir(NewProfilesDir);
+
   // Migrate config from %ProgramData%\HaPcRemote to %AppData%\HaPcRemote (pre-0.9.4 upgrade)
   OldConfig := ExpandConstant('{commonappdata}\HaPcRemote\appsettings.json');
-  NewConfigDir := ExpandConstant('{userappdata}\HaPcRemote');
   NewConfig := NewConfigDir + '\appsettings.json';
-  if FileExists(OldConfig) and not FileExists(NewConfig) then begin
-    CreateDir(NewConfigDir);
+  if FileExists(OldConfig) and not FileExists(NewConfig) then
     FileCopy(OldConfig, NewConfig, False);
+
+  // Migrate monitor profiles from {app}\monitor-profiles to %AppData%\HaPcRemote\monitor-profiles (pre-0.9.2 upgrade)
+  OldProfilesDir := ExpandConstant('{app}\monitor-profiles');
+  if DirExists(OldProfilesDir) then begin
+    if FindFirst(OldProfilesDir + '\*.cfg', ProfileRec) then begin
+      try
+        repeat
+          FileCopy(OldProfilesDir + '\' + ProfileRec.Name,
+            NewProfilesDir + '\' + ProfileRec.Name, False);
+        until not FindNext(ProfileRec);
+      finally
+        FindClose(ProfileRec);
+      end;
+    end;
   end;
 end;
 
