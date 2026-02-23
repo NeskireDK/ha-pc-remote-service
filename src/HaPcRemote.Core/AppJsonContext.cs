@@ -28,6 +28,11 @@ namespace HaPcRemote.Service;
 [JsonSerializable(typeof(ApiResponse<List<SteamGame>>))]
 [JsonSerializable(typeof(SteamRunningGame))]
 [JsonSerializable(typeof(ApiResponse<SteamRunningGame>))]
+[JsonSerializable(typeof(IReadOnlyList<string>))]
+[JsonSerializable(typeof(ApiResponse<IReadOnlyList<string>>))]
+[JsonSerializable(typeof(AudioState))]
+[JsonSerializable(typeof(SystemState))]
+[JsonSerializable(typeof(ApiResponse<SystemState>))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]

@@ -9,10 +9,20 @@ public sealed class PcRemoteOptions
     public string ToolsPath { get; set; } = "./tools";
     public string ProfilesPath { get; set; } = "./monitor-profiles";
     public Dictionary<string, AppDefinitionOptions> Apps { get; set; } = new();
+    public Dictionary<string, ModeConfig> Modes { get; set; } = new();
 }
 
 public sealed class AuthOptions
 {
     public bool Enabled { get; set; } = true;
     public string ApiKey { get; set; } = string.Empty;
+}
+
+public sealed class ModeConfig
+{
+    public string? AudioDevice { get; set; }
+    public string? MonitorProfile { get; set; }
+    public int? Volume { get; set; }
+    public string? LaunchApp { get; set; }
+    public string? KillApp { get; set; }
 }
