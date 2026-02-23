@@ -185,7 +185,19 @@ dotnet publish src/HaPcRemote.Service -c Release -r win-x64 /p:PublishAot=true
 ```
 
 ## Known Issues
-
+- **Monitor Profile List seems to have issues with loading / showing cfg's despite successfull response**:
+```[18.31.09] [INF] Diagnostics - Request starting HTTP/1.1 GET http://192.168.1.232:5000/api/monitor/profiles - - -
+[18.31.09] [INF] EndpointMiddleware - Executing endpoint 'HTTP: GET /api/monitor/profiles'
+[18.31.09] [INF] JsonResult - Writing value of type 'ApiResponse`1' as Json.
+[18.31.09] [INF] EndpointMiddleware - Executed endpoint 'HTTP: GET /api/monitor/profiles'
+[18.31.09] [INF] Diagnostics - Request finished HTTP/1.1 GET http://192.168.1.232:5000/api/monitor/profiles - 200 - application/json;+charset=utf-8 6.9362ms
+```
+- **Whlist stopping of games work, launching them doesnt, no logs found**
+- **Missing menu item in Tray to go to monitor profile folder**
+- **Startup logging doesnt show path for settings nor monitor profiles**
+- **What is playing Icon isnt implemented yet**
+- **Logging level option is non-funcitonal and doesnt show in tray menu, cant change between Info, debug, error**
+- **Tools arent cleaned up after uninstall, neither is folder in install path**
 - **Steam: game launch silently no-ops if tray isn't running** — `IpcSteamPlatform.Send` returns `null` without error when the tray is not connected, and the endpoint still returns 200. No game launches, no error surfaces in HA. Fix: return 503 when IPC is unavailable.
 - **Steam: running game not highlighted on cold-start** — if the currently running game falls outside the top-20 recently-played list, `source` has a name that is absent from `source_list` and no entry is highlighted. Fix: always include the running game in the list regardless of rank.
 - **Monitor profiles shows empty list** — the profiles directory (`ProfilesPath`, default `./monitor-profiles`) must exist next to the service exe before the service starts. If it is missing, the endpoint returns an empty list. Create the directory and add `.cfg` files exported from MultiMonitorTool.
