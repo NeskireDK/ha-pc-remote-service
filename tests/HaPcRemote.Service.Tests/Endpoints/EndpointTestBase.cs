@@ -48,6 +48,7 @@ public class EndpointTestBase : IDisposable
         builder.Services.AddSingleton<AppService>();
         builder.Services.AddSingleton<AudioService>();
         builder.Services.AddSingleton<MonitorService>();
+        builder.Services.AddSingleton<ModeService>();
         builder.Services.AddSingleton<SteamService>();
         // MdnsAdvertiserService excluded — avoids UDP socket binding in tests
 
@@ -56,6 +57,8 @@ public class EndpointTestBase : IDisposable
         _app.UseMiddleware<ApiKeyMiddleware>();
         _app.MapHealthEndpoints();
         _app.MapSystemEndpoints();
+        _app.MapModeEndpoints();
+        _app.MapSystemStateEndpoints();
         _app.MapAppEndpoints();
         _app.MapAudioEndpoints();
         _app.MapMonitorEndpoints();

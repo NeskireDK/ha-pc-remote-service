@@ -84,6 +84,7 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<AppService>();
         builder.Services.AddSingleton<AudioService>();
         builder.Services.AddSingleton<MonitorService>();
+        builder.Services.AddSingleton<ModeService>();
         builder.Services.AddHostedService<MdnsAdvertiserService>();
         builder.Services.AddSingleton<IPowerService, WindowsPowerService>();
         builder.Services.AddSingleton<ISteamPlatform, WindowsSteamPlatform>();
@@ -116,6 +117,8 @@ internal static class TrayWebHost
         app.UseMiddleware<ApiKeyMiddleware>();
         app.MapHealthEndpoints();
         app.MapSystemEndpoints();
+        app.MapModeEndpoints();
+        app.MapSystemStateEndpoints();
         app.MapAppEndpoints();
         app.MapAudioEndpoints();
         app.MapMonitorEndpoints();
