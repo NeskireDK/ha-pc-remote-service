@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     strategy:
       matrix:
@@ -27,23 +27,27 @@ jobs:
         shell: bash
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Publish Service (Native AOT)
+      - name: Publish Tray App
         run: >
-          dotnet publish src/HaPcRemote.Service/HaPcRemote.Service.csproj
+          dotnet publish src/HaPcRemote.Tray/HaPcRemote.Tray.csproj
           -c Release
           -r ${{ matrix.runtime }}
-          /p:PublishAot=true
+          --no-self-contained
+          /p:PublishSingleFile=true
           /p:Version=${{ steps.version.outputs.version }}
           -o publish/${{ matrix.runtime }}
 
-      - name: Upload service artifact
+      - name: Upload tray artifact
         uses: actions/upload-artifact@v4
         with:
           name: HaPcRemote-${{ matrix.runtime }}
-          path: publish/${{ matrix.runtime }}/HaPcRemote.Service.exe
+          path: publish/${{ matrix.runtime }}/HaPcRemote.Tray.exe
 
-  build-tray:
-    runs-on: windows-latest
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runtime: [linux-x64, linux-arm64]
     steps:
       - uses: actions/checkout@v4
 
@@ -57,39 +61,33 @@ jobs:
         shell: bash
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Publish Tray App
+      - name: Publish Headless App
         run: >
-          dotnet publish src/HaPcRemote.Tray/HaPcRemote.Tray.csproj
+          dotnet publish src/HaPcRemote.Headless/HaPcRemote.Headless.csproj
           -c Release
-          -r win-x64
-          --no-self-contained
+          -r ${{ matrix.runtime }}
+          --self-contained
           /p:PublishSingleFile=true
           /p:Version=${{ steps.version.outputs.version }}
-          -o publish/tray
+          -o publish/${{ matrix.runtime }}
 
-      - name: Upload tray artifact
+      - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HaPcRemote-tray
-          path: publish/tray/HaPcRemote.Tray.exe
+          name: HaPcRemote-${{ matrix.runtime }}
+          path: publish/${{ matrix.runtime }}/HaPcRemote.Headless
 
   installer:
-    needs: [build, build-tray]
+    needs: [build-windows]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download x64 service artifact
+      - name: Download x64 tray artifact
         uses: actions/download-artifact@v4
         with:
           name: HaPcRemote-win-x64
           path: publish/win-x64
-
-      - name: Download tray artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: HaPcRemote-tray
-          path: publish/tray
 
       - name: Extract version from tag
         id: version
@@ -110,7 +108,7 @@ jobs:
           path: installer/Output/*.exe
 
   release:
-    needs: [build, build-tray, installer]
+    needs: [build-windows, build-linux, installer]
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -120,12 +118,14 @@ jobs:
 
       - name: Prepare release assets
         run: |
-          cp artifacts/HaPcRemote-tray/HaPcRemote.Tray.exe artifacts/HaPcRemote-win-x64/
-          cp artifacts/HaPcRemote-tray/HaPcRemote.Tray.exe artifacts/HaPcRemote-win-arm64/
           cd artifacts/HaPcRemote-win-x64
-          zip ../../HaPcRemote-win-x64.zip HaPcRemote.Service.exe HaPcRemote.Tray.exe
+          zip ../../HaPcRemote-win-x64.zip HaPcRemote.Tray.exe
           cd ../HaPcRemote-win-arm64
-          zip ../../HaPcRemote-win-arm64.zip HaPcRemote.Service.exe HaPcRemote.Tray.exe
+          zip ../../HaPcRemote-win-arm64.zip HaPcRemote.Tray.exe
+          cd ../HaPcRemote-linux-x64
+          tar czf ../../HaPcRemote-linux-x64.tar.gz HaPcRemote.Headless
+          cd ../HaPcRemote-linux-arm64
+          tar czf ../../HaPcRemote-linux-arm64.tar.gz HaPcRemote.Headless
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -134,4 +134,6 @@ jobs:
           files: |
             HaPcRemote-win-x64.zip
             HaPcRemote-win-arm64.zip
+            HaPcRemote-linux-x64.tar.gz
+            HaPcRemote-linux-arm64.tar.gz
             artifacts/HaPcRemote-installer/*.exe
