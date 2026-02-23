@@ -1,12 +1,15 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace HaPcRemote.Service.Services;
 
 [SupportedOSPlatform("windows")]
-public class WindowsSteamPlatform : ISteamPlatform
+public class WindowsSteamPlatform(ILogger<WindowsSteamPlatform> logger) : ISteamPlatform
 {
+    private readonly ILogger<WindowsSteamPlatform> _logger = logger;
+
     public string? GetSteamPath()
     {
         using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Valve\Steam");
@@ -21,7 +24,14 @@ public class WindowsSteamPlatform : ISteamPlatform
 
     public void LaunchSteamUrl(string url)
     {
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        _logger.LogInformation("Launching Steam URL: {Url}", url);
+        var process = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        if (process == null)
+        {
+            _logger.LogWarning(
+                "Steam URL launch returned null process handle — Steam may not be installed or the steam:// protocol is not registered: {Url}",
+                url);
+        }
     }
 
     public void KillProcessesInDirectory(string directory)
