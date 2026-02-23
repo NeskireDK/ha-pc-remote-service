@@ -1,5 +1,3 @@
-using HaPcRemote.Shared.Configuration;
-using HaPcRemote.Shared.Ipc;
 using HaPcRemote.Tray.Forms;
 using HaPcRemote.Tray.Logging;
 using HaPcRemote.Tray.Models;
@@ -9,8 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace HaPcRemote.Tray;
 
 /// <summary>
-/// WinForms application context that shows a system tray icon
-/// and hosts the named pipe IPC server.
+/// WinForms application context. Hosts the system tray icon and log viewer.
+/// Kestrel runs alongside via TrayWebHost.
 /// </summary>
 internal sealed class TrayApplicationContext : ApplicationContext
 {
@@ -18,39 +16,26 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private readonly NotifyIcon _notifyIcon;
     private readonly CancellationTokenSource _cts = new();
-    private readonly ILoggerFactory _loggerFactory;
+    private readonly CancellationTokenSource _webCts;
     private readonly ILogger _logger;
-    private readonly IpcRequestHandler _requestHandler;
-    private readonly IpcServer _ipcServer;
     private readonly InMemoryLogProvider _logProvider;
     private readonly UpdateChecker _updateChecker;
     private readonly System.Windows.Forms.Timer _updateTimer;
-    private readonly ServiceLogTailer _serviceLogTailer;
 
     private LogViewerForm? _logViewerForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _autoUpdateMenuItem;
-    private ToolStripMenuItem? _restartMenuItem;
-    private ToolStripMenuItem? _debugMenuItem;
     private UpdateChecker.ReleaseInfo? _pendingRelease;
-    private LogLevel _minLogLevel = LogLevel.Information;
 
-    public TrayApplicationContext()
+    public TrayApplicationContext(IServiceProvider webServices, CancellationTokenSource webCts, InMemoryLogProvider logProvider)
     {
-        _logProvider = new InMemoryLogProvider();
+        _webCts = webCts;
+        _logProvider = logProvider;
 
-        _loggerFactory = LoggerFactory.Create(builder =>
-        {
-            builder.AddConsole();
-            builder.AddProvider(_logProvider);
-            builder.AddFilter((_, level) => level >= _minLogLevel);
-        });
-        _logger = _loggerFactory.CreateLogger<TrayApplicationContext>();
+        var loggerFactory = webServices.GetRequiredService<ILoggerFactory>();
+        _logger = loggerFactory.CreateLogger<TrayApplicationContext>();
 
-        _requestHandler = new IpcRequestHandler(_logger);
-        _ipcServer = new IpcServer(_requestHandler.HandleAsync, _logger);
-
-        _updateChecker = new UpdateChecker(_loggerFactory.CreateLogger<UpdateChecker>());
+        _updateChecker = new UpdateChecker(loggerFactory.CreateLogger<UpdateChecker>());
 
         var settings = TraySettings.Load();
 
@@ -62,14 +47,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             ContextMenuStrip = BuildContextMenu(settings)
         };
 
-        _ = Task.Run(() => RunIpcServerAsync(_cts.Token));
-
-        // Tail the service log file so the log viewer shows service output
-        _serviceLogTailer = new ServiceLogTailer(
-            ConfigPaths.GetLogFilePath(), _logProvider, _logger);
-        _serviceLogTailer.Start();
-
-        // Check for updates after 30s, then every 5min (auto-update on) or 4h (off)
+        // Check for updates after 30s, then on timer
         _updateTimer = new System.Windows.Forms.Timer { Interval = GetUpdateTimerInterval(settings.AutoUpdate) };
         _updateTimer.Tick += async (_, _) => await SafeCheckForUpdateAsync(showProgress: false);
         _updateTimer.Start();
@@ -89,14 +67,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Show Log", null, OnShowLog);
         menu.Items.Add("Show API Key", null, OnShowApiKey);
-
-        _restartMenuItem = new ToolStripMenuItem("Restart Service");
-        _restartMenuItem.Click += OnRestartService;
-        menu.Items.Add(_restartMenuItem);
-
-        _debugMenuItem = new ToolStripMenuItem("Debug Logging") { CheckOnClick = true };
-        _debugMenuItem.CheckedChanged += OnDebugLoggingToggled;
-        menu.Items.Add(_debugMenuItem);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -125,32 +95,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         dialog.ShowDialog();
     }
 
-    private async void OnRestartService(object? sender, EventArgs e)
-    {
-        if (_restartMenuItem is null) return;
-
-        _restartMenuItem.Enabled = false;
-        _restartMenuItem.Text = "Restarting...";
-        try
-        {
-            await Services.ServiceController.RestartAsync(_logger, _cts.Token);
-        }
-        finally
-        {
-            if (_restartMenuItem is not null)
-            {
-                _restartMenuItem.Text = "Restart Service";
-                _restartMenuItem.Enabled = true;
-            }
-        }
-    }
-
-    private void OnDebugLoggingToggled(object? sender, EventArgs e)
-    {
-        _minLogLevel = _debugMenuItem!.Checked ? LogLevel.Debug : LogLevel.Information;
-        _logger.LogInformation("Debug logging {State}", _debugMenuItem.Checked ? "enabled" : "disabled");
-    }
-
     private void OnAutoUpdateToggled(object? sender, EventArgs e)
     {
         var s = TraySettings.Load();
@@ -166,13 +110,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private async void OnCheckForUpdatesClick(object? sender, EventArgs e)
     {
         if (_pendingRelease is not null)
-        {
             await HandleDownloadAsync(_pendingRelease);
-        }
         else
-        {
             await SafeCheckForUpdateAsync(showProgress: true);
-        }
     }
 
     private async Task SafeCheckForUpdateAsync(bool showProgress = false)
@@ -269,38 +209,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private async void OnExit(object? sender, EventArgs e)
+    private void OnExit(object? sender, EventArgs e)
     {
         _logger.LogInformation("Shutting down...");
-
-        try
-        {
-            await Services.ServiceController.StopAsync(_logger);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not stop service");
-        }
-
         _cts.Cancel();
+        _webCts.Cancel();
         _notifyIcon.Visible = false;
         Application.Exit();
-    }
-
-    private async Task RunIpcServerAsync(CancellationToken ct)
-    {
-        try
-        {
-            await _ipcServer.RunAsync(ct);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Normal shutdown
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "IPC server crashed");
-        }
     }
 
     private static string GetVersionString()
@@ -319,13 +234,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (disposing)
         {
             _cts.Cancel();
-            _serviceLogTailer.Dispose();
+            _cts.Dispose();
             _updateTimer.Dispose();
             _logViewerForm?.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
-            _loggerFactory.Dispose();
-            _cts.Dispose();
         }
         base.Dispose(disposing);
     }
