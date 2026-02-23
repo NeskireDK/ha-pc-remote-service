@@ -21,6 +21,7 @@
     <InternalsVisibleTo Include="HaPcRemote.Service" />
     <InternalsVisibleTo Include="HaPcRemote.Service.Tests" />
     <InternalsVisibleTo Include="HaPcRemote.Headless" />
+    <InternalsVisibleTo Include="HaPcRemote.Tray" />
   </ItemGroup>
 
 </Project>
