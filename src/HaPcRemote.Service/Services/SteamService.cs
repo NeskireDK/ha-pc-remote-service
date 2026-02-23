@@ -23,14 +23,28 @@ public class SteamService(ISteamPlatform platform)
         return Task.FromResult(games);
     }
 
-    public Task<SteamRunningGame?> GetRunningGameAsync()
+    public async Task<SteamRunningGame?> GetRunningGameAsync()
     {
         var appId = platform.GetRunningAppId();
         if (appId == 0)
-            return Task.FromResult<SteamRunningGame?>(null);
+            return null;
 
-        var name = _cachedGames?.Find(g => g.AppId == appId)?.Name ?? $"Unknown ({appId})";
-        return Task.FromResult<SteamRunningGame?>(new SteamRunningGame { AppId = appId, Name = name });
+        // Warm the cache if not yet populated
+        if (_cachedGames == null || _cachedGames.Count == 0)
+            await GetGamesAsync();
+
+        var name = _cachedGames?.Find(g => g.AppId == appId)?.Name;
+
+        // Game is running but not in the top-20 list — look it up from its manifest directly
+        if (name == null)
+        {
+            var steamPath = platform.GetSteamPath();
+            if (steamPath != null)
+                name = FindGameNameFromManifest(steamPath, appId);
+        }
+
+        name ??= $"Unknown ({appId})";
+        return new SteamRunningGame { AppId = appId, Name = name };
     }
 
     public async Task LaunchGameAsync(int appId)
@@ -108,6 +122,37 @@ public class SteamService(ISteamPlatform platform)
         var kv = KVSerializer.Create(KVSerializationFormat.KeyValues1Text);
         var data = kv.Deserialize(stream);
         return data["installdir"]?.ToString();
+    }
+
+    private static string? FindGameNameFromManifest(string steamPath, int appId)
+    {
+        var libraryFoldersPath = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
+        if (!File.Exists(libraryFoldersPath))
+            return null;
+
+        var vdfContent = File.ReadAllText(libraryFoldersPath);
+        var libraryPaths = ParseLibraryFolders(vdfContent);
+
+        foreach (var libPath in libraryPaths)
+        {
+            var manifestPath = Path.Combine(libPath, "steamapps", $"appmanifest_{appId}.acf");
+            if (!File.Exists(manifestPath))
+                continue;
+
+            try
+            {
+                var content = File.ReadAllText(manifestPath);
+                var game = ParseAppManifest(content);
+                if (game != null)
+                    return game.Name;
+            }
+            catch
+            {
+                // Skip corrupt manifest
+            }
+        }
+
+        return null;
     }
 
     private static List<SteamGame> LoadInstalledGames(string steamPath)
