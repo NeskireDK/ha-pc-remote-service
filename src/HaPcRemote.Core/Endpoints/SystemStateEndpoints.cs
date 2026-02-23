@@ -18,7 +18,7 @@ public static class SystemStateEndpoints
             List<MonitorInfo>? monitors = null;
             List<string>? monitorProfiles = null;
             List<SteamGame>? steamGames = null;
-            SteamGame? runningGame = null;
+            SteamRunningGame? runningGame = null;
             List<string>? modes = null;
 
             try
@@ -27,7 +27,7 @@ public static class SystemStateEndpoints
                 var current = devices.Find(d => d.IsDefault);
                 audio = new AudioState
                 {
-                    Devices = devices.Select(d => d.Name).ToList(),
+                    Devices = devices,
                     Current = current?.Name,
                     Volume = current?.Volume
                 };
@@ -68,8 +68,7 @@ public static class SystemStateEndpoints
             try
             {
                 var running = await steamService.GetRunningGameAsync();
-                if (running is not null)
-                    runningGame = new SteamGame { AppId = running.AppId, Name = running.Name, LastPlayed = 0 };
+                runningGame = running;
             }
             catch (Exception ex)
             {
