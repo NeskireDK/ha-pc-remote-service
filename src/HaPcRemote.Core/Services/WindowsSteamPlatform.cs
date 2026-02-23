@@ -15,7 +15,7 @@ public class WindowsSteamPlatform : ISteamPlatform
 
     public int GetRunningAppId()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Valve\Steam");
+        using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Valve\Steam\ActiveProcess");
         return key?.GetValue("RunningAppID") is int appId ? appId : 0;
     }
 
