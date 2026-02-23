@@ -1,8 +1,12 @@
+using System.Diagnostics;
+using HaPcRemote.Service.Services;
+using HaPcRemote.Service.Configuration;
 using HaPcRemote.Tray.Forms;
 using HaPcRemote.Tray.Logging;
 using HaPcRemote.Tray.Models;
 using HaPcRemote.Tray.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Tray;
 
@@ -21,6 +25,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly InMemoryLogProvider _logProvider;
     private readonly UpdateChecker _updateChecker;
     private readonly System.Windows.Forms.Timer _updateTimer;
+    private readonly string _profilesPath;
+    private readonly IServiceProvider _webServices;
+    private readonly System.Windows.Forms.Timer _steamPollTimer;
+    private readonly Icon _defaultIcon;
+    private Icon? _playingIcon;
+    private bool _isGamePlaying;
 
     private LogViewerForm? _logViewerForm;
     private ToolStripMenuItem? _updateMenuItem;
@@ -32,22 +42,33 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         _webCts = webCts;
         _logProvider = logProvider;
+        _webServices = webServices;
 
         var loggerFactory = webServices.GetRequiredService<ILoggerFactory>();
         _logger = loggerFactory.CreateLogger<TrayApplicationContext>();
+
+        var options = webServices.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
+        _profilesPath = options.ProfilesPath;
 
         _updateChecker = new UpdateChecker(loggerFactory.CreateLogger<UpdateChecker>());
 
         var settings = TraySettings.Load();
         InMemoryLogProvider.DebugEnabled = settings.DebugLogging;
 
+        var appIcon = LoadAppIcon();
+        _defaultIcon = appIcon;
+
         _notifyIcon = new NotifyIcon
         {
-            Icon = LoadAppIcon(),
+            Icon = appIcon,
             Text = $"HA PC Remote {VersionString}",
             Visible = true,
             ContextMenuStrip = BuildContextMenu(settings)
         };
+
+        _steamPollTimer = new System.Windows.Forms.Timer { Interval = 10_000 };
+        _steamPollTimer.Tick += OnSteamPollTick;
+        _steamPollTimer.Start();
 
         // Check for updates after 30s, then on timer
         _updateTimer = new System.Windows.Forms.Timer { Interval = GetUpdateTimerInterval(settings.AutoUpdate) };
@@ -60,6 +81,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         });
 
         _logger.LogInformation("HA PC Remote Tray {Version} started", VersionString);
+        _logger.LogInformation("Profiles path: {ProfilesPath}", _profilesPath);
+        _logger.LogInformation("Tools path: {ToolsPath}", options.ToolsPath);
     }
 
     private ContextMenuStrip BuildContextMenu(TraySettings settings)
@@ -69,6 +92,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Show Log", null, OnShowLog);
         menu.Items.Add("Show API Key", null, OnShowApiKey);
+        menu.Items.Add("Open Profiles Folder", null, OnOpenProfilesFolder);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -100,6 +124,48 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         using var dialog = new ApiKeyDialog();
         dialog.ShowDialog();
+    }
+
+    private void OnOpenProfilesFolder(object? sender, EventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(_profilesPath);
+            Process.Start(new ProcessStartInfo("explorer.exe", _profilesPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to open profiles folder: {Path}", _profilesPath);
+        }
+    }
+
+    private async void OnSteamPollTick(object? sender, EventArgs e)
+    {
+        try
+        {
+            var steamService = _webServices.GetRequiredService<SteamService>();
+            var running = await steamService.GetRunningGameAsync();
+            var isPlaying = running != null;
+            if (isPlaying == _isGamePlaying) return;
+            _isGamePlaying = isPlaying;
+            _notifyIcon.Icon = isPlaying ? GetPlayingIcon() : _defaultIcon;
+            _notifyIcon.Text = isPlaying
+                ? $"HA PC Remote {VersionString} — {running!.Name}"
+                : $"HA PC Remote {VersionString}";
+        }
+        catch { /* ignore poll errors */ }
+    }
+
+    private Icon GetPlayingIcon()
+    {
+        if (_playingIcon != null) return _playingIcon;
+        var bmp = _defaultIcon.ToBitmap();
+        using var g = Graphics.FromImage(bmp);
+        using var brush = new SolidBrush(Color.Lime);
+        g.FillEllipse(brush, bmp.Width - 7, bmp.Height - 7, 6, 6);
+        _playingIcon = Icon.FromHandle(bmp.GetHicon());
+        bmp.Dispose();
+        return _playingIcon;
     }
 
     private void OnAutoUpdateToggled(object? sender, EventArgs e)
@@ -252,6 +318,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _cts.Cancel();
             _cts.Dispose();
             _updateTimer.Dispose();
+            _steamPollTimer.Dispose();
+            _playingIcon?.Dispose();
             _logViewerForm?.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
