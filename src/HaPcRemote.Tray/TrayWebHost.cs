@@ -100,7 +100,7 @@ internal static class TrayWebHost
             }
             catch (Exception ex)
             {
-                var logger = context.RequestServices.GetRequiredService<ILogger<TrayWebHost>>();
+                var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(TrayWebHost));
                 logger.LogError(ex, "Unhandled exception");
                 if (!context.Response.HasStarted)
                 {
