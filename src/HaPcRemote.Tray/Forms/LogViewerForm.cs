@@ -17,6 +17,7 @@ internal sealed class LogViewerForm : Form
         Size = new Size(800, 500);
         MinimumSize = new Size(400, 300);
         StartPosition = FormStartPosition.CenterScreen;
+        ShowInTaskbar = true;
         Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? SystemIcons.Application;
 
         _logBox = new RichTextBox

@@ -25,6 +25,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private LogViewerForm? _logViewerForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _autoUpdateMenuItem;
+    private ToolStripMenuItem? _debugLoggingMenuItem;
     private UpdateChecker.ReleaseInfo? _pendingRelease;
 
     public TrayApplicationContext(IServiceProvider webServices, CancellationTokenSource webCts, InMemoryLogProvider logProvider)
@@ -38,6 +39,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _updateChecker = new UpdateChecker(loggerFactory.CreateLogger<UpdateChecker>());
 
         var settings = TraySettings.Load();
+        InMemoryLogProvider.DebugEnabled = settings.DebugLogging;
 
         _notifyIcon = new NotifyIcon
         {
@@ -78,6 +80,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _autoUpdateMenuItem.CheckedChanged += OnAutoUpdateToggled;
         menu.Items.Add(_autoUpdateMenuItem);
 
+        _debugLoggingMenuItem = new ToolStripMenuItem("Debug Logging") { CheckOnClick = true, Checked = settings.DebugLogging };
+        _debugLoggingMenuItem.CheckedChanged += OnDebugLoggingToggled;
+        menu.Items.Add(_debugLoggingMenuItem);
+
         menu.Items.Add("Exit", null, OnExit);
         return menu;
     }
@@ -87,6 +93,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _logViewerForm ??= new LogViewerForm(_logProvider);
         _logViewerForm.Show();
         _logViewerForm.BringToFront();
+        _logViewerForm.Activate();
     }
 
     private void OnShowApiKey(object? sender, EventArgs e)
@@ -102,6 +109,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
         s.Save();
         _updateTimer.Interval = GetUpdateTimerInterval(s.AutoUpdate);
         _logger.LogInformation("Auto update {State}", s.AutoUpdate ? "enabled" : "disabled");
+    }
+
+    private void OnDebugLoggingToggled(object? sender, EventArgs e)
+    {
+        var s = TraySettings.Load();
+        s.DebugLogging = _debugLoggingMenuItem!.Checked;
+        s.Save();
+        InMemoryLogProvider.DebugEnabled = s.DebugLogging;
+        _logger.LogInformation("Debug logging {State}", s.DebugLogging ? "enabled" : "disabled");
     }
 
     private static int GetUpdateTimerInterval(bool autoUpdate)
@@ -196,7 +212,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (_updateMenuItem is null) return;
 
         _updateMenuItem.Enabled = false;
-        _updateMenuItem.Text = "Downloading...";
+        _updateMenuItem.Text = "Updating…";
 
         if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
         {
