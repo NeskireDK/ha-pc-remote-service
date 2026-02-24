@@ -293,4 +293,117 @@ public class AudioServiceTests
             A<IEnumerable<string>>._,
             A<int>._)).MustHaveHappenedOnceExactly();
     }
+
+    // ── CSV parsing boundary cases ────────────────────────────────────
+
+    [Fact]
+    public void ParseCsvOutput_NullLikeOnlyCommas_IsSkipped()
+    {
+        // Line has 5 columns but type is not "Device" — should be excluded
+        var csv = "Application,VoiceMeeter,Render,Render,50.0%";
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ParseCsvOutput_DeviceNameWithSpaces_ParsedCorrectly()
+    {
+        var csv = "Device,Realtek High Definition Audio,Render,Render,60.0%";
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.Count.ShouldBe(1);
+        devices[0].Name.ShouldBe("Realtek High Definition Audio");
+    }
+
+    [Fact]
+    public void ParseCsvOutput_VolumeZeroPercent_ParsesAsZero()
+    {
+        var csv = "Device,Speakers,Render,Render,0.0%";
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.Count.ShouldBe(1);
+        devices[0].Volume.ShouldBe(0);
+    }
+
+    [Fact]
+    public void ParseCsvOutput_VolumeOneHundredPercent_ParsesAs100()
+    {
+        var csv = "Device,Speakers,Render,Render,100.0%";
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.Count.ShouldBe(1);
+        devices[0].Volume.ShouldBe(100);
+    }
+
+    [Fact]
+    public void ParseCsvOutput_DeviceNameWithSpecialChars_ParsedCorrectly()
+    {
+        var csv = "Device,USB Audio (2.0) [HID],Render,Render,45.0%";
+        var devices = AudioService.ParseCsvOutput(csv);
+
+        devices.Count.ShouldBe(1);
+        devices[0].Name.ShouldBe("USB Audio (2.0) [HID]");
+    }
+
+    // ── Async boundary cases ──────────────────────────────────────────
+
+    [Fact]
+    public async Task GetDevicesAsync_EmptyOutput_ReturnsEmptyList()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(string.Empty);
+        var service = CreateService();
+
+        var devices = await service.GetDevicesAsync();
+
+        devices.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetDefaultDeviceAsync_DeviceNameWithSpaces_CallsCliRunnerCorrectly()
+    {
+        var csv = "Device,Realtek High Definition Audio,Render,Render,60.0%";
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(csv);
+        var service = CreateService();
+
+        await service.SetDefaultDeviceAsync("Realtek High Definition Audio");
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>.That.EndsWith("SoundVolumeView.exe"),
+            A<IEnumerable<string>>.That.IsSameSequenceAs(
+                new[] { "/SetDefault", "Realtek High Definition Audio", "1" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task SetVolumeAsync_ZeroVolume_CallsCliRunnerWithZero()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await service.SetVolumeAsync(0);
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetVolume", "Speakers", "0" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task SetVolumeAsync_100Volume_CallsCliRunnerWith100()
+    {
+        A.CallTo(() => _cliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+            .Returns(SampleCsv);
+        var service = CreateService();
+
+        await service.SetVolumeAsync(100);
+
+        A.CallTo(() => _cliRunner.RunAsync(
+            A<string>._,
+            A<IEnumerable<string>>.That.IsSameSequenceAs(new[] { "/SetVolume", "Speakers", "100" }),
+            A<int>._)).MustHaveHappenedOnceExactly();
+    }
 }

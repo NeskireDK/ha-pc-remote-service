@@ -68,9 +68,7 @@ public class ModeEndpointTests : EndpointTestBase
     [Fact]
     public async Task ApplyMode_VolumeOnly_ReturnsOk()
     {
-        const string SampleCsv = "Device,Speakers,Render,Render,50.0%";
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        // AudioService is IAudioService fake — SetVolumeAsync returns completed task by default
         using var client = CreateClient(OptionsWithModes());
 
         var response = await client.PostAsync("/api/system/mode/gaming", null);
@@ -80,5 +78,61 @@ public class ModeEndpointTests : EndpointTestBase
             AppJsonContext.Default.ApiResponse);
         json.ShouldNotBeNull();
         json.Success.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ApplyMode_ResponseMessageContainsModeKey()
+    {
+        using var client = CreateClient(OptionsWithModes());
+
+        var response = await client.PostAsync("/api/system/mode/work", null);
+
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse>(
+            AppJsonContext.Default.ApiResponse);
+        json.ShouldNotBeNull();
+        json.Message!.ShouldContain("work");
+    }
+
+    [Fact]
+    public async Task GetModes_NoModesConfigured_ReturnsSuccessTrue()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/modes");
+
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<string>>>(
+            AppJsonContext.Default.ApiResponseIReadOnlyListString);
+        json.ShouldNotBeNull();
+        json.Success.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ApplyMode_EmptyModeName_Returns404()
+    {
+        // Route with empty segment won't match — ASP.NET returns 404
+        using var client = CreateClient(OptionsWithModes());
+
+        var response = await client.PostAsync("/api/system/mode/", null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ApplyMode_ModeWithAllNullConfig_ReturnsOk()
+    {
+        // A mode with no volume/device/profile — ApplyModeAsync is a no-op
+        var options = new PcRemoteOptions
+        {
+            Auth = new AuthOptions { Enabled = false },
+            Modes = new Dictionary<string, ModeConfig>
+            {
+                ["idle"] = new() // all properties null/default
+            }
+        };
+        using var client = CreateClient(options);
+
+        var response = await client.PostAsync("/api/system/mode/idle", null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 }
