@@ -11,7 +11,7 @@ public static class SteamEndpoints
         var group = endpoints.MapGroup("/api/steam");
         group.AddEndpointFilter<EndpointExceptionFilter>();
 
-        group.MapGet("/games", async (SteamService steamService) =>
+        group.MapGet("/games", async (ISteamService steamService) =>
         {
             var games = await steamService.GetGamesAsync();
             return Results.Json(
@@ -19,7 +19,7 @@ public static class SteamEndpoints
                 AppJsonContext.Default.ApiResponseListSteamGame);
         });
 
-        group.MapGet("/running", async (SteamService steamService) =>
+        group.MapGet("/running", async (ISteamService steamService) =>
         {
             var running = await steamService.GetRunningGameAsync();
             return Results.Json(
@@ -27,7 +27,7 @@ public static class SteamEndpoints
                 AppJsonContext.Default.ApiResponseSteamRunningGame);
         });
 
-        group.MapPost("/run/{appId:int}", async (int appId, SteamService steamService,
+        group.MapPost("/run/{appId:int}", async (int appId, ISteamService steamService,
             ILogger<SteamService> logger) =>
         {
             logger.LogInformation("Launch Steam game requested: {AppId}", appId);
@@ -37,7 +37,7 @@ public static class SteamEndpoints
                 AppJsonContext.Default.ApiResponseSteamRunningGame);
         });
 
-        group.MapPost("/stop", async (SteamService steamService, ILogger<SteamService> logger) =>
+        group.MapPost("/stop", async (ISteamService steamService, ILogger<SteamService> logger) =>
         {
             logger.LogInformation("Stop Steam game requested");
             await steamService.StopGameAsync();

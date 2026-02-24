@@ -17,11 +17,11 @@ public sealed partial class WindowsIdleService : IIdleService
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
-    public int GetIdleSeconds()
+    public int? GetIdleSeconds()
     {
         var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
         if (!GetLastInputInfo(ref info))
-            return 0;
+            return null;
 
         var idleMs = (uint)Environment.TickCount - info.dwTime;
         return (int)(idleMs / 1000);

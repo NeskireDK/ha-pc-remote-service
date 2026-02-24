@@ -8,7 +8,7 @@ public static class ModeEndpoints
 {
     public static IEndpointRouteBuilder MapModeEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/system/modes", (ModeService modeService) =>
+        endpoints.MapGet("/api/system/modes", (IModeService modeService) =>
         {
             var names = modeService.GetModeNames();
             return Results.Json(
@@ -16,7 +16,7 @@ public static class ModeEndpoints
                 AppJsonContext.Default.ApiResponseIReadOnlyListString);
         }).AddEndpointFilter<EndpointExceptionFilter>();
 
-        endpoints.MapPost("/api/system/mode/{modeName}", async (string modeName, ModeService modeService,
+        endpoints.MapPost("/api/system/mode/{modeName}", async (string modeName, IModeService modeService,
             ILogger<ModeService> logger) =>
         {
             logger.LogInformation("Apply mode '{ModeName}' requested", modeName);

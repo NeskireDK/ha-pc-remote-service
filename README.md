@@ -215,9 +215,8 @@ dotnet publish src/HaPcRemote.Tray -c Release -r win-x64
 dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 ```
 
-## Known issues
-- favicon: [15.12.23] [WRN] ApiKeyMiddleware - Request to /api/steam/running missing API key
-[15.12.23] [WRN] ApiKeyMiddleware - Request to /favicon.ico missing API key
+## Known Issues
+- Browsers hitting the service URL directly trigger API key warnings for `/favicon.ico` requests
 
 ## Roadmap
 

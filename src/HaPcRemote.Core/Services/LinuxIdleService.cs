@@ -6,7 +6,7 @@ namespace HaPcRemote.Service.Services;
 [SupportedOSPlatform("linux")]
 public sealed class LinuxIdleService(ILogger<LinuxIdleService> logger) : IIdleService
 {
-    public int GetIdleSeconds()
+    public int? GetIdleSeconds()
     {
         // xprintidle returns milliseconds since last X11 input event
         try
@@ -19,7 +19,7 @@ public sealed class LinuxIdleService(ILogger<LinuxIdleService> logger) : IIdleSe
                 CreateNoWindow = true
             });
 
-            if (process is null) return 0;
+            if (process is null) return null;
 
             var output = process.StandardOutput.ReadToEnd().Trim();
             process.WaitForExit();
@@ -32,6 +32,6 @@ public sealed class LinuxIdleService(ILogger<LinuxIdleService> logger) : IIdleSe
             logger.LogDebug(ex, "xprintidle not available");
         }
 
-        return 0;
+        return null;
     }
 }

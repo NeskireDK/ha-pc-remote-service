@@ -10,8 +10,8 @@ public static class SystemStateEndpoints
         endpoints.MapGet("/api/system/state", async (
             IAudioService audioService,
             IMonitorService monitorService,
-            SteamService steamService,
-            ModeService modeService,
+            ISteamService steamService,
+            IModeService modeService,
             IIdleService idleService,
             ILogger<SystemState> logger) =>
         {
