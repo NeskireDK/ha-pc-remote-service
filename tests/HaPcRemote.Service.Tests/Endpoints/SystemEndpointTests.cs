@@ -48,6 +48,17 @@ public class SystemEndpointTests : EndpointTestBase
     }
 
     [Fact]
+    public async Task Idle_Unavailable_Returns503()
+    {
+        A.CallTo(() => IdleService.GetIdleSeconds()).Returns((int?)null);
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/idle");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
     public async Task Idle_ServiceThrows_Returns500()
     {
         A.CallTo(() => IdleService.GetIdleSeconds())

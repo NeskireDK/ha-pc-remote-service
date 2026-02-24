@@ -21,7 +21,12 @@ public static class SystemEndpoints
         group.MapGet("/idle", (IIdleService idleService) =>
         {
             var seconds = idleService.GetIdleSeconds();
-            return Results.Json(ApiResponse.Ok(seconds), AppJsonContext.Default.ApiResponseInt32);
+            if (seconds is null)
+                return Results.Json(
+                    ApiResponse.Fail("Idle detection unavailable"),
+                    AppJsonContext.Default.ApiResponse,
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            return Results.Json(ApiResponse.Ok(seconds.Value), AppJsonContext.Default.ApiResponseInt32);
         });
 
         return group;

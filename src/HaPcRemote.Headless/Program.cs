@@ -83,12 +83,12 @@ builder.Services.AddSingleton<IAppLauncher, DirectAppLauncher>();
 builder.Services.AddSingleton<AppService>();
 builder.Services.AddSingleton<IAudioService, LinuxAudioService>();
 builder.Services.AddSingleton<IMonitorService, LinuxMonitorService>();
-builder.Services.AddSingleton<ModeService>();
+builder.Services.AddSingleton<IModeService, ModeService>();
 builder.Services.AddHostedService<MdnsAdvertiserService>();
 builder.Services.AddSingleton<IPowerService, LinuxPowerService>();
 builder.Services.AddSingleton<IIdleService, LinuxIdleService>();
 builder.Services.AddSingleton<ISteamPlatform, LinuxSteamPlatform>();
-builder.Services.AddSingleton<SteamService>();
+builder.Services.AddSingleton<ISteamService, SteamService>();
 
 var app = builder.Build();
 

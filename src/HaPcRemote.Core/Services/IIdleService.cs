@@ -3,7 +3,8 @@ namespace HaPcRemote.Service.Services;
 public interface IIdleService
 {
     /// <summary>
-    /// Returns the number of seconds since the last user input (keyboard/mouse).
+    /// Returns the number of seconds since the last user input (keyboard/mouse),
+    /// or null if idle detection is unavailable.
     /// </summary>
-    int GetIdleSeconds();
+    int? GetIdleSeconds();
 }

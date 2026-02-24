@@ -3,7 +3,7 @@ using ValveKeyValue;
 
 namespace HaPcRemote.Service.Services;
 
-public class SteamService(ISteamPlatform platform)
+public class SteamService(ISteamPlatform platform) : ISteamService
 {
     private List<SteamGame>? _cachedGames;
     private DateTime _cacheExpiry;

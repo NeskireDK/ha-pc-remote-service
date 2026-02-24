@@ -7,7 +7,7 @@ public class ModeService(
     IOptionsMonitor<PcRemoteOptions> options,
     IAudioService audioService,
     IMonitorService monitorService,
-    AppService appService)
+    AppService appService) : IModeService
 {
     public IReadOnlyList<string> GetModeNames() =>
         options.CurrentValue.Modes.Keys.ToList();
