@@ -217,15 +217,19 @@ dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 
 ## Known Issues
 - Browsers hitting the service URL directly trigger API key warnings for `/favicon.ico` requests
-
+- Top 20 isnt working correctly, shows games that hasnt been played since 2022. Need to introduce some debug discovery code or review our approach of sorting the steam files.
+- Game Images comes in variting size / format. If possible investigate compatiblity with home assistant Poster's prefered else square.
+- Non-steam games arent compatible and cannot so far be launched - theres also the issue of how to get posters for these games, could they be extracted from steam or another free fallback solution?
+- When user manually checks for update and quickly clicks the green update button, the tray will show a console error of the file is already in use (this is due to auto update triggered right after and colliding with user update, a low priority to solve)
+- Update button shouldnt be green, just regular colors
 ## Roadmap
 
-- [x] Debug logging toggle in tray menu *(v0.9.2)*
-- [x] Configurable log levels: Error / Warning / Info / Verbose *(v0.9.4)*
-- [x] Linux headless daemon + systemd user service *(v0.9.5)*
-- [x] PC Mode endpoint + HA select entity *(v1.0)*
-- [x] Aggregated state endpoint `GET /api/system/state` *(v1.0)*
-- [x] User Idle Time endpoint `GET /api/system/idle` *(v1.0.2)*
+- [ ] Introduce config panel with multiple tabs
+- [ ] User configurable for adding and removing PC modes, for each new PC modes have dropdowns for available monitor profiles, monitors, audio devices and an option for dont change.
+- [ ] Show log in the new config panel
+- [ ] General settings for setting log level, auto update.
+- [ ] When PC modes are stable, consider implementing a config panel to bind PC modes to games, so they will trigger the mode followed by launch of game. User configable delay for each game. 
+- [x] Verifying Linux headless daemon + systemd user service *(v0.9.5)*
 - [x] Brand icons submitted to [home-assistant/brands](https://github.com/home-assistant/brands) *(awaiting approval)*
 
 ## License
