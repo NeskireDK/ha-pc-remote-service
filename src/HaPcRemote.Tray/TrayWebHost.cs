@@ -87,6 +87,7 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<ModeService>();
         builder.Services.AddHostedService<MdnsAdvertiserService>();
         builder.Services.AddSingleton<IPowerService, WindowsPowerService>();
+        builder.Services.AddSingleton<IIdleService, WindowsIdleService>();
         builder.Services.AddSingleton<ISteamPlatform, WindowsSteamPlatform>();
         builder.Services.AddSingleton<SteamService>();
 

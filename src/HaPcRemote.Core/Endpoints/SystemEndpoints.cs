@@ -18,6 +18,12 @@ public static class SystemEndpoints
             return Results.Json(ApiResponse.Ok("Sleep initiated"), AppJsonContext.Default.ApiResponse);
         });
 
+        group.MapGet("/idle", (IIdleService idleService) =>
+        {
+            var seconds = idleService.GetIdleSeconds();
+            return Results.Json(ApiResponse.Ok(seconds), AppJsonContext.Default.ApiResponseInt32);
+        });
+
         return group;
     }
 }

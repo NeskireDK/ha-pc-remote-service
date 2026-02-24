@@ -74,8 +74,9 @@ All endpoints except `/api/health` require the `X-Api-Key` header.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| `GET` | `/api/system/state` | All state in one call (audio, monitors, Steam, modes) |
+| `GET` | `/api/system/state` | All state in one call (audio, monitors, Steam, modes, idle) |
 | `GET` | `/api/system/modes` | List available PC mode names |
+| `GET` | `/api/system/idle` | Seconds since last keyboard/mouse input |
 | `POST` | `/api/system/mode/{name}` | Apply a named PC mode |
 | `POST` | `/api/system/sleep` | Suspend the PC |
 
@@ -225,8 +226,8 @@ dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 - [x] Linux headless daemon + systemd user service *(v0.9.5)*
 - [x] PC Mode endpoint + HA select entity *(v1.0)*
 - [x] Aggregated state endpoint `GET /api/system/state` *(v1.0)*
+- [x] User Idle Time endpoint `GET /api/system/idle` *(v1.0.2)*
 - [x] Brand icons submitted to [home-assistant/brands](https://github.com/home-assistant/brands) *(awaiting approval)*
-- [ ] User Idle Time sensor `GET /api/system/idle` *(v1.1)*
 
 ## License
 

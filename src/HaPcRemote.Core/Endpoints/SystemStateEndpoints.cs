@@ -12,6 +12,7 @@ public static class SystemStateEndpoints
             IMonitorService monitorService,
             SteamService steamService,
             ModeService modeService,
+            IIdleService idleService,
             ILogger<SystemState> logger) =>
         {
             // Fire all async calls concurrently
@@ -49,6 +50,10 @@ public static class SystemStateEndpoints
             try { modes = modeService.GetModeNames().ToList(); }
             catch (Exception ex) { logger.LogWarning(ex, "Failed to get modes"); }
 
+            int? idleSeconds = null;
+            try { idleSeconds = idleService.GetIdleSeconds(); }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get idle time"); }
+
             var state = new SystemState
             {
                 Audio = audio,
@@ -56,7 +61,8 @@ public static class SystemStateEndpoints
                 MonitorProfiles = monitorProfiles,
                 SteamGames = steamGames,
                 RunningGame = runningGame,
-                Modes = modes
+                Modes = modes,
+                IdleSeconds = idleSeconds
             };
 
             return Results.Json(

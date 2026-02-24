@@ -133,6 +133,35 @@ public class SystemStateEndpointTests : EndpointTestBase
     }
 
     [Fact]
+    public async Task GetState_IdleAvailable_PopulatesIdleSeconds()
+    {
+        SetupDefaults();
+        A.CallTo(() => IdleService.GetIdleSeconds()).Returns(120);
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/state");
+
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SystemState>>(
+            AppJsonContext.Default.ApiResponseSystemState);
+        json!.Data!.IdleSeconds.ShouldBe(120);
+    }
+
+    [Fact]
+    public async Task GetState_IdleFails_IdleSecondsIsNull()
+    {
+        SetupDefaults();
+        A.CallTo(() => IdleService.GetIdleSeconds())
+            .Throws(new InvalidOperationException("no idle"));
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/state");
+
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SystemState>>(
+            AppJsonContext.Default.ApiResponseSystemState);
+        json!.Data!.IdleSeconds.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task GetState_AlwaysReturnsSuccessTrue()
     {
         A.CallTo(() => AudioService.GetDevicesAsync())
