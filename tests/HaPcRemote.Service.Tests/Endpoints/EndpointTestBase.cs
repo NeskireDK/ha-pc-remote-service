@@ -45,8 +45,8 @@ public class EndpointTestBase : IDisposable
         builder.Services.AddSingleton(AppLauncher);
         builder.Services.AddSingleton(PowerService);
         builder.Services.AddSingleton(SteamPlatform);
-        builder.Services.AddSingleton(AudioService);
-        builder.Services.AddSingleton(MonitorService);
+        builder.Services.AddSingleton<IAudioService>(AudioService);
+        builder.Services.AddSingleton<IMonitorService>(MonitorService);
 
         // Real services that delegate to fakes
         builder.Services.AddSingleton<AppService>();
