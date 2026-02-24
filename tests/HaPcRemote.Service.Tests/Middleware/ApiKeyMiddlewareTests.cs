@@ -95,4 +95,81 @@ public class ApiKeyMiddlewareTests
 
         called.ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task InvokeAsync_EmptyApiKey_Returns401()
+    {
+        var called = false;
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; }, _logger);
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/system/sleep";
+        context.Request.Headers["X-Api-Key"] = "";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context, CreateOptions());
+
+        called.ShouldBeFalse();
+        context.Response.StatusCode.ShouldBe(401);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WhitespaceApiKey_Returns401()
+    {
+        var called = false;
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; }, _logger);
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/system/sleep";
+        context.Request.Headers["X-Api-Key"] = "   ";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context, CreateOptions());
+
+        called.ShouldBeFalse();
+        context.Response.StatusCode.ShouldBe(401);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_CorrectKeyWithLeadingWhitespace_Returns401()
+    {
+        // Key with whitespace is not equal to the stored key — must be exact match
+        var called = false;
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; }, _logger);
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/system/sleep";
+        context.Request.Headers["X-Api-Key"] = " " + ValidApiKey;
+        context.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(context, CreateOptions());
+
+        called.ShouldBeFalse();
+        context.Response.StatusCode.ShouldBe(401);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_AuthEndpointCaseInsensitive_SkipsAuth()
+    {
+        // /api/health path check is case-insensitive
+        var called = false;
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; }, _logger);
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/API/HEALTH";
+
+        await middleware.InvokeAsync(context, CreateOptions());
+
+        called.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ValidKey_ResponseStatusRemainsDefault()
+    {
+        var middleware = new ApiKeyMiddleware(_ => Task.CompletedTask, _logger);
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/system/sleep";
+        context.Request.Headers["X-Api-Key"] = ValidApiKey;
+
+        await middleware.InvokeAsync(context, CreateOptions());
+
+        // Default status code is 200 — middleware should not change it
+        context.Response.StatusCode.ShouldBe(200);
+    }
 }

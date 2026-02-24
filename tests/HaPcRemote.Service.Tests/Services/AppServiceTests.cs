@@ -146,4 +146,81 @@ public class AppServiceTests
         A.CallTo(() => launcher.LaunchAsync("calc.exe", null))
             .MustHaveHappenedOnceExactly();
     }
+
+    [Fact]
+    public async Task KillAsync_KnownKey_DoesNotThrow()
+    {
+        var apps = new Dictionary<string, AppDefinitionOptions>
+        {
+            ["notepad"] = new()
+            {
+                DisplayName = "Notepad",
+                ExePath = "notepad.exe",
+                ProcessName = "notepad_unlikely_running_xyz_12345"
+            }
+        };
+        var service = new AppService(CreateOptions(apps), A.Fake<IAppLauncher>());
+
+        // Process not running — should complete without throwing
+        await Should.NotThrowAsync(() => service.KillAsync("notepad"));
+    }
+
+    [Fact]
+    public async Task GetAllStatusesAsync_AppKeyIsPreservedInResult()
+    {
+        var apps = new Dictionary<string, AppDefinitionOptions>
+        {
+            ["my-app-key"] = new()
+            {
+                DisplayName = "My App",
+                ExePath = "myapp.exe",
+                ProcessName = "myapp_unlikely_running_xyz_12345"
+            }
+        };
+        var service = new AppService(CreateOptions(apps), A.Fake<IAppLauncher>());
+
+        var result = await service.GetAllStatusesAsync();
+
+        result.Count.ShouldBe(1);
+        result[0].Key.ShouldBe("my-app-key");
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_IsRunning_ReflectsProcessState()
+    {
+        // Use a process name that is definitely not running
+        var apps = new Dictionary<string, AppDefinitionOptions>
+        {
+            ["ghost"] = new()
+            {
+                DisplayName = "Ghost",
+                ExePath = "ghost.exe",
+                ProcessName = "ghost_never_running_zzz_99999"
+            }
+        };
+        var service = new AppService(CreateOptions(apps), A.Fake<IAppLauncher>());
+
+        var result = await service.GetStatusAsync("ghost");
+
+        result.IsRunning.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task LaunchAsync_AppKeyIsCaseSensitive_ThrowsForWrongCase()
+    {
+        var apps = new Dictionary<string, AppDefinitionOptions>
+        {
+            ["notepad"] = new()
+            {
+                DisplayName = "Notepad",
+                ExePath = "notepad.exe",
+                ProcessName = "notepad"
+            }
+        };
+        var service = new AppService(CreateOptions(apps), A.Fake<IAppLauncher>());
+
+        // Default Dictionary is case-sensitive — "Notepad" != "notepad"
+        await Should.ThrowAsync<KeyNotFoundException>(
+            () => service.LaunchAsync("Notepad"));
+    }
 }

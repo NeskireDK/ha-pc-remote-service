@@ -269,4 +269,154 @@ public class SteamServiceTests
 
         A.CallTo(() => _platform.KillProcessesInDirectory(A<string>._)).MustNotHaveHappened();
     }
+
+    // ── ParseLibraryFolders edge cases ───────────────────────────────
+
+    [Fact]
+    public void ParseLibraryFolders_NullContentPath_ReturnsEmptyList()
+    {
+        // VDF with a folder entry but no path key — should produce empty list
+        var vdf = """
+            "libraryfolders"
+            {
+                "0"
+                {
+                    "label"     "some label"
+                }
+            }
+            """;
+
+        var paths = SteamService.ParseLibraryFolders(vdf);
+
+        paths.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ParseLibraryFolders_SingleEntry_ReturnsSinglePath()
+    {
+        var vdf = """
+            "libraryfolders"
+            {
+                "0"
+                {
+                    "path"      "E:\\Games\\Steam"
+                }
+            }
+            """;
+
+        var paths = SteamService.ParseLibraryFolders(vdf);
+
+        paths.Count.ShouldBe(1);
+        paths[0].ShouldBe(@"E:\Games\Steam");
+    }
+
+    // ── ParseAppManifest edge cases ───────────────────────────────────
+
+    [Fact]
+    public void ParseAppManifest_EmptyString_ReturnsNull()
+    {
+        // ValveKeyValue will parse an empty doc — no appid/name => null
+        var acf = """
+            "AppState"
+            {
+            }
+            """;
+
+        var game = SteamService.ParseAppManifest(acf);
+
+        game.ShouldBeNull();
+    }
+
+    [Fact]
+    public void ParseAppManifest_AppIdZero_ReturnsGame()
+    {
+        // appid 0 is technically valid integer — service should return a game object
+        var acf = """
+            "AppState"
+            {
+                "appid"     "0"
+                "name"      "Unknown App"
+            }
+            """;
+
+        var game = SteamService.ParseAppManifest(acf);
+
+        game.ShouldNotBeNull();
+        game.AppId.ShouldBe(0);
+        game.Name.ShouldBe("Unknown App");
+    }
+
+    [Fact]
+    public void ParseAppManifest_VeryLargeLastUpdated_ParsesCorrectly()
+    {
+        var acf = """
+            "AppState"
+            {
+                "appid"        "730"
+                "name"         "Counter-Strike 2"
+                "LastUpdated"  "9999999999"
+            }
+            """;
+
+        var game = SteamService.ParseAppManifest(acf);
+
+        game.ShouldNotBeNull();
+        game.LastPlayed.ShouldBe(9999999999L);
+    }
+
+    // ── GetGamesAsync edge cases ──────────────────────────────────────
+
+    [Fact]
+    public async Task GetGamesAsync_SteamNotInstalled_Throws()
+    {
+        A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
+        var service = CreateService();
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => service.GetGamesAsync());
+    }
+
+    [Fact]
+    public async Task GetGamesAsync_EmptySteamPath_Throws()
+    {
+        A.CallTo(() => _platform.GetSteamPath()).Returns(string.Empty);
+        var service = CreateService();
+
+        // GetSteamPath returns empty string — treated as non-null but libraryfolders.vdf won't exist
+        // so should return empty list, not throw
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        var result = await service.GetGamesAsync();
+
+        result.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetGamesAsync_CacheHit_DoesNotCallPlatformAgain()
+    {
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        var service = CreateService();
+
+        await service.GetGamesAsync(); // warm cache
+        await service.GetGamesAsync(); // should use cache
+
+        // GetSteamPath called exactly once (first call only)
+        A.CallTo(() => _platform.GetSteamPath()).MustHaveHappenedOnceExactly();
+    }
+
+    // ── LaunchGameAsync edge cases ────────────────────────────────────
+
+    [Fact]
+    public async Task LaunchGame_AppIdZero_LaunchesIt()
+    {
+        // Edge: launching appId 0 — no game running, so it should still call LaunchSteamUrl
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(1);
+        // running appId (1) != target (0), different game running so StopGame is called
+        A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
+        var service = CreateService();
+
+        await service.LaunchGameAsync(0);
+
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/0"))
+            .MustHaveHappenedOnceExactly();
+    }
 }

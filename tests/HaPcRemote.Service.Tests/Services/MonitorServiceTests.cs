@@ -550,4 +550,107 @@ public class MonitorServiceTests : IDisposable
         await Should.ThrowAsync<KeyNotFoundException>(
             () => service.SoloMonitorAsync("UNKNOWN"));
     }
+
+    // ── ApplyProfileAsync edge cases ──────────────────────────────────
+
+    [Fact]
+    public async Task ApplyProfileAsync_ProfileNameWithDots_ThrowsArgumentException()
+    {
+        var service = CreateService();
+
+        await Should.ThrowAsync<ArgumentException>(
+            () => service.ApplyProfileAsync(".."));
+    }
+
+    [Fact]
+    public async Task ApplyProfileAsync_ProfileFileMissing_ThrowsKeyNotFoundException()
+    {
+        // Profile name is valid (no traversal), but .cfg file does not exist
+        var service = CreateService();
+
+        await Should.ThrowAsync<KeyNotFoundException>(
+            () => service.ApplyProfileAsync("nonexistent-profile"));
+    }
+
+    [Fact]
+    public async Task GetProfilesAsync_OnlyNonCfgFiles_ReturnsEmptyList()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "notes.txt"), "");
+        File.WriteAllText(Path.Combine(_tempDir, "config.json"), "");
+        var service = CreateService();
+
+        var result = await service.GetProfilesAsync();
+
+        result.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetProfilesAsync_ProfileNamesAreSortedAlphabetically()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "zebra.cfg"), "");
+        File.WriteAllText(Path.Combine(_tempDir, "alpha.cfg"), "");
+        File.WriteAllText(Path.Combine(_tempDir, "middle.cfg"), "");
+        var service = CreateService();
+
+        var result = await service.GetProfilesAsync();
+
+        result.Count.ShouldBe(3);
+        result[0].Name.ShouldBe("alpha");
+        result[1].Name.ShouldBe("middle");
+        result[2].Name.ShouldBe("zebra");
+    }
+
+    // ── ParseXmlOutput edge cases ─────────────────────────────────────
+
+    [Fact]
+    public void ParseXmlOutput_MalformedXml_ThrowsException()
+    {
+        var badXml = "<monitors_list><item><name>unclosed";
+
+        Should.Throw<Exception>(() => MonitorService.ParseXmlOutput(badXml));
+    }
+
+    [Fact]
+    public void ParseXmlOutput_AllMonitorsDisconnected_ReturnsEmptyList()
+    {
+        var xml = """
+            <?xml version="1.0" ?>
+            <monitors_list>
+              <item>
+                <name>\\.\DISPLAY1</name>
+                <disconnected>Yes</disconnected>
+                <active>No</active>
+              </item>
+              <item>
+                <name>\\.\DISPLAY2</name>
+                <disconnected>Yes</disconnected>
+                <active>No</active>
+              </item>
+            </monitors_list>
+            """;
+
+        var monitors = MonitorService.ParseXmlOutput(xml);
+
+        monitors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ParseXmlOutput_FrequencyMissing_DefaultsToZero()
+    {
+        var xml = """
+            <?xml version="1.0" ?>
+            <monitors_list>
+              <item>
+                <name>\\.\DISPLAY1</name>
+                <active>Yes</active>
+                <disconnected>No</disconnected>
+              </item>
+            </monitors_list>
+            """;
+
+        var monitors = MonitorService.ParseXmlOutput(xml);
+
+        monitors.Count.ShouldBe(1);
+        monitors[0].DisplayFrequency.ShouldBe(0);
+    }
 }
