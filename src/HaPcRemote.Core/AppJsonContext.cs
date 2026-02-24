@@ -30,6 +30,8 @@ namespace HaPcRemote.Service;
 [JsonSerializable(typeof(ApiResponse<SteamRunningGame>))]
 [JsonSerializable(typeof(IReadOnlyList<string>))]
 [JsonSerializable(typeof(ApiResponse<IReadOnlyList<string>>))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(ApiResponse<int>))]
 [JsonSerializable(typeof(AudioState))]
 [JsonSerializable(typeof(SystemState))]
 [JsonSerializable(typeof(ApiResponse<SystemState>))]

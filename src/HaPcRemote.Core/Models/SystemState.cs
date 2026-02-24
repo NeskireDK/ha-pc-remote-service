@@ -8,6 +8,7 @@ public sealed class SystemState
     public List<SteamGame>? SteamGames { get; init; }
     public SteamRunningGame? RunningGame { get; init; }
     public List<string>? Modes { get; init; }
+    public int? IdleSeconds { get; init; }
 }
 
 public sealed class AudioState

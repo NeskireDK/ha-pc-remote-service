@@ -20,6 +20,7 @@ public class EndpointTestBase : IAsyncLifetime
     protected readonly ISteamPlatform SteamPlatform = A.Fake<ISteamPlatform>();
     protected readonly IAudioService AudioService = A.Fake<IAudioService>();
     protected readonly IMonitorService MonitorService = A.Fake<IMonitorService>();
+    protected readonly IIdleService IdleService = A.Fake<IIdleService>();
 
     private WebApplication? _app;
 
@@ -47,6 +48,7 @@ public class EndpointTestBase : IAsyncLifetime
         builder.Services.AddSingleton(SteamPlatform);
         builder.Services.AddSingleton<IAudioService>(AudioService);
         builder.Services.AddSingleton<IMonitorService>(MonitorService);
+        builder.Services.AddSingleton(IdleService);
 
         // Real services that delegate to fakes
         builder.Services.AddSingleton<AppService>();
