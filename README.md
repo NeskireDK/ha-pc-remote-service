@@ -214,6 +214,10 @@ dotnet publish src/HaPcRemote.Tray -c Release -r win-x64
 dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 ```
 
+## Known issues
+- favicon: [15.12.23] [WRN] ApiKeyMiddleware - Request to /api/steam/running missing API key
+[15.12.23] [WRN] ApiKeyMiddleware - Request to /favicon.ico missing API key
+
 ## Roadmap
 
 - [x] Debug logging toggle in tray menu *(v0.9.2)*
@@ -221,7 +225,7 @@ dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 - [x] Linux headless daemon + systemd user service *(v0.9.5)*
 - [x] PC Mode endpoint + HA select entity *(v1.0)*
 - [x] Aggregated state endpoint `GET /api/system/state` *(v1.0)*
-- [ ] Brand icons submitted to [home-assistant/brands](https://github.com/home-assistant/brands) *(awaiting approval)*
+- [x] Brand icons submitted to [home-assistant/brands](https://github.com/home-assistant/brands) *(awaiting approval)*
 - [ ] User Idle Time sensor `GET /api/system/idle` *(v1.1)*
 
 ## License
