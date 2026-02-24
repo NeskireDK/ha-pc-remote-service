@@ -13,12 +13,17 @@ public class SystemStateEndpointTests : EndpointTestBase
         new AudioDevice { Name = "Speakers", IsDefault = true, Volume = 50 }
     ];
 
-    [Fact]
-    public async Task GetState_ReturnsOk()
+    private void SetupDefaults()
     {
         A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
         A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
         A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
+    }
+
+    [Fact]
+    public async Task GetState_ReturnsOk()
+    {
+        SetupDefaults();
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/system/state");
@@ -34,9 +39,7 @@ public class SystemStateEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetState_AudioAvailable_PopulatesAudioField()
     {
-        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
-        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
-        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
+        SetupDefaults();
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/system/state");
@@ -69,9 +72,7 @@ public class SystemStateEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetState_NoRunningGame_RunningGameIsNull()
     {
-        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
-        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
-        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
+        SetupDefaults();
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/system/state");
@@ -84,9 +85,7 @@ public class SystemStateEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetState_SteamNotInstalled_SteamGamesIsNull()
     {
-        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
-        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
-        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
+        SetupDefaults();
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/system/state");

@@ -48,7 +48,10 @@ public sealed class LinuxSteamPlatform : ISteamPlatform
             if (value is not null && int.TryParse(value, out var appId))
                 return appId;
         }
-        catch { }
+        catch (Exception)
+        {
+            // VDF parsing can fail if the file is being written to by Steam
+        }
 
         return 0;
     }
@@ -67,7 +70,7 @@ public sealed class LinuxSteamPlatform : ISteamPlatform
     public void LaunchSteamUrl(string url)
     {
         // UseShellExecute on Linux delegates to xdg-open, which handles steam:// URIs
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        using var process = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
     public void KillProcessesInDirectory(string directory)

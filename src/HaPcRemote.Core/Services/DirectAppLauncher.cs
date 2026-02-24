@@ -18,7 +18,7 @@ public sealed class DirectAppLauncher : IAppLauncher
         };
         if (!string.IsNullOrEmpty(arguments))
             startInfo.Arguments = arguments;
-        Process.Start(startInfo);
+        using var process = Process.Start(startInfo);
         return Task.CompletedTask;
     }
 }

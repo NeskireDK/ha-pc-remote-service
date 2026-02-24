@@ -34,16 +34,17 @@ builder.Services.Configure<PcRemoteOptions>(
 builder.Services.PostConfigure<PcRemoteOptions>(options =>
 {
     var baseDir = AppContext.BaseDirectory;
-    if (!Path.IsPathRooted(options.ToolsPath))
-        options.ToolsPath = Path.GetFullPath(options.ToolsPath, baseDir);
-    if (!Path.IsPathRooted(options.ProfilesPath))
-        options.ProfilesPath = Path.GetFullPath(options.ProfilesPath, baseDir);
+    options.ToolsPath = ResolveRelativePath(options.ToolsPath, baseDir);
+    options.ProfilesPath = ResolveRelativePath(options.ProfilesPath, baseDir);
     foreach (var app in options.Apps.Values)
     {
-        if (!string.IsNullOrEmpty(app.ExePath) && !Path.IsPathRooted(app.ExePath))
-            app.ExePath = Path.GetFullPath(app.ExePath, baseDir);
+        if (!string.IsNullOrEmpty(app.ExePath))
+            app.ExePath = ResolveRelativePath(app.ExePath, baseDir);
     }
 });
+
+static string ResolveRelativePath(string path, string baseDir) =>
+    Path.IsPathRooted(path) ? path : Path.GetFullPath(path, baseDir);
 
 var pcRemoteConfig = builder.Configuration
     .GetSection(PcRemoteOptions.SectionName)
@@ -58,8 +59,9 @@ if (pcRemoteConfig.Auth.Enabled && string.IsNullOrEmpty(pcRemoteConfig.Auth.ApiK
         Directory.CreateDirectory(writableConfigDir);
         configPath = writableConfigPath;
     }
-    catch
+    catch (Exception ex)
     {
+        Console.WriteLine($"[STARTUP] Failed to create config directory {writableConfigDir}: {ex.Message}");
         configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
     }
     var generatedKey = ApiKeyService.GenerateApiKey();
@@ -106,7 +108,8 @@ app.Use(async (context, next) =>
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsJsonAsync(
                 ApiResponse.Fail("Internal server error"),
-                AppJsonContext.Default.ApiResponse);
+                AppJsonContext.Default.ApiResponse,
+                context.RequestAborted);
         }
     }
 });
