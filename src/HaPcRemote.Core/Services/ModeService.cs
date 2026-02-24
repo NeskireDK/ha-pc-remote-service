@@ -5,8 +5,8 @@ namespace HaPcRemote.Service.Services;
 
 public class ModeService(
     IOptionsMonitor<PcRemoteOptions> options,
-    AudioService audioService,
-    MonitorService monitorService,
+    IAudioService audioService,
+    IMonitorService monitorService,
     AppService appService)
 {
     public IReadOnlyList<string> GetModeNames() =>

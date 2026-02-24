@@ -8,13 +8,16 @@ namespace HaPcRemote.Service.Tests.Endpoints;
 
 public class AudioEndpointTests : EndpointTestBase
 {
-    private const string SampleCsv = "Device,Speakers,Render,Render,50.0%\nDevice,Headphones,Render,,75.0%";
+    private static readonly List<AudioDevice> TwoDevices =
+    [
+        new AudioDevice { Name = "Speakers", IsDefault = true, Volume = 50 },
+        new AudioDevice { Name = "Headphones", IsDefault = false, Volume = 75 }
+    ];
 
     [Fact]
     public async Task GetDevices_ReturnsDeviceList()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(TwoDevices);
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/audio/devices");
@@ -30,8 +33,8 @@ public class AudioEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetCurrent_ReturnsDefaultDevice()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.GetCurrentDeviceAsync())
+            .Returns(TwoDevices[0]);
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/audio/current");
@@ -46,8 +49,8 @@ public class AudioEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetCurrent_NoDefault_Returns404()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns("Device,Speakers,Render,,50.0%"); // No default
+        A.CallTo(() => AudioService.GetCurrentDeviceAsync())
+            .Returns((AudioDevice?)null);
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/audio/current");
@@ -58,8 +61,7 @@ public class AudioEndpointTests : EndpointTestBase
     [Fact]
     public async Task SetVolume_ValidRange_ReturnsOk()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.SetVolumeAsync(50)).Returns(Task.CompletedTask);
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/audio/volume/50", null);
@@ -87,8 +89,7 @@ public class AudioEndpointTests : EndpointTestBase
     [Fact]
     public async Task SetDefault_ReturnsOk()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.SetDefaultDeviceAsync("Headphones")).Returns(Task.CompletedTask);
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/audio/set/Headphones", null);
@@ -99,8 +100,8 @@ public class AudioEndpointTests : EndpointTestBase
     [Fact]
     public async Task SetDefault_InvalidDevice_Returns404()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.SetDefaultDeviceAsync("NonExistent"))
+            .Throws(new KeyNotFoundException("Audio device 'NonExistent' not found."));
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/audio/set/NonExistent", null);

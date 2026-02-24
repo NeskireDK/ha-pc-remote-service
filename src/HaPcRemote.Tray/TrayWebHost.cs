@@ -82,8 +82,8 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<ICliRunner, CliRunner>();
         builder.Services.AddSingleton<IAppLauncher, DirectAppLauncher>();
         builder.Services.AddSingleton<AppService>();
-        builder.Services.AddSingleton<AudioService>();
-        builder.Services.AddSingleton<MonitorService>();
+        builder.Services.AddSingleton<IAudioService, AudioService>();
+        builder.Services.AddSingleton<IMonitorService, MonitorService>();
         builder.Services.AddSingleton<ModeService>();
         builder.Services.AddHostedService<MdnsAdvertiserService>();
         builder.Services.AddSingleton<IPowerService, WindowsPowerService>();

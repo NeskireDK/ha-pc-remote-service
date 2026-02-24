@@ -8,8 +8,8 @@ public static class SystemStateEndpoints
     public static IEndpointRouteBuilder MapSystemStateEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/system/state", async (
-            AudioService audioService,
-            MonitorService monitorService,
+            IAudioService audioService,
+            IMonitorService monitorService,
             SteamService steamService,
             ModeService modeService,
             ILogger<SystemState> logger) =>

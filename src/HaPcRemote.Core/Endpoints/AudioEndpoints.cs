@@ -9,7 +9,7 @@ public static class AudioEndpoints
     {
         var group = endpoints.MapGroup("/api/audio");
 
-        group.MapGet("/devices", async (AudioService audioService, ILogger<AudioService> logger) =>
+        group.MapGet("/devices", async (IAudioService audioService, ILogger<IAudioService> logger) =>
         {
             try
             {
@@ -28,7 +28,7 @@ public static class AudioEndpoints
             }
         });
 
-        group.MapGet("/current", async (AudioService audioService, ILogger<AudioService> logger) =>
+        group.MapGet("/current", async (IAudioService audioService, ILogger<IAudioService> logger) =>
         {
             try
             {
@@ -55,8 +55,8 @@ public static class AudioEndpoints
             }
         });
 
-        group.MapPost("/set/{deviceName}", async (string deviceName, AudioService audioService,
-            ILogger<AudioService> logger) =>
+        group.MapPost("/set/{deviceName}", async (string deviceName, IAudioService audioService,
+            ILogger<IAudioService> logger) =>
         {
             try
             {
@@ -83,8 +83,8 @@ public static class AudioEndpoints
             }
         });
 
-        group.MapPost("/volume/{level:int}", async (int level, AudioService audioService,
-            ILogger<AudioService> logger) =>
+        group.MapPost("/volume/{level:int}", async (int level, IAudioService audioService,
+            ILogger<IAudioService> logger) =>
         {
             if (level < 0 || level > 100)
             {

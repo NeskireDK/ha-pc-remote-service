@@ -18,6 +18,8 @@ public class EndpointTestBase : IDisposable
     protected readonly IAppLauncher AppLauncher = A.Fake<IAppLauncher>();
     protected readonly IPowerService PowerService = A.Fake<IPowerService>();
     protected readonly ISteamPlatform SteamPlatform = A.Fake<ISteamPlatform>();
+    protected readonly IAudioService AudioService = A.Fake<IAudioService>();
+    protected readonly IMonitorService MonitorService = A.Fake<IMonitorService>();
 
     private WebApplication? _app;
 
@@ -43,11 +45,11 @@ public class EndpointTestBase : IDisposable
         builder.Services.AddSingleton(AppLauncher);
         builder.Services.AddSingleton(PowerService);
         builder.Services.AddSingleton(SteamPlatform);
+        builder.Services.AddSingleton<IAudioService>(AudioService);
+        builder.Services.AddSingleton<IMonitorService>(MonitorService);
 
         // Real services that delegate to fakes
         builder.Services.AddSingleton<AppService>();
-        builder.Services.AddSingleton<AudioService>();
-        builder.Services.AddSingleton<MonitorService>();
         builder.Services.AddSingleton<ModeService>();
         builder.Services.AddSingleton<SteamService>();
         // MdnsAdvertiserService excluded — avoids UDP socket binding in tests

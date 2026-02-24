@@ -8,51 +8,26 @@ namespace HaPcRemote.Service.Tests.Endpoints;
 
 public class MonitorEndpointTests : EndpointTestBase
 {
-    private const string SampleXml =
-        """
-        <?xml version="1.0" ?>
-        <monitors_list>
-        <item>
-        <resolution>3840 X 2160</resolution>
-        <active>Yes</active>
-        <disconnected>No</disconnected>
-        <primary>Yes</primary>
-        <frequency>144</frequency>
-        <name>\\.\DISPLAY1</name>
-        <short_monitor_id>GSM59A4</short_monitor_id>
-        <monitor_name>LG ULTRAGEAR</monitor_name>
-        <monitor_serial_number>ABC123</monitor_serial_number>
-        </item>
-        <item>
-        <resolution>2560 X 1440</resolution>
-        <active>Yes</active>
-        <disconnected>No</disconnected>
-        <primary>No</primary>
-        <frequency>60</frequency>
-        <name>\\.\DISPLAY2</name>
-        <short_monitor_id>DEL4321</short_monitor_id>
-        <monitor_name>Dell U2723QE</monitor_name>
-        <monitor_serial_number>XYZ789</monitor_serial_number>
-        </item>
-        </monitors_list>
-        """;
-
-    private void SetupCliRunnerWithXml()
-    {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Invokes((string _, IEnumerable<string> args, int _) =>
-            {
-                var argList = args.ToList();
-                if (argList.Count >= 2 && argList[0] == "/sxml" && !string.IsNullOrEmpty(argList[1]))
-                    File.WriteAllText(argList[1], SampleXml);
-            })
-            .Returns(string.Empty);
-    }
+    private static readonly List<MonitorInfo> TwoMonitors =
+    [
+        new MonitorInfo
+        {
+            Name = @"\\.\DISPLAY1", MonitorId = "GSM59A4", SerialNumber = "ABC123",
+            MonitorName = "LG ULTRAGEAR", Width = 3840, Height = 2160,
+            DisplayFrequency = 144, IsActive = true, IsPrimary = true
+        },
+        new MonitorInfo
+        {
+            Name = @"\\.\DISPLAY2", MonitorId = "DEL4321", SerialNumber = "XYZ789",
+            MonitorName = "Dell U2723QE", Width = 2560, Height = 1440,
+            DisplayFrequency = 60, IsActive = true, IsPrimary = false
+        }
+    ];
 
     [Fact]
     public async Task GetMonitors_ReturnsMonitorList()
     {
-        SetupCliRunnerWithXml();
+        A.CallTo(() => MonitorService.GetMonitorsAsync()).Returns(TwoMonitors);
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/monitor/list");
@@ -67,7 +42,8 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task EnableMonitor_UnknownId_Returns404()
     {
-        SetupCliRunnerWithXml();
+        A.CallTo(() => MonitorService.EnableMonitorAsync("UNKNOWN"))
+            .Throws(new KeyNotFoundException("Monitor 'UNKNOWN' not found."));
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/monitor/enable/UNKNOWN", null);
@@ -78,7 +54,7 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task EnableMonitor_ValidId_ReturnsOk()
     {
-        SetupCliRunnerWithXml();
+        A.CallTo(() => MonitorService.EnableMonitorAsync("DEL4321")).Returns(Task.CompletedTask);
         using var client = CreateClient();
 
         var response = await client.PostAsync("/api/monitor/enable/DEL4321", null);
@@ -89,6 +65,7 @@ public class MonitorEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetProfiles_ReturnsEmptyList()
     {
+        A.CallTo(() => MonitorService.GetProfilesAsync()).Returns(new List<MonitorProfile>());
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/monitor/profiles");

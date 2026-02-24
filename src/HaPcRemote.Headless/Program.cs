@@ -79,8 +79,8 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddSingleton<ICliRunner, CliRunner>();
 builder.Services.AddSingleton<IAppLauncher, DirectAppLauncher>();
 builder.Services.AddSingleton<AppService>();
-builder.Services.AddSingleton<AudioService>();
-builder.Services.AddSingleton<MonitorService>();
+builder.Services.AddSingleton<IAudioService, LinuxAudioService>();
+builder.Services.AddSingleton<IMonitorService, LinuxMonitorService>();
 builder.Services.AddSingleton<ModeService>();
 builder.Services.AddHostedService<MdnsAdvertiserService>();
 builder.Services.AddSingleton<IPowerService, LinuxPowerService>();
