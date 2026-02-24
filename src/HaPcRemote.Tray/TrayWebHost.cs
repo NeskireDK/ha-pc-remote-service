@@ -19,6 +19,7 @@ internal static class TrayWebHost
 
         // Logging — file + in-memory (shared with tray log viewer)
         builder.Logging.ClearProviders();
+        builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
         builder.Logging.AddProvider(new FileLoggerProvider(ConfigPaths.GetLogFilePath()));
         builder.Logging.AddProvider(logProvider);
 
