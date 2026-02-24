@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
 
-public class MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner, ILogger<MonitorService> logger)
+public class MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner, ILogger<MonitorService> logger) : IMonitorService
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(60);
 

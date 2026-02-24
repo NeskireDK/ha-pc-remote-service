@@ -8,13 +8,15 @@ namespace HaPcRemote.Service.Tests.Endpoints;
 
 public class SystemStateEndpointTests : EndpointTestBase
 {
-    private const string SampleCsv = "Device,Speakers,Render,Render,50.0%";
+    private static readonly List<AudioDevice> SpeakersDefault =
+    [
+        new AudioDevice { Name = "Speakers", IsDefault = true, Volume = 50 }
+    ];
 
     [Fact]
     public async Task GetState_ReturnsOk()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
         A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
         A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
         using var client = CreateClient();
@@ -32,8 +34,7 @@ public class SystemStateEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetState_AudioAvailable_PopulatesAudioField()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
         A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
         A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
         using var client = CreateClient();
@@ -50,7 +51,7 @@ public class SystemStateEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetState_AudioFails_ReturnsNullAudio()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
+        A.CallTo(() => AudioService.GetDevicesAsync())
             .Throws(new InvalidOperationException("tool missing"));
         A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
         A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
@@ -68,8 +69,7 @@ public class SystemStateEndpointTests : EndpointTestBase
     [Fact]
     public async Task GetState_NoRunningGame_RunningGameIsNull()
     {
-        A.CallTo(() => CliRunner.RunAsync(A<string>._, A<IEnumerable<string>>._, A<int>._))
-            .Returns(SampleCsv);
+        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
         A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
         A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
         using var client = CreateClient();
@@ -79,5 +79,74 @@ public class SystemStateEndpointTests : EndpointTestBase
         var json = await response.Content.ReadFromJsonAsync<ApiResponse<SystemState>>(
             AppJsonContext.Default.ApiResponseSystemState);
         json!.Data!.RunningGame.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetState_SteamNotInstalled_SteamGamesIsNull()
+    {
+        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
+        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
+        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/state");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SystemState>>(
+            AppJsonContext.Default.ApiResponseSystemState);
+        json!.Success.ShouldBeTrue();
+        json.Data!.SteamGames.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetState_BothAudioAndSteamFail_ReturnsPartialState()
+    {
+        A.CallTo(() => AudioService.GetDevicesAsync())
+            .Throws(new InvalidOperationException("tool missing"));
+        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
+        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/state");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SystemState>>(
+            AppJsonContext.Default.ApiResponseSystemState);
+        json!.Success.ShouldBeTrue();
+        json.Data!.Audio.ShouldBeNull();
+        json.Data.SteamGames.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetState_RunningGamePresent_PopulatesRunningGame()
+    {
+        A.CallTo(() => AudioService.GetDevicesAsync()).Returns(SpeakersDefault);
+        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(730);
+        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/state");
+
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SystemState>>(
+            AppJsonContext.Default.ApiResponseSystemState);
+        json!.Data!.RunningGame.ShouldNotBeNull();
+        json.Data.RunningGame.AppId.ShouldBe(730);
+    }
+
+    [Fact]
+    public async Task GetState_AlwaysReturnsSuccessTrue()
+    {
+        A.CallTo(() => AudioService.GetDevicesAsync())
+            .Throws(new Exception("all broken"));
+        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
+        A.CallTo(() => SteamPlatform.GetRunningAppId()).Throws(new Exception("steam broken"));
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/system/state");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SystemState>>(
+            AppJsonContext.Default.ApiResponseSystemState);
+        json!.Success.ShouldBeTrue();
     }
 }

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
 
-public class AudioService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner)
+public class AudioService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner cliRunner) : IAudioService
 {
     public async Task<List<AudioDevice>> GetDevicesAsync()
     {

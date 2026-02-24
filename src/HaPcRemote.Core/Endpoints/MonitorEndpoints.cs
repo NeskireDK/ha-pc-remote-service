@@ -11,7 +11,7 @@ public static class MonitorEndpoints
 
         // ── Monitor control endpoints ────────────────────────────────
 
-        group.MapGet("/list", async (MonitorService monitorService, ILogger<MonitorService> logger) =>
+        group.MapGet("/list", async (IMonitorService monitorService, ILogger<IMonitorService> logger) =>
         {
             try
             {
@@ -30,8 +30,8 @@ public static class MonitorEndpoints
             }
         });
 
-        group.MapPost("/solo/{id}", async (string id, MonitorService monitorService,
-            ILogger<MonitorService> logger) =>
+        group.MapPost("/solo/{id}", async (string id, IMonitorService monitorService,
+            ILogger<IMonitorService> logger) =>
         {
             try
             {
@@ -58,8 +58,8 @@ public static class MonitorEndpoints
             }
         });
 
-        group.MapPost("/enable/{id}", async (string id, MonitorService monitorService,
-            ILogger<MonitorService> logger) =>
+        group.MapPost("/enable/{id}", async (string id, IMonitorService monitorService,
+            ILogger<IMonitorService> logger) =>
         {
             try
             {
@@ -86,8 +86,8 @@ public static class MonitorEndpoints
             }
         });
 
-        group.MapPost("/disable/{id}", async (string id, MonitorService monitorService,
-            ILogger<MonitorService> logger) =>
+        group.MapPost("/disable/{id}", async (string id, IMonitorService monitorService,
+            ILogger<IMonitorService> logger) =>
         {
             try
             {
@@ -114,8 +114,8 @@ public static class MonitorEndpoints
             }
         });
 
-        group.MapPost("/primary/{id}", async (string id, MonitorService monitorService,
-            ILogger<MonitorService> logger) =>
+        group.MapPost("/primary/{id}", async (string id, IMonitorService monitorService,
+            ILogger<IMonitorService> logger) =>
         {
             try
             {
@@ -144,7 +144,7 @@ public static class MonitorEndpoints
 
         // ── Profile endpoints ────────────────────────────────────────
 
-        group.MapGet("/profiles", async (MonitorService monitorService, ILogger<MonitorService> logger) =>
+        group.MapGet("/profiles", async (IMonitorService monitorService, ILogger<IMonitorService> logger) =>
         {
             try
             {
@@ -163,8 +163,8 @@ public static class MonitorEndpoints
             }
         });
 
-        group.MapPost("/set/{profile}", async (string profile, MonitorService monitorService,
-            ILogger<MonitorService> logger) =>
+        group.MapPost("/set/{profile}", async (string profile, IMonitorService monitorService,
+            ILogger<IMonitorService> logger) =>
         {
             try
             {
