@@ -109,7 +109,7 @@ app.Use(async (context, next) =>
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsJsonAsync(
                 ApiResponse.Fail("Internal server error"),
-                AppJsonContext.Default.ApiResponse,
+                AppJsonContext.Default.Options,
                 context.RequestAborted);
         }
     }
