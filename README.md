@@ -222,14 +222,23 @@ dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 - Non-steam games arent compatible and cannot so far be launched - theres also the issue of how to get posters for these games, could they be extracted from steam or another free fallback solution?
 - When user manually checks for update and quickly clicks the green update button, the tray will show a console error of the file is already in use (this is due to auto update triggered right after and colliding with user update, a low priority to solve)
 - Update button shouldnt be green, just regular colors
+- Entity turn on and off broken:
+```Logger: homeassistant.helpers.script.pc_turn_off
+Source: helpers/script.py:2098
+First occurred: 18:19:09 (3 occurrences)
+Last logged: 19:25:50
+
+PC turn_off: Error executing script. Invalid data for call_service at pos 1: extra keys not allowed @ data['input']
+```
 ## Roadmap
 
 - [ ] Introduce config panel with multiple tabs
 - [ ] User configurable for adding and removing PC modes, for each new PC modes have dropdowns for available monitor profiles, monitors, audio devices and an option for dont change.
 - [ ] Show log in the new config panel
 - [ ] General settings for setting log level, auto update.
+- [ ] Settings tab for default power settings, sleep when disconnect etc values. 
 - [ ] When PC modes are stable, consider implementing a config panel to bind PC modes to games, so they will trigger the mode followed by launch of game. User configable delay for each game. 
-- [x] Verifying Linux headless daemon + systemd user service *(v0.9.5)*
+- [ ] Verify Linux headless daemon + systemd user service *(v0.9.5)*
 - [x] Brand icons submitted to [home-assistant/brands](https://github.com/home-assistant/brands) *(awaiting approval)*
 
 ## License
