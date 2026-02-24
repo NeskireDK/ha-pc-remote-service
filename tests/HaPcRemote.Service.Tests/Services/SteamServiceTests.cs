@@ -205,24 +205,50 @@ public class SteamServiceTests
     // ── LaunchGameAsync tests ────────────────────────────────────────
 
     [Fact]
-    public async Task LaunchGame_SameGameRunning_NoOp()
+    public async Task LaunchGame_SameGameRunning_ReturnsRunningGame()
     {
         A.CallTo(() => _platform.GetRunningAppId()).Returns(730);
+        A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
         var service = CreateService();
 
-        await service.LaunchGameAsync(730);
+        var result = await service.LaunchGameAsync(730);
 
+        result.ShouldNotBeNull();
+        result.AppId.ShouldBe(730);
         A.CallTo(() => _platform.LaunchSteamUrl(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]
     public async Task LaunchGame_NoGameRunning_LaunchesSteamUrl()
     {
+        // First call returns 0 (no game), poll calls also return 0 (launch not confirmed)
         A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
         var service = CreateService();
 
-        await service.LaunchGameAsync(730);
+        var result = await service.LaunchGameAsync(730);
 
+        result.ShouldBeNull();
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task LaunchGame_NoGameRunning_PollConfirms_ReturnsGame()
+    {
+        // First call returns 0 (triggers launch), then poll returns the launched appId
+        var callCount = 0;
+        A.CallTo(() => _platform.GetRunningAppId()).ReturnsLazily(() =>
+        {
+            callCount++;
+            return callCount <= 1 ? 0 : 730;
+        });
+        A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
+        var service = CreateService();
+
+        var result = await service.LaunchGameAsync(730);
+
+        result.ShouldNotBeNull();
+        result.AppId.ShouldBe(730);
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730"))
             .MustHaveHappenedOnceExactly();
     }
@@ -232,13 +258,14 @@ public class SteamServiceTests
     {
         // First call: different game is running (for LaunchGameAsync check)
         // Second call: still running (for StopGameAsync check)
-        // Third call: from StopGameAsync's GetSteamPath check
+        // After launch: poll calls return 0 (launch not confirmed)
         A.CallTo(() => _platform.GetRunningAppId()).Returns(570);
         A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
         var service = CreateService();
 
-        await service.LaunchGameAsync(730);
+        var result = await service.LaunchGameAsync(730);
 
+        result.ShouldBeNull(); // Poll never sees 730
         // StopGameAsync was called (checks RunningAppId and GetSteamPath)
         A.CallTo(() => _platform.GetSteamPath()).MustHaveHappened();
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730"))
@@ -414,8 +441,9 @@ public class SteamServiceTests
         A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
         var service = CreateService();
 
-        await service.LaunchGameAsync(0);
+        var result = await service.LaunchGameAsync(0);
 
+        // Poll never sees appId 0 (GetRunningAppId keeps returning 1)
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/0"))
             .MustHaveHappenedOnceExactly();
     }
