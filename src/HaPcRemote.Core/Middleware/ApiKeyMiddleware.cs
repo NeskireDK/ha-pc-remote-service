@@ -23,7 +23,9 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddlew
 
         var path = context.Request.Path.Value ?? string.Empty;
 
-        if (ExemptPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)))
+        // Only require auth for /api/ paths; skip non-API requests (favicon.ico, etc.)
+        if (!path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
+            ExemptPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)))
         {
             await next(context);
             return;
