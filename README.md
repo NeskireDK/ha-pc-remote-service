@@ -74,6 +74,9 @@ All endpoints except `/api/health` require the `X-Api-Key` header.
 
 | Method | Route | Description |
 |--------|-------|-------------|
+| `GET` | `/api/system/state` | All state in one call (audio, monitors, Steam, modes) |
+| `GET` | `/api/system/modes` | List available PC mode names |
+| `POST` | `/api/system/mode/{name}` | Apply a named PC mode |
 | `POST` | `/api/system/sleep` | Suspend the PC |
 
 ### Audio
@@ -153,6 +156,20 @@ Full example:
         "Arguments": "steam://open/bigpicture",
         "ProcessName": "steam"
       }
+    },
+    "Modes": {
+      "couch": {
+        "AudioDevice": "HDMI Output",
+        "MonitorProfile": "tv-only",
+        "Volume": 40,
+        "LaunchApp": "steam-bigpicture"
+      },
+      "desktop": {
+        "AudioDevice": "Speakers",
+        "MonitorProfile": "desk-full",
+        "Volume": 25,
+        "KillApp": "steam-bigpicture"
+      }
     }
   }
 }
@@ -166,6 +183,7 @@ Full example:
 | `ToolsPath` | `./tools` | Directory containing NirSoft executables |
 | `ProfilesPath` | `%AppData%\HaPcRemote\monitor-profiles` | Directory containing monitor profile `.cfg` files |
 | `Apps` | `{}` | Map of app key to app definition |
+| `Modes` | `{}` | Map of mode name to mode config |
 
 ### App Definition
 
@@ -186,9 +204,14 @@ Two free NirSoft tools are required for audio and monitor features. The installe
 ## Building
 
 ```bash
-dotnet build HaPcRemote.sln
-dotnet test HaPcRemote.sln
+# Tests (WSL-safe — skips Windows-only Tray project)
+dotnet test tests/HaPcRemote.Service.Tests
+
+# Windows release
 dotnet publish src/HaPcRemote.Tray -c Release -r win-x64
+
+# Linux release
+dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 ```
 
 ## Roadmap
@@ -196,8 +219,10 @@ dotnet publish src/HaPcRemote.Tray -c Release -r win-x64
 - [x] Debug logging toggle in tray menu *(v0.9.2)*
 - [x] Configurable log levels: Error / Warning / Info / Verbose *(v0.9.4)*
 - [x] Linux headless daemon + systemd user service *(v0.9.5)*
-- [ ] PC Mode endpoint + HA select entity *(v1.0)*
-- [ ] Submit brand icons to [home-assistant/brands](https://github.com/home-assistant/brands)
+- [x] PC Mode endpoint + HA select entity *(v1.0)*
+- [x] Aggregated state endpoint `GET /api/system/state` *(v1.0)*
+- [ ] Brand icons submitted to [home-assistant/brands](https://github.com/home-assistant/brands) *(awaiting approval)*
+- [ ] User Idle Time sensor `GET /api/system/idle` *(v1.1)*
 
 ## License
 

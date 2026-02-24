@@ -53,10 +53,10 @@ public static class SteamEndpoints
             try
             {
                 logger.LogInformation("Launch Steam game requested: {AppId}", appId);
-                await steamService.LaunchGameAsync(appId);
+                var result = await steamService.LaunchGameAsync(appId);
                 return Results.Json(
-                    ApiResponse.Ok($"Launched Steam game {appId}"),
-                    AppJsonContext.Default.ApiResponse);
+                    ApiResponse.Ok(result),
+                    AppJsonContext.Default.ApiResponseSteamRunningGame);
             }
             catch (Exception ex)
             {

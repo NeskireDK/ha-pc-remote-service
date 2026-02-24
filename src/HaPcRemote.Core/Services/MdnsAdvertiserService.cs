@@ -36,6 +36,8 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
     private UdpClient? _udpClient;
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
+    private int _respondPending;
+    private DateTime _lastResponseTime;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -196,18 +198,33 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
 
     private async Task SendResponseAsync()
     {
+        if (Interlocked.CompareExchange(ref _respondPending, 1, 0) != 0)
+            return;
+
         try
         {
+            if ((DateTime.UtcNow - _lastResponseTime).TotalSeconds < 1)
+                return;
+
             var packet = BuildResponsePacket();
             await _udpClient!.SendAsync(packet, packet.Length, MdnsEndpoint);
+            _lastResponseTime = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
             logger.LogDebug(ex, "Failed to send mDNS response");
         }
+        finally
+        {
+            Interlocked.Exchange(ref _respondPending, 0);
+        }
     }
 
-    private byte[] BuildResponsePacket()
+    private byte[] BuildResponsePacket() => BuildPacket(4500, 120, 4500, 120);
+
+    private byte[] BuildGoodbyePacket() => BuildPacket(0, 0, 0, 0);
+
+    private byte[] BuildPacket(uint ptrTtl, uint srvTtl, uint txtTtl, uint aTtl)
     {
         using var ms = new MemoryStream(512);
         using var writer = new BinaryWriter(ms);
@@ -224,18 +241,18 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
         WriteDnsName(writer, ServiceType);
         WriteBigEndian(writer, 12); // Type PTR
         WriteBigEndian(writer, 0x0001); // Class IN (no cache-flush — PTR is a shared record per RFC 6762 §10.2)
-        WriteBigEndian32(writer, 4500); // TTL
+        WriteBigEndian32(writer, ptrTtl);
         var ptrData = EncodeDnsName(_instanceName);
-        WriteBigEndian(writer, (ushort)ptrData.Length); // RD Length
+        WriteBigEndian(writer, (ushort)ptrData.Length);
         writer.Write(ptrData);
 
         // SRV record: instance -> hostname:port
         WriteDnsName(writer, _instanceName);
         WriteBigEndian(writer, 33); // Type SRV
         WriteBigEndian(writer, 0x8001); // Class IN + cache flush
-        WriteBigEndian32(writer, 120); // TTL
+        WriteBigEndian32(writer, srvTtl);
         var srvTarget = EncodeDnsName(_hostname);
-        WriteBigEndian(writer, (ushort)(6 + srvTarget.Length)); // RD Length
+        WriteBigEndian(writer, (ushort)(6 + srvTarget.Length));
         WriteBigEndian(writer, 0); // Priority
         WriteBigEndian(writer, 0); // Weight
         WriteBigEndian(writer, (ushort)_servicePort); // Port
@@ -245,72 +262,17 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
         WriteDnsName(writer, _instanceName);
         WriteBigEndian(writer, 16); // Type TXT
         WriteBigEndian(writer, 0x8001); // Class IN + cache flush
-        WriteBigEndian32(writer, 4500); // TTL
+        WriteBigEndian32(writer, txtTtl);
         var txtData = EncodeTxtRecords();
         WriteBigEndian(writer, (ushort)txtData.Length);
         writer.Write(txtData);
 
-        // A record: hostname -> IP addresses
+        // A record: hostname -> IP address
         var ipAddress = GetLocalIpAddress();
         WriteDnsName(writer, _hostname);
         WriteBigEndian(writer, 1); // Type A
         WriteBigEndian(writer, 0x8001); // Class IN + cache flush
-        WriteBigEndian32(writer, 120); // TTL
-        WriteBigEndian(writer, 4); // RD Length
-        writer.Write(ipAddress.GetAddressBytes());
-
-        return ms.ToArray();
-    }
-
-    private byte[] BuildGoodbyePacket()
-    {
-        using var ms = new MemoryStream(512);
-        using var writer = new BinaryWriter(ms);
-
-        // DNS Header
-        WriteBigEndian(writer, 0); // Transaction ID
-        WriteBigEndian(writer, 0x8400); // Flags: Response + Authoritative
-        WriteBigEndian(writer, 0); // Questions
-        WriteBigEndian(writer, 4); // Answer count: PTR + SRV + TXT + A
-        WriteBigEndian(writer, 0); // Authority
-        WriteBigEndian(writer, 0); // Additional
-
-        // PTR record with TTL=0
-        WriteDnsName(writer, ServiceType);
-        WriteBigEndian(writer, 12); // Type PTR
-        WriteBigEndian(writer, 0x0001); // Class IN
-        WriteBigEndian32(writer, 0); // TTL = 0 (goodbye)
-        var ptrData = EncodeDnsName(_instanceName);
-        WriteBigEndian(writer, (ushort)ptrData.Length);
-        writer.Write(ptrData);
-
-        // SRV record with TTL=0
-        WriteDnsName(writer, _instanceName);
-        WriteBigEndian(writer, 33); // Type SRV
-        WriteBigEndian(writer, 0x8001); // Class IN + cache flush
-        WriteBigEndian32(writer, 0); // TTL = 0
-        var srvTarget = EncodeDnsName(_hostname);
-        WriteBigEndian(writer, (ushort)(6 + srvTarget.Length));
-        WriteBigEndian(writer, 0);
-        WriteBigEndian(writer, 0);
-        WriteBigEndian(writer, (ushort)_servicePort);
-        writer.Write(srvTarget);
-
-        // TXT record with TTL=0
-        WriteDnsName(writer, _instanceName);
-        WriteBigEndian(writer, 16); // Type TXT
-        WriteBigEndian(writer, 0x8001);
-        WriteBigEndian32(writer, 0); // TTL = 0
-        var txtData = EncodeTxtRecords();
-        WriteBigEndian(writer, (ushort)txtData.Length);
-        writer.Write(txtData);
-
-        // A record with TTL=0
-        var ipAddress = GetLocalIpAddress();
-        WriteDnsName(writer, _hostname);
-        WriteBigEndian(writer, 1); // Type A
-        WriteBigEndian(writer, 0x8001);
-        WriteBigEndian32(writer, 0); // TTL = 0
+        WriteBigEndian32(writer, aTtl);
         WriteBigEndian(writer, 4);
         writer.Write(ipAddress.GetAddressBytes());
 

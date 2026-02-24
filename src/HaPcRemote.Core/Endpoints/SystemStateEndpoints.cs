@@ -14,75 +14,57 @@ public static class SystemStateEndpoints
             ModeService modeService,
             ILogger<SystemState> logger) =>
         {
-            AudioState? audio = null;
-            List<MonitorInfo>? monitors = null;
-            List<string>? monitorProfiles = null;
-            List<SteamGame>? steamGames = null;
-            SteamRunningGame? runningGame = null;
-            List<string>? modes = null;
-
-            try
+            // Fire all async calls concurrently
+            var audioTask = Task.Run(async () =>
             {
                 var devices = await audioService.GetDevicesAsync();
                 var current = devices.Find(d => d.IsDefault);
-                audio = new AudioState
+                return new AudioState
                 {
                     Devices = devices,
                     Current = current?.Name,
                     Volume = current?.Volume
                 };
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to get audio state");
-            }
+            });
 
-            try
-            {
-                monitors = await monitorService.GetMonitorsAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to get monitors");
-            }
+            var monitorsTask = Task.Run(() => monitorService.GetMonitorsAsync());
 
-            try
+            var profilesTask = Task.Run(async () =>
             {
                 var profiles = await monitorService.GetProfilesAsync();
-                monitorProfiles = profiles.Select(p => p.Name).ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to get monitor profiles");
-            }
+                return profiles.Select(p => p.Name).ToList();
+            });
 
-            try
-            {
-                steamGames = await steamService.GetGamesAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to get Steam games");
-            }
+            var steamGamesTask = Task.Run(() => steamService.GetGamesAsync());
+            var runningGameTask = Task.Run(() => steamService.GetRunningGameAsync());
 
-            try
-            {
-                var running = await steamService.GetRunningGameAsync();
-                runningGame = running;
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to get running Steam game");
-            }
+            try { await Task.WhenAll(audioTask, monitorsTask, profilesTask, steamGamesTask, runningGameTask); }
+            catch { /* individual failures handled below */ }
 
-            try
-            {
-                modes = modeService.GetModeNames().ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to get modes");
-            }
+            // Extract results — each in its own try/catch for partial failure
+            AudioState? audio = null;
+            try { audio = await audioTask; }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get audio state"); }
+
+            List<MonitorInfo>? monitors = null;
+            try { monitors = await monitorsTask; }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get monitors"); }
+
+            List<string>? monitorProfiles = null;
+            try { monitorProfiles = await profilesTask; }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get monitor profiles"); }
+
+            List<SteamGame>? steamGames = null;
+            try { steamGames = await steamGamesTask; }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get Steam games"); }
+
+            SteamRunningGame? runningGame = null;
+            try { runningGame = await runningGameTask; }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get running Steam game"); }
+
+            List<string>? modes = null;
+            try { modes = modeService.GetModeNames().ToList(); }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get modes"); }
 
             var state = new SystemState
             {

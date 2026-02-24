@@ -42,7 +42,7 @@ public class SteamEndpointTests : EndpointTestBase
     }
 
     [Fact]
-    public async Task Run_NoSteamRunning_Returns200()
+    public async Task Run_NoSteamRunning_Returns200WithNullData()
     {
         A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(0);
         using var client = CreateClient();
@@ -50,8 +50,32 @@ public class SteamEndpointTests : EndpointTestBase
         var response = await client.PostAsync("/api/steam/run/730", null);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SteamRunningGame>>(
+            AppJsonContext.Default.ApiResponseSteamRunningGame);
+        json.ShouldNotBeNull();
+        json.Success.ShouldBeTrue();
+        json.Data.ShouldBeNull(); // Poll never confirms because fake always returns 0
         A.CallTo(() => SteamPlatform.LaunchSteamUrl("steam://rungameid/730"))
             .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Run_SameGameRunning_Returns200WithGameData()
+    {
+        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(730);
+        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
+        using var client = CreateClient();
+
+        var response = await client.PostAsync("/api/steam/run/730", null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<SteamRunningGame>>(
+            AppJsonContext.Default.ApiResponseSteamRunningGame);
+        json.ShouldNotBeNull();
+        json.Success.ShouldBeTrue();
+        json.Data.ShouldNotBeNull();
+        json.Data.AppId.ShouldBe(730);
+        A.CallTo(() => SteamPlatform.LaunchSteamUrl(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]

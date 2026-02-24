@@ -7,20 +7,26 @@ public class SteamService(ISteamPlatform platform)
 {
     private List<SteamGame>? _cachedGames;
     private DateTime _cacheExpiry;
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
 
-    public Task<List<SteamGame>> GetGamesAsync()
+    public async Task<List<SteamGame>> GetGamesAsync()
     {
         if (_cachedGames != null && DateTime.UtcNow < _cacheExpiry)
-            return Task.FromResult(_cachedGames);
+            return _cachedGames;
 
-        var steamPath = platform.GetSteamPath()
-            ?? throw new InvalidOperationException("Steam is not installed.");
+        var steamPath = platform.GetSteamPath();
+        if (steamPath == null)
+        {
+            if (_cachedGames != null)
+                return _cachedGames;
 
-        var games = LoadInstalledGames(steamPath);
+            throw new InvalidOperationException("Steam is not installed.");
+        }
+
+        var games = await Task.Run(() => LoadInstalledGames(steamPath));
         _cachedGames = games;
         _cacheExpiry = DateTime.UtcNow + CacheDuration;
-        return Task.FromResult(games);
+        return games;
     }
 
     public async Task<SteamRunningGame?> GetRunningGameAsync()
@@ -31,7 +37,10 @@ public class SteamService(ISteamPlatform platform)
 
         // Warm the cache if not yet populated
         if (_cachedGames == null || _cachedGames.Count == 0)
-            await GetGamesAsync();
+        {
+            try { await GetGamesAsync(); }
+            catch (InvalidOperationException) { /* Steam path unavailable, continue without cache */ }
+        }
 
         var name = _cachedGames?.Find(g => g.AppId == appId)?.Name;
 
@@ -47,16 +56,27 @@ public class SteamService(ISteamPlatform platform)
         return new SteamRunningGame { AppId = appId, Name = name };
     }
 
-    public async Task LaunchGameAsync(int appId)
+    public async Task<SteamRunningGame?> LaunchGameAsync(int appId)
     {
         var runningAppId = platform.GetRunningAppId();
         if (runningAppId == appId)
-            return; // Already running
+            return await GetRunningGameAsync();
 
         if (runningAppId != 0)
             await StopGameAsync();
 
         platform.LaunchSteamUrl($"steam://rungameid/{appId}");
+
+        // Brief poll — Steam registers running state within seconds
+        for (var i = 0; i < 10; i++)
+        {
+            await Task.Delay(500);
+            var running = platform.GetRunningAppId();
+            if (running == appId)
+                return await GetRunningGameAsync();
+        }
+
+        return null; // Steam didn't accept the launch
     }
 
     public Task StopGameAsync()
