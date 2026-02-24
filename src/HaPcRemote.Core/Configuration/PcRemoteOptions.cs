@@ -10,6 +10,13 @@ public sealed class PcRemoteOptions
     public string ProfilesPath { get; set; } = "./monitor-profiles";
     public Dictionary<string, AppDefinitionOptions> Apps { get; set; } = new();
     public Dictionary<string, ModeConfig> Modes { get; set; } = new();
+    public PowerSettings Power { get; set; } = new();
+}
+
+public sealed class PowerSettings
+{
+    public bool SleepOnDisconnect { get; set; }
+    public int SleepDelayMinutes { get; set; } = 10;
 }
 
 public sealed class AuthOptions

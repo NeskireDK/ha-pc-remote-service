@@ -91,6 +91,8 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<IIdleService, WindowsIdleService>();
         builder.Services.AddSingleton<ISteamPlatform, WindowsSteamPlatform>();
         builder.Services.AddSingleton<ISteamService, SteamService>();
+        builder.Services.AddSingleton<IConfigurationWriter>(
+            new ConfigurationWriter(writableConfigPath));
 
         var app = builder.Build();
 

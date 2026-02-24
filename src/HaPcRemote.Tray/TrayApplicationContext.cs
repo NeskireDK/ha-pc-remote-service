@@ -33,7 +33,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private Icon? _playingIcon;
     private bool _isGamePlaying;
 
-    private LogViewerForm? _logViewerForm;
+    private SettingsForm? _settingsForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _autoUpdateMenuItem;
     private UpdateChecker.ReleaseInfo? _pendingRelease;
@@ -92,6 +92,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add($"HA PC Remote {VersionString}", null, null!).Enabled = false;
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Settings", null, OnShowSettings);
         menu.Items.Add("Show Log", null, OnShowLog);
         menu.Items.Add("Show API Key", null, OnShowApiKey);
         menu.Items.Add("Open Profiles Folder", null, OnOpenProfilesFolder);
@@ -106,27 +107,25 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _autoUpdateMenuItem.CheckedChanged += OnAutoUpdateToggled;
         menu.Items.Add(_autoUpdateMenuItem);
 
-        var loggingMenu = new ToolStripMenuItem("Logging");
-        var levels = new[] { ("Error", LogLevel.Error), ("Warning", LogLevel.Warning), ("Info", LogLevel.Information), ("Verbose", LogLevel.Debug) };
-        foreach (var (label, level) in levels)
-        {
-            var item = new ToolStripMenuItem(label) { CheckOnClick = false, Checked = false };
-            item.Click += (_, _) => OnLogLevelSelected(loggingMenu, level);
-            loggingMenu.DropDownItems.Add(item);
-        }
-        menu.Items.Add(loggingMenu);
-        ApplyLogLevelToMenu(loggingMenu, ParseLogLevel(settings.LogLevel));
-
         menu.Items.Add("Exit", null, OnExit);
         return menu;
     }
 
+    private void OnShowSettings(object? sender, EventArgs e)
+    {
+        EnsureSettingsForm();
+        _settingsForm!.ShowTab(0); // General tab
+    }
+
     private void OnShowLog(object? sender, EventArgs e)
     {
-        _logViewerForm ??= new LogViewerForm(_logProvider);
-        _logViewerForm.Show();
-        _logViewerForm.BringToFront();
-        _logViewerForm.Activate();
+        EnsureSettingsForm();
+        _settingsForm!.ShowTab(3); // Log tab
+    }
+
+    private void EnsureSettingsForm()
+    {
+        _settingsForm ??= new SettingsForm(_webServices, _logProvider);
     }
 
     private void OnShowApiKey(object? sender, EventArgs e)
@@ -205,23 +204,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _                    => "Warning"
     };
 
-    private static void ApplyLogLevelToMenu(ToolStripMenuItem loggingMenu, LogLevel active)
-    {
-        foreach (ToolStripMenuItem item in loggingMenu.DropDownItems)
-            item.Checked = item.Text == LogLevelToString(active) ||
-                           (item.Text == "Warning" && active == LogLevel.Warning);
-    }
-
-    private void OnLogLevelSelected(ToolStripMenuItem loggingMenu, LogLevel level)
-    {
-        var s = TraySettings.Load();
-        s.LogLevel = LogLevelToString(level);
-        s.Save();
-        InMemoryLogProvider.MinimumLevel = level;
-        FileLoggerProvider.MinimumLevel = level;
-        ApplyLogLevelToMenu(loggingMenu, level);
-        _logger.LogInformation("Log level set to {Level}", level);
-    }
+    // Log level and auto-update settings are now managed in the Settings panel (GeneralTab)
 
     private static int GetUpdateTimerInterval(bool autoUpdate)
         => autoUpdate ? 5 * 60 * 1000 : 4 * 60 * 60 * 1000;
@@ -287,7 +270,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _pendingRelease = release;
         _updateMenuItem.Text = $"Update to {release.TagName}";
-        _updateMenuItem.BackColor = Color.FromArgb(50, 80, 50);
         _updateMenuItem.Enabled = true;
 
         _notifyIcon.ShowBalloonTip(
@@ -357,7 +339,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _updateTimer.Dispose();
             _steamPollTimer.Dispose();
             _playingIcon?.Dispose();
-            _logViewerForm?.Dispose();
+            _settingsForm?.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
         }
