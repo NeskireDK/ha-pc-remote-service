@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Logging — console (captured by journalctl) + file
 builder.Logging.ClearProviders();
+builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 builder.Logging.AddConsole();
 builder.Logging.AddProvider(new FileLoggerProvider(ConfigPaths.GetLogFilePath()));
 
