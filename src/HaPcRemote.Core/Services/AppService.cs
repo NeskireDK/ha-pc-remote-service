@@ -40,8 +40,8 @@ public class AppService(IOptionsMonitor<PcRemoteOptions> options, IAppLauncher a
         var processes = Process.GetProcessesByName(definition.ProcessName);
         foreach (var process in processes)
         {
-            process.Kill(entireProcessTree: true);
-            process.Dispose();
+            using (process)
+                process.Kill(entireProcessTree: true);
         }
 
         return Task.CompletedTask;

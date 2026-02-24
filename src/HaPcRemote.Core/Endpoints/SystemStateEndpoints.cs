@@ -15,31 +15,14 @@ public static class SystemStateEndpoints
             ILogger<SystemState> logger) =>
         {
             // Fire all async calls concurrently
-            var audioTask = Task.Run(async () =>
-            {
-                var devices = await audioService.GetDevicesAsync();
-                var current = devices.Find(d => d.IsDefault);
-                return new AudioState
-                {
-                    Devices = devices,
-                    Current = current?.Name,
-                    Volume = current?.Volume
-                };
-            });
-
-            var monitorsTask = Task.Run(() => monitorService.GetMonitorsAsync());
-
-            var profilesTask = Task.Run(async () =>
-            {
-                var profiles = await monitorService.GetProfilesAsync();
-                return profiles.Select(p => p.Name).ToList();
-            });
-
-            var steamGamesTask = Task.Run(() => steamService.GetGamesAsync());
-            var runningGameTask = Task.Run(() => steamService.GetRunningGameAsync());
+            var audioTask = GetAudioStateAsync(audioService);
+            var monitorsTask = monitorService.GetMonitorsAsync();
+            var profilesTask = GetProfileNamesAsync(monitorService);
+            var steamGamesTask = steamService.GetGamesAsync();
+            var runningGameTask = steamService.GetRunningGameAsync();
 
             try { await Task.WhenAll(audioTask, monitorsTask, profilesTask, steamGamesTask, runningGameTask); }
-            catch { /* individual failures handled below */ }
+            catch (Exception ex) { logger.LogDebug(ex, "One or more state queries failed"); }
 
             // Extract results — each in its own try/catch for partial failure
             AudioState? audio = null;
@@ -82,5 +65,23 @@ public static class SystemStateEndpoints
         });
 
         return endpoints;
+    }
+
+    private static async Task<AudioState> GetAudioStateAsync(IAudioService audioService)
+    {
+        var devices = await audioService.GetDevicesAsync();
+        var current = devices.Find(d => d.IsDefault);
+        return new AudioState
+        {
+            Devices = devices,
+            Current = current?.Name,
+            Volume = current?.Volume
+        };
+    }
+
+    private static async Task<List<string>> GetProfileNamesAsync(IMonitorService monitorService)
+    {
+        var profiles = await monitorService.GetProfilesAsync();
+        return profiles.Select(p => p.Name).ToList();
     }
 }

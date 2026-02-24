@@ -10,18 +10,13 @@ namespace HaPcRemote.Service.Tests.Endpoints;
 public class SteamEndpointTests : EndpointTestBase
 {
     [Fact]
-    public async Task GetGames_ReturnsList()
+    public async Task GetGames_SteamNotInstalled_Returns500()
     {
-        // SteamService reads from filesystem, but with a fake ISteamPlatform
-        // GetGamesAsync will throw because GetSteamPath returns null by default.
-        // We need to set it up so it returns a path, but the filesystem won't have files.
-        // So this will return an empty list or throw. Let's test the error path.
         A.CallTo(() => SteamPlatform.GetSteamPath()).Returns((string?)null);
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/steam/games");
 
-        // SteamService throws InvalidOperationException when Steam not installed
         response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
     }
 

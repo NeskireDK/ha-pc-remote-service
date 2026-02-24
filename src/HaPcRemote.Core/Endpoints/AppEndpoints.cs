@@ -1,3 +1,4 @@
+using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
 
@@ -8,107 +9,42 @@ public static class AppEndpoints
     public static RouteGroupBuilder MapAppEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/app");
+        group.AddEndpointFilter<EndpointExceptionFilter>();
 
-        group.MapGet("/status", async (AppService appService, ILogger<AppService> logger) =>
+        group.MapGet("/status", async (AppService appService) =>
         {
-            try
-            {
-                var statuses = await appService.GetAllStatusesAsync();
-                return Results.Json(
-                    ApiResponse.Ok<List<AppInfo>>(statuses),
-                    AppJsonContext.Default.ApiResponseListAppInfo);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to get app statuses");
-                return Results.Json(
-                    ApiResponse.Fail("Internal server error"),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
+            var statuses = await appService.GetAllStatusesAsync();
+            return Results.Json(
+                ApiResponse.Ok<List<AppInfo>>(statuses),
+                AppJsonContext.Default.ApiResponseListAppInfo);
         });
 
         group.MapPost("/launch/{appKey}", async (string appKey, AppService appService,
             ILogger<AppService> logger) =>
         {
-            try
-            {
-                logger.LogInformation("Launch requested for app '{AppKey}'", appKey);
-                await appService.LaunchAsync(appKey);
-                return Results.Json(
-                    ApiResponse.Ok($"App '{appKey}' launched"),
-                    AppJsonContext.Default.ApiResponse);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return Results.Json(
-                    ApiResponse.Fail(ex.Message),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status404NotFound);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to launch app '{AppKey}'", appKey);
-                return Results.Json(
-                    ApiResponse.Fail("Internal server error"),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
+            logger.LogInformation("Launch requested for app '{AppKey}'", appKey);
+            await appService.LaunchAsync(appKey);
+            return Results.Json(
+                ApiResponse.Ok($"App '{appKey}' launched"),
+                AppJsonContext.Default.ApiResponse);
         });
 
         group.MapPost("/kill/{appKey}", async (string appKey, AppService appService,
             ILogger<AppService> logger) =>
         {
-            try
-            {
-                logger.LogInformation("Kill requested for app '{AppKey}'", appKey);
-                await appService.KillAsync(appKey);
-                return Results.Json(
-                    ApiResponse.Ok($"App '{appKey}' killed"),
-                    AppJsonContext.Default.ApiResponse);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return Results.Json(
-                    ApiResponse.Fail(ex.Message),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status404NotFound);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to kill app '{AppKey}'", appKey);
-                return Results.Json(
-                    ApiResponse.Fail("Internal server error"),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
+            logger.LogInformation("Kill requested for app '{AppKey}'", appKey);
+            await appService.KillAsync(appKey);
+            return Results.Json(
+                ApiResponse.Ok($"App '{appKey}' killed"),
+                AppJsonContext.Default.ApiResponse);
         });
 
-        group.MapGet("/status/{appKey}", async (string appKey, AppService appService,
-            ILogger<AppService> logger) =>
+        group.MapGet("/status/{appKey}", async (string appKey, AppService appService) =>
         {
-            try
-            {
-                var status = await appService.GetStatusAsync(appKey);
-                return Results.Json(
-                    ApiResponse.Ok(status),
-                    AppJsonContext.Default.ApiResponseAppInfo);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return Results.Json(
-                    ApiResponse.Fail(ex.Message),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status404NotFound);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to get status for app '{AppKey}'", appKey);
-                return Results.Json(
-                    ApiResponse.Fail("Internal server error"),
-                    AppJsonContext.Default.ApiResponse,
-                    statusCode: StatusCodes.Status500InternalServerError);
-            }
+            var status = await appService.GetStatusAsync(appKey);
+            return Results.Json(
+                ApiResponse.Ok(status),
+                AppJsonContext.Default.ApiResponseAppInfo);
         });
 
         return group;

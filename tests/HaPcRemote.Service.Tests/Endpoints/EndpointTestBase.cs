@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Tests.Endpoints;
 
-public class EndpointTestBase : IDisposable
+public class EndpointTestBase : IAsyncLifetime
 {
     protected readonly ICliRunner CliRunner = A.Fake<ICliRunner>();
     protected readonly IAppLauncher AppLauncher = A.Fake<IAppLauncher>();
@@ -71,11 +71,15 @@ public class EndpointTestBase : IDisposable
         return _app.GetTestClient();
     }
 
-    public void Dispose()
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
     {
-        _app?.StopAsync().GetAwaiter().GetResult();
-        _app?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        GC.SuppressFinalize(this);
+        if (_app is not null)
+        {
+            await _app.StopAsync();
+            await _app.DisposeAsync();
+        }
     }
 
     private sealed class StaticOptionsMonitor(PcRemoteOptions value) : IOptionsMonitor<PcRemoteOptions>
