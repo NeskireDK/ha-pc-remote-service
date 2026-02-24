@@ -159,6 +159,22 @@ public class ApiKeyMiddlewareTests
         called.ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData("/favicon.ico")]
+    [InlineData("/robots.txt")]
+    [InlineData("/")]
+    public async Task InvokeAsync_NonApiPath_SkipsAuth(string path)
+    {
+        var called = false;
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; }, _logger);
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+
+        await middleware.InvokeAsync(context, CreateOptions());
+
+        called.ShouldBeTrue();
+    }
+
     [Fact]
     public async Task InvokeAsync_ValidKey_ResponseStatusRemainsDefault()
     {

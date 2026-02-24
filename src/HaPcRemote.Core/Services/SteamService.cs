@@ -123,6 +123,7 @@ public class SteamService(ISteamPlatform platform) : ISteamService
 
         var appIdStr = data["appid"]?.ToString();
         var name = data["name"]?.ToString();
+        var lastPlayedStr = data["LastPlayed"]?.ToString();
         var lastUpdatedStr = data["LastUpdated"]?.ToString();
 
         if (string.IsNullOrEmpty(appIdStr) || string.IsNullOrEmpty(name))
@@ -131,9 +132,11 @@ public class SteamService(ISteamPlatform platform) : ISteamService
         if (!int.TryParse(appIdStr, out var appId))
             return null;
 
-        long.TryParse(lastUpdatedStr, out var lastUpdated);
+        // Prefer LastPlayed (actual play history); fall back to LastUpdated (install/update time)
+        if (!long.TryParse(lastPlayedStr, out var lastPlayed))
+            long.TryParse(lastUpdatedStr, out lastPlayed);
 
-        return new SteamGame { AppId = appId, Name = name, LastPlayed = lastUpdated };
+        return new SteamGame { AppId = appId, Name = name, LastPlayed = lastPlayed };
     }
 
     internal static string? ParseInstallDir(string acfContent)

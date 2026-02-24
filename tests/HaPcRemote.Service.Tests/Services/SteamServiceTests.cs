@@ -46,7 +46,7 @@ public class SteamServiceTests
         game.ShouldNotBeNull();
         game.AppId.ShouldBe(730);
         game.Name.ShouldBe("Counter-Strike 2");
-        game.LastPlayed.ShouldBe(1700000000L);
+        game.LastPlayed.ShouldBe(1708000000L); // Uses LastPlayed field, not LastUpdated
     }
 
     [Fact]
@@ -371,6 +371,43 @@ public class SteamServiceTests
         game.ShouldNotBeNull();
         game.AppId.ShouldBe(0);
         game.Name.ShouldBe("Unknown App");
+    }
+
+    [Fact]
+    public void ParseAppManifest_OnlyLastUpdated_FallsBackToLastUpdated()
+    {
+        var acf = """
+            "AppState"
+            {
+                "appid"        "730"
+                "name"         "Counter-Strike 2"
+                "LastUpdated"  "1700000000"
+            }
+            """;
+
+        var game = SteamService.ParseAppManifest(acf);
+
+        game.ShouldNotBeNull();
+        game.LastPlayed.ShouldBe(1700000000L);
+    }
+
+    [Fact]
+    public void ParseAppManifest_BothFields_PrefersLastPlayed()
+    {
+        var acf = """
+            "AppState"
+            {
+                "appid"        "730"
+                "name"         "Counter-Strike 2"
+                "LastUpdated"  "1700000000"
+                "LastPlayed"   "1708000000"
+            }
+            """;
+
+        var game = SteamService.ParseAppManifest(acf);
+
+        game.ShouldNotBeNull();
+        game.LastPlayed.ShouldBe(1708000000L);
     }
 
     [Fact]
