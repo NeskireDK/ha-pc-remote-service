@@ -1,5 +1,6 @@
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Tray.Forms;
 
@@ -8,6 +9,7 @@ internal sealed class ModesTab : TabPage
     private readonly IConfigurationWriter _configWriter;
     private readonly IAudioService _audioService;
     private readonly IMonitorService _monitorService;
+    private readonly IOptions<PcRemoteOptions> _options;
 
     private readonly ListBox _modeList;
     private readonly TextBox _modeNameBox;
@@ -15,8 +17,8 @@ internal sealed class ModesTab : TabPage
     private readonly ComboBox _monitorProfileCombo;
     private readonly TrackBar _volumeSlider;
     private readonly Label _volumeLabel;
-    private readonly TextBox _launchAppBox;
-    private readonly TextBox _killAppBox;
+    private readonly ComboBox _launchAppCombo;
+    private readonly ComboBox _killAppCombo;
     private readonly Button _saveButton;
     private readonly Button _deleteButton;
     private readonly Button _newButton;
@@ -31,6 +33,7 @@ internal sealed class ModesTab : TabPage
         _configWriter = services.GetRequiredService<IConfigurationWriter>();
         _audioService = services.GetRequiredService<IAudioService>();
         _monitorService = services.GetRequiredService<IMonitorService>();
+        _options = services.GetRequiredService<IOptions<PcRemoteOptions>>();
 
         // Left panel: mode list + buttons
         var leftPanel = new Panel { Dock = DockStyle.Left, Width = 180, Padding = new Padding(0, 0, 10, 0) };
@@ -116,14 +119,28 @@ internal sealed class ModesTab : TabPage
         editLayout.Controls.Add(volumePanel, 1, row++);
 
         // Launch app
-        _launchAppBox = new TextBox { BackColor = Color.FromArgb(50, 50, 50), ForeColor = Color.White, Width = 250, BorderStyle = BorderStyle.FixedSingle };
+        _launchAppCombo = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 250,
+            BackColor = Color.FromArgb(50, 50, 50),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
         editLayout.Controls.Add(MakeLabel("Launch App:"), 0, row);
-        editLayout.Controls.Add(_launchAppBox, 1, row++);
+        editLayout.Controls.Add(_launchAppCombo, 1, row++);
 
         // Kill app
-        _killAppBox = new TextBox { BackColor = Color.FromArgb(50, 50, 50), ForeColor = Color.White, Width = 250, BorderStyle = BorderStyle.FixedSingle };
+        _killAppCombo = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 250,
+            BackColor = Color.FromArgb(50, 50, 50),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
         editLayout.Controls.Add(MakeLabel("Kill App:"), 0, row);
-        editLayout.Controls.Add(_killAppBox, 1, row++);
+        editLayout.Controls.Add(_killAppCombo, 1, row++);
 
         // Save button
         _saveButton = CreateButton("Save Mode");
@@ -166,7 +183,49 @@ internal sealed class ModesTab : TabPage
         {
             // Services may fail if tools aren't installed
         }
+
+        RefreshAppDropdowns();
     }
+
+    private void RefreshAppDropdowns()
+    {
+        var apps = _options.Value.Apps;
+
+        _launchAppCombo.Items.Clear();
+        _launchAppCombo.Items.Add(new AppDropdownItem(null, "(None)"));
+        _killAppCombo.Items.Clear();
+        _killAppCombo.Items.Add(new AppDropdownItem(null, "(None)"));
+
+        foreach (var (key, app) in apps)
+        {
+            var item = new AppDropdownItem(key, app.DisplayName);
+            _launchAppCombo.Items.Add(item);
+            _killAppCombo.Items.Add(item);
+        }
+    }
+
+    private static void SelectAppItem(ComboBox combo, string? appKey)
+    {
+        if (string.IsNullOrEmpty(appKey))
+        {
+            combo.SelectedIndex = 0;
+            return;
+        }
+
+        for (int i = 0; i < combo.Items.Count; i++)
+        {
+            if (combo.Items[i] is AppDropdownItem item && item.Key == appKey)
+            {
+                combo.SelectedIndex = i;
+                return;
+            }
+        }
+
+        combo.SelectedIndex = 0;
+    }
+
+    private static string? GetSelectedAppKey(ComboBox combo)
+        => (combo.SelectedItem as AppDropdownItem)?.Key;
 
     private void LoadModes()
     {
@@ -186,8 +245,8 @@ internal sealed class ModesTab : TabPage
         _audioDeviceCombo.SelectedItem = mode.AudioDevice ?? "(Don't change)";
         _monitorProfileCombo.SelectedItem = mode.MonitorProfile ?? "(Don't change)";
         _volumeSlider.Value = mode.Volume ?? 50;
-        _launchAppBox.Text = mode.LaunchApp ?? "";
-        _killAppBox.Text = mode.KillApp ?? "";
+        SelectAppItem(_launchAppCombo, mode.LaunchApp);
+        SelectAppItem(_killAppCombo, mode.KillApp);
     }
 
     private void OnNewMode(object? sender, EventArgs e)
@@ -199,8 +258,8 @@ internal sealed class ModesTab : TabPage
         if (_monitorProfileCombo.Items.Count > 0)
             _monitorProfileCombo.SelectedIndex = 0;
         _volumeSlider.Value = 50;
-        _launchAppBox.Text = "";
-        _killAppBox.Text = "";
+        if (_launchAppCombo.Items.Count > 0) _launchAppCombo.SelectedIndex = 0;
+        if (_killAppCombo.Items.Count > 0) _killAppCombo.SelectedIndex = 0;
         _modeNameBox.Focus();
     }
 
@@ -218,8 +277,8 @@ internal sealed class ModesTab : TabPage
             AudioDevice = _audioDeviceCombo.SelectedItem?.ToString() is "(Don't change)" ? null : _audioDeviceCombo.SelectedItem?.ToString(),
             MonitorProfile = _monitorProfileCombo.SelectedItem?.ToString() is "(Don't change)" ? null : _monitorProfileCombo.SelectedItem?.ToString(),
             Volume = _volumeSlider.Value,
-            LaunchApp = string.IsNullOrWhiteSpace(_launchAppBox.Text) ? null : _launchAppBox.Text.Trim(),
-            KillApp = string.IsNullOrWhiteSpace(_killAppBox.Text) ? null : _killAppBox.Text.Trim()
+            LaunchApp = GetSelectedAppKey(_launchAppCombo),
+            KillApp = GetSelectedAppKey(_killAppCombo)
         };
 
         // If renaming (selected name differs from text box), delete old
@@ -263,4 +322,10 @@ internal sealed class ModesTab : TabPage
         Size = new Size(75, 28),
         Cursor = Cursors.Hand
     };
+
+    private sealed class AppDropdownItem(string? key, string displayName)
+    {
+        public string? Key { get; } = key;
+        public override string ToString() => displayName;
+    }
 }

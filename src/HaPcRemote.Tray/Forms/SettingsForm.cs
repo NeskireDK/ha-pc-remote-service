@@ -34,7 +34,7 @@ internal sealed class SettingsForm : Form
             Font = new Font("Segoe UI", 9.5f),
         };
 
-        _generalTab = new GeneralTab();
+        _generalTab = new GeneralTab(services);
         _modesTab = new ModesTab(services);
         _powerTab = new PowerTab(services);
         _logTab = new LogTab(logProvider);
