@@ -151,7 +151,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         try
         {
-            var steamService = _webServices.GetRequiredService<SteamService>();
+            var steamService = _webServices.GetRequiredService<ISteamService>();
             var running = await steamService.GetRunningGameAsync();
             var isPlaying = running != null;
             if (isPlaying == _isGamePlaying) return;
@@ -195,16 +195,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         "Verbose" => LogLevel.Debug,
         _         => LogLevel.Warning
     };
-
-    private static string LogLevelToString(LogLevel level) => level switch
-    {
-        LogLevel.Error       => "Error",
-        LogLevel.Information => "Info",
-        LogLevel.Debug       => "Verbose",
-        _                    => "Warning"
-    };
-
-    // Log level and auto-update settings are now managed in the Settings panel (GeneralTab)
 
     private static int GetUpdateTimerInterval(bool autoUpdate)
         => autoUpdate ? 5 * 60 * 1000 : 4 * 60 * 60 * 1000;

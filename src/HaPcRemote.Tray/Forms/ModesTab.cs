@@ -194,8 +194,10 @@ internal sealed class ModesTab : TabPage
     {
         _modeList.ClearSelected();
         _modeNameBox.Text = "";
-        _audioDeviceCombo.SelectedIndex = 0;
-        _monitorProfileCombo.SelectedIndex = 0;
+        if (_audioDeviceCombo.Items.Count > 0)
+            _audioDeviceCombo.SelectedIndex = 0;
+        if (_monitorProfileCombo.Items.Count > 0)
+            _monitorProfileCombo.SelectedIndex = 0;
         _volumeSlider.Value = 50;
         _launchAppBox.Text = "";
         _killAppBox.Text = "";
