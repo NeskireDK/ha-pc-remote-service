@@ -31,8 +31,7 @@ public class ConfigurationWriterTests : IDisposable
 
         options.Port.ShouldBe(5000);
         options.Modes.ShouldBeEmpty();
-        options.Power.SleepOnDisconnect.ShouldBeFalse();
-        options.Power.SleepDelayMinutes.ShouldBe(10);
+        options.Power.AutoSleepAfterMinutes.ShouldBe(0);
     }
 
     [Fact]
@@ -166,13 +165,11 @@ public class ConfigurationWriterTests : IDisposable
 
         writer.SavePowerSettings(new PowerSettings
         {
-            SleepOnDisconnect = true,
-            SleepDelayMinutes = 15
+            AutoSleepAfterMinutes = 30
         });
 
         var options = writer.Read();
-        options.Power.SleepOnDisconnect.ShouldBeTrue();
-        options.Power.SleepDelayMinutes.ShouldBe(15);
+        options.Power.AutoSleepAfterMinutes.ShouldBe(30);
     }
 
     [Fact]
@@ -181,11 +178,11 @@ public class ConfigurationWriterTests : IDisposable
         var writer = CreateWriter();
         writer.SaveMode("couch", new ModeConfig { AudioDevice = "HDMI" });
 
-        writer.SavePowerSettings(new PowerSettings { SleepOnDisconnect = true });
+        writer.SavePowerSettings(new PowerSettings { AutoSleepAfterMinutes = 30 });
 
         var options = writer.Read();
         options.Modes.ShouldContainKey("couch");
-        options.Power.SleepOnDisconnect.ShouldBeTrue();
+        options.Power.AutoSleepAfterMinutes.ShouldBe(30);
     }
 
     // ── SavePort ────────────────────────────────────────────────────────
@@ -206,14 +203,14 @@ public class ConfigurationWriterTests : IDisposable
     {
         var writer = CreateWriter();
         writer.SaveMode("couch", new ModeConfig { AudioDevice = "HDMI" });
-        writer.SavePowerSettings(new PowerSettings { SleepOnDisconnect = true });
+        writer.SavePowerSettings(new PowerSettings { AutoSleepAfterMinutes = 30 });
 
         writer.SavePort(9090);
 
         var options = writer.Read();
         options.Port.ShouldBe(9090);
         options.Modes.ShouldContainKey("couch");
-        options.Power.SleepOnDisconnect.ShouldBeTrue();
+        options.Power.AutoSleepAfterMinutes.ShouldBe(30);
     }
 
     [Theory]

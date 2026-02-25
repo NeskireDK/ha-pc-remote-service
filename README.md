@@ -1,5 +1,15 @@
 # ha-pc-remote-service
 
+You use your PC for work during the day and gaming on your TV in the evening.
+Every time you switch, it's the same ritual — audio output, monitors, volume, Steam Big Picture.
+Every time you're done, you remember to put it to sleep.
+
+This handles that transition. Define how your PC should be set up for each context. Home Assistant switches between them with one tap — audio, monitors, volume, and app launch sequenced and done. Launch a game and it switches automatically. Finish and the PC sleeps on its own.
+
+Not a console. Your PC, with the same reliability.
+
+---
+
 A Windows system tray application (and Linux headless daemon) that embeds a Kestrel REST API for controlling a PC remotely. Designed for use with the [ha-pc-remote](https://github.com/NeskireDK/ha-pc-remote) Home Assistant integration.
 
 The app advertises itself via mDNS (`_pc-remote._tcp`) for auto-discovery by the HA integration.

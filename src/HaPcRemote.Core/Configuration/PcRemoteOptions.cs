@@ -16,8 +16,8 @@ public sealed class PcRemoteOptions
 
 public sealed class PowerSettings
 {
-    public bool SleepOnDisconnect { get; set; }
-    public int SleepDelayMinutes { get; set; } = 10;
+    /// <summary>Minutes of total inactivity (no game + no input) before sleep. 0 = disabled.</summary>
+    public int AutoSleepAfterMinutes { get; set; } = 0;
 }
 
 public sealed class AuthOptions
