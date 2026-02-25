@@ -27,11 +27,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly UpdateChecker _updateChecker;
     private readonly System.Windows.Forms.Timer _updateTimer;
     private readonly string _profilesPath;
+    private readonly int _port;
     private readonly IServiceProvider _webServices;
     private readonly System.Windows.Forms.Timer _steamPollTimer;
     private readonly Icon _defaultIcon;
     private Icon? _playingIcon;
     private bool _isGamePlaying;
+
+    private readonly SemaphoreSlim _updateLock = new(1, 1);
 
     private SettingsForm? _settingsForm;
     private ToolStripMenuItem? _updateMenuItem;
@@ -49,6 +52,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         var options = webServices.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
         _profilesPath = options.ProfilesPath;
+        _port = options.Port;
 
         _updateChecker = new UpdateChecker(loggerFactory.CreateLogger<UpdateChecker>());
 
@@ -96,6 +100,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add("Show Log", null, OnShowLog);
         menu.Items.Add("Show API Key", null, OnShowApiKey);
         menu.Items.Add("Open Profiles Folder", null, OnOpenProfilesFolder);
+        menu.Items.Add("API Explorer", null, OnOpenApiExplorer);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -144,6 +149,18 @@ internal sealed class TrayApplicationContext : ApplicationContext
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to open profiles folder: {Path}", _profilesPath);
+        }
+    }
+
+    private void OnOpenApiExplorer(object? sender, EventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo($"http://localhost:{_port}/debug") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to open API Explorer");
         }
     }
 
@@ -231,7 +248,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (showProgress)
         {
             _updateMenuItem.Enabled = false;
-            _updateMenuItem.BackColor = default;
             _updateMenuItem.Text = "Checking...";
         }
 
@@ -286,17 +302,30 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (_updateMenuItem is null) return;
 
-        _updateMenuItem.Enabled = false;
-        _updateMenuItem.Text = "Updating…";
-
-        if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
+        if (!_updateLock.Wait(0))
         {
-            Application.Exit();
+            _logger.LogInformation("Update already in progress, skipping");
+            return;
         }
-        else
+
+        try
         {
-            _updateMenuItem.Text = $"Update to {release.TagName}";
-            _updateMenuItem.Enabled = true;
+            _updateMenuItem.Enabled = false;
+            _updateMenuItem.Text = "Updating…";
+
+            if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
+            {
+                Application.Exit();
+            }
+            else
+            {
+                _updateMenuItem.Text = $"Update to {release.TagName}";
+                _updateMenuItem.Enabled = true;
+            }
+        }
+        finally
+        {
+            _updateLock.Release();
         }
     }
 
@@ -326,6 +355,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             _cts.Cancel();
             _cts.Dispose();
+            _updateLock.Dispose();
             _updateTimer.Dispose();
             _steamPollTimer.Dispose();
             _playingIcon?.Dispose();

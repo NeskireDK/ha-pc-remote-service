@@ -55,9 +55,9 @@ Config is stored in `~/.config/HaPcRemote/appsettings.json`.
 The tray app is the main process — it hosts the HTTP server (Kestrel) directly. It must be running for any API feature to work.
 
 Features:
-- **Log viewer** — shows live service logs (right-click → Show Log)
+- **Settings panel** — tabbed UI for Modes, Games, General, and log viewer
 - **API key display** — shows the auto-generated API key (right-click → Show API Key)
-- **Log level** — configurable: Error / Warning / Info / Verbose (right-click → Logging)
+- **API Explorer** — opens a self-hosted debug page listing all endpoints with "Try it" buttons (right-click → API Explorer)
 - **Auto-update** — checks GitHub for new releases, downloads and runs the installer
 
 ## API Endpoints
@@ -125,14 +125,23 @@ Apps are defined in `appsettings.json` under `PcRemote.Apps`.
 
 ### Steam
 
-Requires Steam to be installed. Returns the top 20 most recently played games.
+Requires Steam to be installed. Returns the top 20 most recently played games (including non-Steam shortcuts).
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| `GET` | `/api/steam/games` | List installed games (sorted by last played, top 20) |
+| `GET` | `/api/steam/games` | List installed games + non-Steam shortcuts (sorted by last played, top 20) |
 | `GET` | `/api/steam/running` | Currently running game, or `null` if none |
-| `POST` | `/api/steam/run/{appId}` | Launch a game by Steam app ID |
+| `POST` | `/api/steam/run/{appId}` | Launch a game by Steam app ID (applies PC mode binding if configured) |
 | `POST` | `/api/steam/stop` | Stop the currently running game |
+| `GET` | `/api/steam/artwork/{appId}` | Serve game artwork from local Steam cache (grid → librarycache fallback) |
+| `GET` | `/api/steam/bindings` | Get game-to-PC-mode bindings |
+| `PUT` | `/api/steam/bindings` | Update game-to-PC-mode bindings |
+
+### Debug
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/debug` | API Explorer page (localhost-only, no auth) |
 
 ## Configuration
 
@@ -171,6 +180,13 @@ Full example:
         "Volume": 25,
         "KillApp": "steam-bigpicture"
       }
+    },
+    "Steam": {
+      "DefaultPcMode": "couch",
+      "GamePcModeBindings": {
+        "730": "desktop",
+        "1245620": "couch"
+      }
     }
   }
 }
@@ -185,6 +201,8 @@ Full example:
 | `ProfilesPath` | `%AppData%\HaPcRemote\monitor-profiles` | Directory containing monitor profile `.cfg` files |
 | `Apps` | `{}` | Map of app key to app definition |
 | `Modes` | `{}` | Map of mode name to mode config |
+| `Steam.DefaultPcMode` | `""` | Default PC mode to apply before launching any game (`""` or `"none"` = no switch) |
+| `Steam.GamePcModeBindings` | `{}` | Per-game overrides: `{ "appId": "modeName" }`. Takes priority over default. `"none"` skips the default. |
 
 ### App Definition
 

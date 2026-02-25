@@ -1,5 +1,8 @@
 using FakeItEasy;
+using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace HaPcRemote.Service.Tests.Services;
@@ -7,8 +10,16 @@ namespace HaPcRemote.Service.Tests.Services;
 public class SteamServiceTests
 {
     private readonly ISteamPlatform _platform = A.Fake<ISteamPlatform>();
+    private readonly IModeService _modeService = A.Fake<IModeService>();
+    private readonly ILogger<SteamService> _logger = A.Fake<ILogger<SteamService>>();
 
-    private SteamService CreateService() => new(_platform);
+    private SteamService CreateService(PcRemoteOptions? options = null)
+    {
+        options ??= new PcRemoteOptions();
+        var monitor = A.Fake<IOptionsMonitor<PcRemoteOptions>>();
+        A.CallTo(() => monitor.CurrentValue).Returns(options);
+        return new SteamService(_platform, _modeService, monitor, _logger);
+    }
 
     // ── ParseLibraryFolders tests (static) ───────────────────────────
 
@@ -483,5 +494,297 @@ public class SteamServiceTests
         // Poll never sees appId 0 (GetRunningAppId keeps returning 1)
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/0"))
             .MustHaveHappenedOnceExactly();
+    }
+
+    // ── LaunchGameAsync shortcut tests ─────────────────────────────────
+
+    [Fact]
+    public async Task LaunchGame_ShortcutAppId_UsesShiftedId()
+    {
+        // Negative appId = non-Steam shortcut
+        var shortcutAppId = -1234567890;
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        var service = CreateService();
+
+        await service.LaunchGameAsync(shortcutAppId);
+
+        // Expected: ((long)(uint)appId << 32) | 0x02000000
+        var expectedLaunchId = ((long)(uint)shortcutAppId << 32) | 0x02000000;
+        A.CallTo(() => _platform.LaunchSteamUrl($"steam://rungameid/{expectedLaunchId}"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task LaunchGame_RegularAppId_UsesPlainId()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        var service = CreateService();
+
+        await service.LaunchGameAsync(730);
+
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // ── IsShortcutAppId tests ──────────────────────────────────────────
+
+    [Theory]
+    [InlineData(-1, true)]
+    [InlineData(-1234567890, true)]
+    [InlineData(0, false)]
+    [InlineData(730, false)]
+    [InlineData(int.MaxValue, false)]
+    public void IsShortcutAppId_ReturnsExpected(int appId, bool expected)
+    {
+        SteamService.IsShortcutAppId(appId).ShouldBe(expected);
+    }
+
+    // ── ParseShortcuts tests ───────────────────────────────────────────
+
+    [Fact]
+    public void ParseShortcuts_ValidBinaryVdf_ReturnsShortcuts()
+    {
+        using var stream = File.OpenRead(TestData.FilePath("shortcuts.vdf"));
+        var shortcuts = SteamService.ParseShortcuts(stream);
+
+        shortcuts.Count.ShouldBe(2);
+
+        shortcuts[0].Name.ShouldBe("My Custom Game");
+        shortcuts[0].AppId.ShouldBe(-1234567890);
+        shortcuts[0].IsShortcut.ShouldBeTrue();
+        shortcuts[0].LastPlayed.ShouldBe(1700000000L);
+
+        shortcuts[1].Name.ShouldBe("Emulator Game");
+        shortcuts[1].AppId.ShouldBe(-987654321);
+        shortcuts[1].IsShortcut.ShouldBeTrue();
+        shortcuts[1].LastPlayed.ShouldBe(1708000000L);
+    }
+
+    [Fact]
+    public void ParseShortcuts_EmptyFile_ReturnsEmptyList()
+    {
+        using var stream = File.OpenRead(TestData.FilePath("shortcuts-empty.vdf"));
+        var shortcuts = SteamService.ParseShortcuts(stream);
+
+        shortcuts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ParseShortcuts_CorruptData_ReturnsEmptyList()
+    {
+        using var stream = new MemoryStream([0xFF, 0xFE, 0x00, 0x01]);
+        var shortcuts = SteamService.ParseShortcuts(stream);
+
+        shortcuts.ShouldBeEmpty();
+    }
+
+    // ── GenerateShortcutAppId tests ────────────────────────────────────
+
+    [Fact]
+    public void GenerateShortcutAppId_AlwaysNegative()
+    {
+        var appId = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+
+        appId.ShouldBeLessThan(0);
+        SteamService.IsShortcutAppId(appId).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void GenerateShortcutAppId_DeterministicForSameInputs()
+    {
+        var id1 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var id2 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+
+        id1.ShouldBe(id2);
+    }
+
+    [Fact]
+    public void GenerateShortcutAppId_DifferentForDifferentInputs()
+    {
+        var id1 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var id2 = SteamService.GenerateShortcutAppId(@"C:\Games\other.exe", "Other Game");
+
+        id1.ShouldNotBe(id2);
+    }
+
+    // ── ResolvePcMode tests ───────────────────────────────────────
+
+    [Fact]
+    public void ResolvePcMode_PerGameBinding_ReturnsPerGameMode()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig
+            {
+                DefaultPcMode = "couch",
+                GamePcModeBindings = new Dictionary<string, string> { ["730"] = "desktop" }
+            }
+        };
+        var service = CreateService(options);
+
+        service.ResolvePcMode(730).ShouldBe("desktop");
+    }
+
+    [Fact]
+    public void ResolvePcMode_NoPerGameBinding_ReturnsDefault()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "couch" }
+        };
+        var service = CreateService(options);
+
+        service.ResolvePcMode(999).ShouldBe("couch");
+    }
+
+    [Fact]
+    public void ResolvePcMode_PerGameNone_ReturnsNull()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig
+            {
+                DefaultPcMode = "couch",
+                GamePcModeBindings = new Dictionary<string, string> { ["730"] = "none" }
+            }
+        };
+        var service = CreateService(options);
+
+        service.ResolvePcMode(730).ShouldBeNull();
+    }
+
+    [Fact]
+    public void ResolvePcMode_DefaultNone_ReturnsNull()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "none" }
+        };
+        var service = CreateService(options);
+
+        service.ResolvePcMode(999).ShouldBeNull();
+    }
+
+    [Fact]
+    public void ResolvePcMode_EmptyDefault_NoBindings_ReturnsNull()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "" }
+        };
+        var service = CreateService(options);
+
+        service.ResolvePcMode(999).ShouldBeNull();
+    }
+
+    [Fact]
+    public void ResolvePcMode_PerGameEmpty_FallsBackToDefault()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig
+            {
+                DefaultPcMode = "couch",
+                GamePcModeBindings = new Dictionary<string, string> { ["730"] = "" }
+            }
+        };
+        var service = CreateService(options);
+
+        service.ResolvePcMode(730).ShouldBe("couch");
+    }
+
+    // ── LaunchGameAsync mode switch tests ──────────────────────────
+
+    [Fact]
+    public async Task LaunchGameAsync_WithBinding_CallsModeSwitchBeforeLaunch()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig
+            {
+                DefaultPcMode = "couch",
+                GamePcModeBindings = new Dictionary<string, string> { ["730"] = "desktop" }
+            }
+        };
+        var service = CreateService(options);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+
+        _ = await service.LaunchGameAsync(730);
+
+        A.CallTo(() => _modeService.ApplyModeAsync("desktop")).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task LaunchGameAsync_ModeNotFound_StillLaunches()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "nonexistent" }
+        };
+        var service = CreateService(options);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _modeService.ApplyModeAsync("nonexistent"))
+            .Throws(new KeyNotFoundException("Mode not found"));
+
+        _ = await service.LaunchGameAsync(999);
+
+        A.CallTo(() => _platform.LaunchSteamUrl(A<string>._)).MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task LaunchGameAsync_NoBinding_NoModeSwitch()
+    {
+        var service = CreateService();
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+
+        _ = await service.LaunchGameAsync(730);
+
+        A.CallTo(() => _modeService.ApplyModeAsync(A<string>._)).MustNotHaveHappened();
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task LaunchGameAsync_SameGameAlreadyRunning_NoModeSwitch()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "couch" }
+        };
+        var service = CreateService(options);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(730);
+        A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
+
+        _ = await service.LaunchGameAsync(730);
+
+        A.CallTo(() => _modeService.ApplyModeAsync(A<string>._)).MustNotHaveHappened();
+        A.CallTo(() => _platform.LaunchSteamUrl(A<string>._)).MustNotHaveHappened();
+    }
+
+    // ── GetBindings tests ─────────────────────────────────────────
+
+    [Fact]
+    public void GetBindings_ReturnsCurrentConfig()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig
+            {
+                DefaultPcMode = "couch",
+                GamePcModeBindings = new Dictionary<string, string>
+                {
+                    ["730"] = "desktop",
+                    ["1245620"] = "couch"
+                }
+            }
+        };
+        var service = CreateService(options);
+
+        var bindings = service.GetBindings();
+
+        bindings.DefaultPcMode.ShouldBe("couch");
+        bindings.GamePcModeBindings.Count.ShouldBe(2);
+        bindings.GamePcModeBindings["730"].ShouldBe("desktop");
+        bindings.GamePcModeBindings["1245620"].ShouldBe("couch");
     }
 }

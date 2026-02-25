@@ -6,4 +6,9 @@ internal static class TestData
         File.ReadAllText(Path.Combine(
             Path.GetDirectoryName(typeof(TestData).Assembly.Location)!,
             "TestData", fileName));
+
+    public static string FilePath(string fileName) =>
+        Path.Combine(
+            Path.GetDirectoryName(typeof(TestData).Assembly.Location)!,
+            "TestData", fileName);
 }

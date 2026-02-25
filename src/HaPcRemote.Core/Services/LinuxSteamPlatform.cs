@@ -25,6 +25,12 @@ public sealed class LinuxSteamPlatform : ISteamPlatform
         return null;
     }
 
+    public string? GetSteamUserId()
+    {
+        var steamPath = GetSteamPath();
+        return steamPath != null ? SteamUserIdResolver.Resolve(steamPath) : null;
+    }
+
     public int GetRunningAppId()
     {
         var steamPath = GetSteamPath();

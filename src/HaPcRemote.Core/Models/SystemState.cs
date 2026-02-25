@@ -9,6 +9,7 @@ public sealed class SystemState
     public SteamRunningGame? RunningGame { get; init; }
     public List<string>? Modes { get; init; }
     public int? IdleSeconds { get; init; }
+    public SteamBindings? SteamBindings { get; init; }
 }
 
 public sealed class AudioState

@@ -166,73 +166,52 @@ Tabbed settings UI in the tray app: Modes, General, and log viewer.
 
 ### Bugs
 
-- [ ] **Kestrel status stuck on "Starting..."** — The label next to the port field in the
-  General tab never transitions to green "Online". It stays on "Starting..." indefinitely
-  even after the server is listening. Red "Offline" untested. *(service — `KestrelStatus` / `GeneralTab`)*
+- [x] **Kestrel status stuck on "Starting..."** — Fixed: synchronous fast path in
+  `GeneralTab.UpdatePortStatus()` when `KestrelStatus.Started` is already completed. *(service)*
 
-- [ ] **Update race condition** — When user manually checks for update and quickly clicks the
-  green update button, the tray shows a console error that the file is already in use. Caused
-  by auto-update triggering right after and colliding with the manual update. Low priority.
-  *(service)*
+- [x] **Update race condition** — Fixed: `SemaphoreSlim` guard in `HandleDownloadAsync`
+  prevents concurrent manual + auto-update downloads. *(service)*
 
-- [ ] **Update button color** — Update button shouldn't be green, should use regular colors.
-  *(service)*
+- [x] **Update button color** — Fixed: removed stale `BackColor` reset. *(service)*
 
-### 7. Rename Duration Sensor to Idle Duration
+### 7. Rename Duration Sensor to Idle Duration *(done in v1.2)*
 
-The "Idle Time" sensor entity name doesn't clearly convey what it measures. Rename to
-"Idle Duration" so `idle` appears in both the entity name and the underlying identifiers.
+- [x] Service: renamed log message from "idle time" → "idle duration" *(service)*
+- [x] Integration: renamed sensor to "Idle Duration" (`idle_duration` entity ID, translations, strings) *(integration)*
 
-- [ ] Service: rename endpoint/field from idle time → idle duration *(service)*
-- [ ] Integration: rename sensor entity to "Idle Duration" (`idle_duration` in entity ID) *(integration)*
+### 8. Non-Steam Game Discovery *(done in v1.2)*
 
-### 8. Non-Steam Game Discovery
+Parses `shortcuts.vdf` (binary VDF via ValveKeyValue) to discover non-Steam game shortcuts.
+Shortcuts merge into the game list with `IsShortcut` flag and launch via shifted
+`steam://rungameid/` URI. CRC32-based appid generation matches Steam's algorithm.
 
-Discover non-Steam game shortcuts added by the user and expose them alongside regular
-Steam games. Shortcuts are stored in `userdata/{steamid}/config/shortcuts.vdf` (binary VDF).
+- [x] Service: parse `shortcuts.vdf`, merge into game list, launch via shifted appid *(service)*
+- [x] Integration: non-Steam games appear in media browser automatically (no changes needed — data flows through existing game list) *(integration)*
 
-The existing ValveKeyValue library already supports binary VDF parsing
-(`KVSerializationFormat.KeyValues1Binary`), used by `LinuxSteamPlatform` for `registry.vdf`.
+### 9. Steam Artwork / Poster Serving *(done in v1.2)*
 
-- [ ] Service: parse `shortcuts.vdf` to extract non-Steam shortcut entries *(service)*
-- [ ] Service: merge shortcuts into the game list with a distinguishing flag *(service)*
-- [ ] Service: launch shortcuts via `steam://rungameid/{(appid << 32) | 0x02000000}` — preserves user args, overlay, and Steam Input *(service)*
-- [ ] Integration: display non-Steam games in media browser alongside Steam games *(integration)*
+`GET /api/steam/artwork/{appId}` serves game artwork from Steam's local cache.
+Resolution order: custom grid art (`userdata/{steamid}/config/grid/{appId}p.*`) →
+library cache (`appcache/librarycache/{appId}_library_600x900.*`). `SteamUserIdResolver`
+discovers the active user via `loginusers.vdf`.
 
-### 9. Steam Artwork / Poster Serving
+- [x] Service: artwork endpoint with grid → librarycache fallback *(service)*
+- [x] Integration: media browser thumbnails use local artwork endpoint instead of Steam CDN *(integration)*
 
-Serve game artwork (posters, heroes, logos) from Steam's local cache so the HA media
-browser can display thumbnails for both Steam and non-Steam games.
+### 10. API Debug Page *(done in v1.2)*
 
-Steam stores artwork in two locations (custom grid takes priority):
-- `userdata/{steamid}/config/grid/` — user-set custom art (`{appid}p.png` for capsule)
-- `appcache/librarycache/` — Steam CDN cache (`{appid}_library_600x900.jpg`)
+Self-hosted HTML page at `GET /debug` (localhost-only, excluded from auth). Lists all
+endpoints with method, path, description, and "Try it" buttons. API key auto-injected
+via `<meta>` tag. Dark theme, no external dependencies.
 
-- [ ] Service: add `GET /api/steam/artwork/{appId}` endpoint that resolves artwork from grid → librarycache fallback *(service)*
-- [ ] Integration: use artwork endpoint as thumbnail URL in media browser `BrowseMedia` entries *(integration)*
+- [x] Service: `/debug` endpoint, localhost-only, API key injection, endpoint catalog *(service)*
+- [x] Tray: "API Explorer" context menu item *(service)*
 
-### 10. API Debug Page in Tray App
+### 11. Game-to-PC-Mode Binding *(done in v1.2)*
 
-Tray context menu item "API Explorer" opens the default browser to a self-hosted debug page
-served by the service. Lists all endpoints with descriptions, methods, and example parameters.
-Each endpoint has a "Try it" button that fires the request and displays the result inline.
-
-**Auth solution:** The HTML page is served by the service itself at `GET /debug` (excluded
-from API key middleware). The page contains a server-rendered `<meta>` tag or JS variable
-with the API key, and all test requests use `fetch()` with the `X-Api-Key` header — so
-authentication stays intact for the real API, but the debug page handles it transparently.
-The `/debug` endpoint only responds to `127.0.0.1`/`::1` requests for safety.
-
-- [ ] Service: add `/debug` endpoint serving a static HTML page, localhost-only, excluded from auth middleware *(service)*
-- [ ] Service: inject API key into the page so JS `fetch()` calls include `X-Api-Key` header automatically *(service)*
-- [ ] Service: auto-discover or manually list all API endpoints with method, path, and example params *(service)*
-- [ ] Tray: add "API Explorer" context menu item that opens `http://localhost:{port}/debug` in default browser *(service)*
-
-### 11. Game-to-PC-Mode Binding
-
-Bind games (Steam and non-Steam) to a PC Mode so the mode switches automatically before
-launch. Config adds a `DefaultPcMode` (one of the defined modes or `none`) and optional
-per-game overrides in `GamePcModeBindings`.
+Per-game and default PC mode bindings. Mode switch executes before game launch.
+Config in `Steam.DefaultPcMode` + `Steam.GamePcModeBindings`. Games settings tab
+in tray with per-game dropdown.
 
 ```json
 "Steam": {
@@ -244,17 +223,10 @@ per-game overrides in `GamePcModeBindings`.
 }
 ```
 
-When a game launch is requested: if the game has a binding use that PC mode, otherwise fall
-back to `DefaultPcMode`. If the resolved mode is `none` or missing, launch without
-switching. The mode switch completes before the game launch begins. No automatic revert
-on session end — that's handled by sleep or manual mode change.
-
-- [ ] Service: add `DefaultPcMode` and `GamePcModeBindings` to config *(service)*
-- [ ] Service: resolve PC mode on game launch — per-game override → default → none *(service)*
-- [ ] Service: execute mode switch before `steam://` launch in `SteamService` *(service)*
-- [ ] Service: expose bindings via API for settings UI and integration *(service)*
-- [ ] Tray: add "Games" settings tab — lists top 20 games, dropdown per game to bind a PC mode, default PC mode selector at top *(service)*
-- [ ] Integration: show current game PC mode binding state in attributes *(integration)*
+- [x] Service: config, resolution logic (per-game → default → none), mode switch before launch *(service)*
+- [x] Service: `GET/PUT /api/steam/bindings` endpoints *(service)*
+- [x] Tray: "Games" settings tab with per-game mode dropdown *(service)*
+- [x] Integration: `game_pc_mode_binding` attribute on media player entity *(integration)*
 
 ---
 

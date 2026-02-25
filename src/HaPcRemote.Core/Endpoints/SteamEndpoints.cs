@@ -1,3 +1,5 @@
+using HaPcRemote.Service.Configuration;
+using Microsoft.AspNetCore.StaticFiles;
 using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
@@ -6,6 +8,8 @@ namespace HaPcRemote.Service.Endpoints;
 
 public static class SteamEndpoints
 {
+    private static readonly FileExtensionContentTypeProvider ContentTypeProvider = new();
+
     public static RouteGroupBuilder MapSteamEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/steam");
@@ -43,6 +47,39 @@ public static class SteamEndpoints
             await steamService.StopGameAsync();
             return Results.Json(
                 ApiResponse.Ok("Steam game stopped"),
+                AppJsonContext.Default.ApiResponse);
+        });
+
+        group.MapGet("/artwork/{appId:int}", (int appId, ISteamService steamService) =>
+        {
+            var path = steamService.GetArtworkPath(appId);
+            if (path == null)
+                return Results.NotFound();
+
+            if (!ContentTypeProvider.TryGetContentType(path, out var contentType))
+                contentType = "application/octet-stream";
+
+            return Results.File(path, contentType);
+        });
+
+        group.MapGet("/bindings", (ISteamService steamService) =>
+        {
+            var bindings = steamService.GetBindings();
+            return Results.Json(
+                ApiResponse.Ok(bindings),
+                AppJsonContext.Default.ApiResponseSteamBindings);
+        });
+
+        group.MapPut("/bindings", async (SteamBindings bindings, IConfigurationWriter configWriter) =>
+        {
+            var steamConfig = new SteamConfig
+            {
+                DefaultPcMode = bindings.DefaultPcMode,
+                GamePcModeBindings = bindings.GamePcModeBindings
+            };
+            await Task.Run(() => configWriter.SaveSteamBindings(steamConfig));
+            return Results.Json(
+                ApiResponse.Ok("Steam bindings saved"),
                 AppJsonContext.Default.ApiResponse);
         });
 
