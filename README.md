@@ -216,8 +216,8 @@ dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 ```
 
 ## Known Issues
-- Browsers hitting the service URL directly trigger API key warnings for `/favicon.ico` requests
-- Top 20 isnt working correctly, shows games that hasnt been played since 2022. Need to introduce some debug discovery code or review our approach of sorting the steam files.
+- ~Browsers hitting the service URL directly trigger API key warnings for `/favicon.ico` requests~ — **Resolved** in v1.0.5: auth middleware now skips non-API paths.
+- ~Top 20 not working correctly, showing games not played since 2022~ — **Resolved** in v1.0.5: Steam sorting now uses actual `LastPlayed` timestamps instead of `LastUpdated` (install/update time).
 - ~Game images varying size/format~ — **Resolved**: switched from `header.jpg` (460x215 landscape) to `library_600x900.jpg` (600x900 portrait poster) matching HA media browser expectations.
 - Non-steam games arent compatible and cannot so far be launched - theres also the issue of how to get posters for these games, could they be extracted from steam or another free fallback solution?
 - When user manually checks for update and quickly clicks the green update button, the tray will show a console error of the file is already in use (this is due to auto update triggered right after and colliding with user update, a low priority to solve)
@@ -225,7 +225,7 @@ dotnet publish src/HaPcRemote.Headless -c Release -r linux-x64
 - ~Entity turn on and off broken~ — **Resolved**: the error `extra keys not allowed @ data['input']` was from a user-defined script using `!input` syntax (a blueprint-only feature) in a regular script. The entity `async_turn_on`/`async_turn_off` methods work correctly. If you see this error, check your scripts for `!input` usage and replace with literal entity IDs or use `target:` instead of `data:`.
 ## Roadmap
 
-- [ ] Introduce config panel with multiple tabs
+- [ ] Introduce config panel with multiple tabs *(in progress — `feature/v1.1-settings-panel`)*
 - [ ] User configurable for adding and removing PC modes, for each new PC modes have dropdowns for available monitor profiles, monitors, audio devices and an option for dont change.
 - [ ] Show log in the new config panel
 - [ ] General settings for setting log level, auto update.
