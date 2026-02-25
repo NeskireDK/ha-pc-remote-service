@@ -484,4 +484,115 @@ public class SteamServiceTests
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/0"))
             .MustHaveHappenedOnceExactly();
     }
+
+    // ── LaunchGameAsync shortcut tests ─────────────────────────────────
+
+    [Fact]
+    public async Task LaunchGame_ShortcutAppId_UsesShiftedId()
+    {
+        // Negative appId = non-Steam shortcut
+        var shortcutAppId = -1234567890;
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        var service = CreateService();
+
+        await service.LaunchGameAsync(shortcutAppId);
+
+        // Expected: ((long)(uint)appId << 32) | 0x02000000
+        var expectedLaunchId = ((long)(uint)shortcutAppId << 32) | 0x02000000;
+        A.CallTo(() => _platform.LaunchSteamUrl($"steam://rungameid/{expectedLaunchId}"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task LaunchGame_RegularAppId_UsesPlainId()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        var service = CreateService();
+
+        await service.LaunchGameAsync(730);
+
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // ── IsShortcutAppId tests ──────────────────────────────────────────
+
+    [Theory]
+    [InlineData(-1, true)]
+    [InlineData(-1234567890, true)]
+    [InlineData(0, false)]
+    [InlineData(730, false)]
+    [InlineData(int.MaxValue, false)]
+    public void IsShortcutAppId_ReturnsExpected(int appId, bool expected)
+    {
+        SteamService.IsShortcutAppId(appId).ShouldBe(expected);
+    }
+
+    // ── ParseShortcuts tests ───────────────────────────────────────────
+
+    [Fact]
+    public void ParseShortcuts_ValidBinaryVdf_ReturnsShortcuts()
+    {
+        using var stream = File.OpenRead(TestData.FilePath("shortcuts.vdf"));
+        var shortcuts = SteamService.ParseShortcuts(stream);
+
+        shortcuts.Count.ShouldBe(2);
+
+        shortcuts[0].Name.ShouldBe("My Custom Game");
+        shortcuts[0].AppId.ShouldBe(-1234567890);
+        shortcuts[0].IsShortcut.ShouldBeTrue();
+        shortcuts[0].LastPlayed.ShouldBe(1700000000L);
+
+        shortcuts[1].Name.ShouldBe("Emulator Game");
+        shortcuts[1].AppId.ShouldBe(-987654321);
+        shortcuts[1].IsShortcut.ShouldBeTrue();
+        shortcuts[1].LastPlayed.ShouldBe(1708000000L);
+    }
+
+    [Fact]
+    public void ParseShortcuts_EmptyFile_ReturnsEmptyList()
+    {
+        using var stream = File.OpenRead(TestData.FilePath("shortcuts-empty.vdf"));
+        var shortcuts = SteamService.ParseShortcuts(stream);
+
+        shortcuts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ParseShortcuts_CorruptData_ReturnsEmptyList()
+    {
+        using var stream = new MemoryStream([0xFF, 0xFE, 0x00, 0x01]);
+        var shortcuts = SteamService.ParseShortcuts(stream);
+
+        shortcuts.ShouldBeEmpty();
+    }
+
+    // ── GenerateShortcutAppId tests ────────────────────────────────────
+
+    [Fact]
+    public void GenerateShortcutAppId_AlwaysNegative()
+    {
+        var appId = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+
+        appId.ShouldBeLessThan(0);
+        SteamService.IsShortcutAppId(appId).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void GenerateShortcutAppId_DeterministicForSameInputs()
+    {
+        var id1 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var id2 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+
+        id1.ShouldBe(id2);
+    }
+
+    [Fact]
+    public void GenerateShortcutAppId_DifferentForDifferentInputs()
+    {
+        var id1 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var id2 = SteamService.GenerateShortcutAppId(@"C:\Games\other.exe", "Other Game");
+
+        id1.ShouldNotBe(id2);
+    }
 }
