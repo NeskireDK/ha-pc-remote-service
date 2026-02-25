@@ -28,4 +28,7 @@ public interface IConfigurationWriter
 
     /// <summary>Update the port only.</summary>
     void SavePort(int port);
+
+    /// <summary>Update Steam game-to-mode bindings.</summary>
+    void SaveSteamBindings(SteamConfig steam);
 }

@@ -1,3 +1,4 @@
+using HaPcRemote.Service.Configuration;
 using Microsoft.AspNetCore.StaticFiles;
 using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
@@ -59,6 +60,27 @@ public static class SteamEndpoints
                 contentType = "application/octet-stream";
 
             return Results.File(path, contentType);
+        });
+
+        group.MapGet("/bindings", (ISteamService steamService) =>
+        {
+            var bindings = steamService.GetBindings();
+            return Results.Json(
+                ApiResponse.Ok(bindings),
+                AppJsonContext.Default.ApiResponseSteamBindings);
+        });
+
+        group.MapPut("/bindings", async (SteamBindings bindings, IConfigurationWriter configWriter) =>
+        {
+            var steamConfig = new SteamConfig
+            {
+                DefaultPcMode = bindings.DefaultPcMode,
+                GamePcModeBindings = bindings.GamePcModeBindings
+            };
+            await Task.Run(() => configWriter.SaveSteamBindings(steamConfig));
+            return Results.Json(
+                ApiResponse.Ok("Steam bindings saved"),
+                AppJsonContext.Default.ApiResponse);
         });
 
         return group;

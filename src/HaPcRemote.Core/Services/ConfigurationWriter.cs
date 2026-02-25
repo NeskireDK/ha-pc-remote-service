@@ -56,6 +56,10 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
         ModifyAndWrite(o => o.Port = port);
     }
 
+    public void SaveSteamBindings(SteamConfig steam)
+        => ModifyAndWrite(o => o.Steam = steam);
+
+
     private void ModifyAndWrite(Action<PcRemoteOptions> modifier)
     {
         lock (_lock)

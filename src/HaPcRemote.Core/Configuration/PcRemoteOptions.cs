@@ -11,6 +11,7 @@ public sealed class PcRemoteOptions
     public Dictionary<string, AppDefinitionOptions> Apps { get; set; } = new();
     public Dictionary<string, ModeConfig> Modes { get; set; } = new();
     public PowerSettings Power { get; set; } = new();
+    public SteamConfig Steam { get; set; } = new();
 }
 
 public sealed class PowerSettings
@@ -23,6 +24,12 @@ public sealed class AuthOptions
 {
     public bool Enabled { get; set; } = true;
     public string ApiKey { get; set; } = string.Empty;
+}
+
+public sealed class SteamConfig
+{
+    public string DefaultPcMode { get; set; } = string.Empty;
+    public Dictionary<string, string> GamePcModeBindings { get; set; } = new();
 }
 
 public sealed class ModeConfig

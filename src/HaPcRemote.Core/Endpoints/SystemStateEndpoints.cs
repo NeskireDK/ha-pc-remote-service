@@ -54,6 +54,10 @@ public static class SystemStateEndpoints
             try { idleSeconds = idleService.GetIdleSeconds(); }
             catch (Exception ex) { logger.LogWarning(ex, "Failed to get idle duration"); }
 
+            SteamBindings? steamBindings = null;
+            try { steamBindings = steamService.GetBindings(); }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get steam bindings"); }
+
             var state = new SystemState
             {
                 Audio = audio,
@@ -62,7 +66,8 @@ public static class SystemStateEndpoints
                 SteamGames = steamGames,
                 RunningGame = runningGame,
                 Modes = modes,
-                IdleSeconds = idleSeconds
+                IdleSeconds = idleSeconds,
+                SteamBindings = steamBindings
             };
 
             return Results.Json(

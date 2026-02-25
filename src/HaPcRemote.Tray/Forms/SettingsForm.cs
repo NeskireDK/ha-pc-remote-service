@@ -12,6 +12,7 @@ internal sealed class SettingsForm : Form
     private readonly TabControl _tabControl;
     private readonly GeneralTab _generalTab;
     private readonly ModesTab _modesTab;
+    private readonly GamesTab _gamesTab;
     private readonly PowerTab _powerTab;
     private readonly LogTab _logTab;
 
@@ -36,11 +37,13 @@ internal sealed class SettingsForm : Form
 
         _generalTab = new GeneralTab(services);
         _modesTab = new ModesTab(services);
+        _gamesTab = new GamesTab(services);
         _powerTab = new PowerTab(services);
         _logTab = new LogTab(logProvider);
 
         _tabControl.TabPages.Add(_generalTab);
         _tabControl.TabPages.Add(_modesTab);
+        _tabControl.TabPages.Add(_gamesTab);
         _tabControl.TabPages.Add(_powerTab);
         _tabControl.TabPages.Add(_logTab);
 

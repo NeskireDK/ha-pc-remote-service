@@ -9,4 +9,5 @@ public interface ISteamService
     Task<SteamRunningGame?> LaunchGameAsync(int appId);
     Task StopGameAsync();
     string? GetArtworkPath(int appId);
+    SteamBindings GetBindings();
 }
