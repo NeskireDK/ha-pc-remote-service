@@ -30,7 +30,7 @@ public class AppService(IOptionsMonitor<PcRemoteOptions> options, IAppLauncher a
     public async Task LaunchAsync(string appKey)
     {
         var definition = GetDefinition(appKey);
-        await appLauncher.LaunchAsync(definition.ExePath, definition.Arguments);
+        await appLauncher.LaunchAsync(definition.ExePath, definition.Arguments, definition.UseShellExecute);
     }
 
     public Task KillAsync(string appKey)

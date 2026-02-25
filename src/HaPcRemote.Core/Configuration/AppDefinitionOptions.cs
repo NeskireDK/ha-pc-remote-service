@@ -6,4 +6,5 @@ public sealed class AppDefinitionOptions
     public string ExePath { get; set; } = string.Empty;
     public string? Arguments { get; set; }
     public string ProcessName { get; set; } = string.Empty;
+    public bool UseShellExecute { get; set; } = false;
 }
