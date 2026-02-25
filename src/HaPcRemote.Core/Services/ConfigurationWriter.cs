@@ -67,6 +67,16 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
         }
     }
 
+    public void SavePort(int port)
+    {
+        lock (_lock)
+        {
+            var options = ReadInternal();
+            options.Port = port;
+            WriteInternal(options);
+        }
+    }
+
     private PcRemoteOptions ReadInternal()
     {
         var root = ReadJsonRoot();

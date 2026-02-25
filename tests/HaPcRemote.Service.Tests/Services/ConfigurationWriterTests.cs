@@ -188,6 +188,34 @@ public class ConfigurationWriterTests : IDisposable
         options.Power.SleepOnDisconnect.ShouldBeTrue();
     }
 
+    // ── SavePort ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SavePort_PersistsNewPort()
+    {
+        var writer = CreateWriter();
+
+        writer.SavePort(8080);
+
+        var options = writer.Read();
+        options.Port.ShouldBe(8080);
+    }
+
+    [Fact]
+    public void SavePort_DoesNotAffectModesOrPower()
+    {
+        var writer = CreateWriter();
+        writer.SaveMode("couch", new ModeConfig { AudioDevice = "HDMI" });
+        writer.SavePowerSettings(new PowerSettings { SleepOnDisconnect = true });
+
+        writer.SavePort(9090);
+
+        var options = writer.Read();
+        options.Port.ShouldBe(9090);
+        options.Modes.ShouldContainKey("couch");
+        options.Power.SleepOnDisconnect.ShouldBeTrue();
+    }
+
     // ── ModeConfig fields ─────────────────────────────────────────────
 
     [Fact]

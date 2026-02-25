@@ -22,4 +22,7 @@ public interface IConfigurationWriter
 
     /// <summary>Update power settings only.</summary>
     void SavePowerSettings(PowerSettings settings);
+
+    /// <summary>Update the port only.</summary>
+    void SavePort(int port);
 }

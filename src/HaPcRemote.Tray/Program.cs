@@ -5,8 +5,9 @@ Application.EnableVisualStyles();
 Application.SetCompatibleTextRenderingDefault(false);
 Application.SetHighDpiMode(HighDpiMode.SystemAware);
 
-using var mutex = new Mutex(true, @"Local\HaPcRemoteTray", out var isNew);
-if (!isNew) return;
+using var mutex = new Mutex(false, @"Local\HaPcRemoteTray");
+if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
+    return; // Another instance still running
 
 var logProvider = new InMemoryLogProvider();
 var webCts = new CancellationTokenSource();

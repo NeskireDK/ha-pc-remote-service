@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Logging;
+using HaPcRemote.Service.Services;
 using HaPcRemote.Tray.Logging;
 using HaPcRemote.Tray.Models;
 using Microsoft.Extensions.Logging;
@@ -9,11 +11,15 @@ namespace HaPcRemote.Tray.Forms;
 
 internal sealed class GeneralTab : TabPage
 {
+    private readonly IConfigurationWriter _configWriter;
     private readonly ComboBox _logLevelCombo;
     private readonly CheckBox _autoUpdateCheck;
+    private readonly NumericUpDown _portInput;
     private readonly Label _portStatusLabel;
+    private readonly Button _portSaveButton;
     private readonly Label _soundVolumeViewLabel;
     private readonly Label _multiMonitorToolLabel;
+    private readonly int _currentPort;
 
     public GeneralTab(IServiceProvider services)
     {
@@ -22,7 +28,9 @@ internal sealed class GeneralTab : TabPage
         ForeColor = Color.White;
         Padding = new Padding(20);
 
+        _configWriter = services.GetRequiredService<IConfigurationWriter>();
         var options = services.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
+        _currentPort = options.Port;
 
         var layout = new TableLayoutPanel
         {
@@ -36,11 +44,39 @@ internal sealed class GeneralTab : TabPage
 
         int row = 0;
 
-        // Port status
-        _portStatusLabel = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
+        // Port input + status
+        var portPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        _portInput = new NumericUpDown
+        {
+            Minimum = 1024,
+            Maximum = 65535,
+            Value = _currentPort,
+            Width = 80,
+            BackColor = Color.FromArgb(50, 50, 50),
+            ForeColor = Color.White
+        };
+        _portStatusLabel = new Label { AutoSize = true, Padding = new Padding(5, 3, 0, 0) };
+        _portSaveButton = new Button
+        {
+            Text = "Save & Restart",
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(50, 50, 50),
+            ForeColor = Color.White,
+            AutoSize = true,
+            Visible = false,
+            Cursor = Cursors.Hand
+        };
+        _portSaveButton.Click += OnPortSave;
+        _portInput.ValueChanged += (_, _) =>
+        {
+            _portSaveButton.Visible = (int)_portInput.Value != _currentPort;
+        };
+        portPanel.Controls.Add(_portInput);
+        portPanel.Controls.Add(_portStatusLabel);
+        portPanel.Controls.Add(_portSaveButton);
         layout.Controls.Add(MakeLabel("Port:"), 0, row);
-        layout.Controls.Add(_portStatusLabel, 1, row++);
-        UpdatePortStatus(options.Port);
+        layout.Controls.Add(portPanel, 1, row++);
+        UpdatePortStatus();
 
         // NirSoft tools status
         _soundVolumeViewLabel = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
@@ -97,32 +133,50 @@ internal sealed class GeneralTab : TabPage
         Controls.Add(layout);
     }
 
-    private void UpdatePortStatus(int port)
+    private void UpdatePortStatus()
     {
-        // Check is deferred because Kestrel starts async after Build()
+        // Deferred check — Kestrel starts async after Build()
+        _portStatusLabel.Text = "starting...";
+        _portStatusLabel.ForeColor = Color.Orange;
+
         _ = Task.Run(async () =>
         {
-            // Give Kestrel a moment to start
             await Task.Delay(2000);
             BeginInvoke(() =>
             {
                 if (KestrelStatus.IsRunning)
                 {
-                    _portStatusLabel.Text = $"{port} (listening)";
+                    _portStatusLabel.Text = "listening";
                     _portStatusLabel.ForeColor = Color.LightGreen;
                 }
                 else if (KestrelStatus.Error is not null)
                 {
-                    _portStatusLabel.Text = $"{port} (failed: {KestrelStatus.Error})";
+                    _portStatusLabel.Text = $"failed: {KestrelStatus.Error}";
                     _portStatusLabel.ForeColor = Color.Salmon;
+                    _portSaveButton.Visible = true;
                 }
                 else
                 {
-                    _portStatusLabel.Text = $"{port} (starting...)";
+                    _portStatusLabel.Text = "starting...";
                     _portStatusLabel.ForeColor = Color.Orange;
                 }
             });
         });
+    }
+
+    private void OnPortSave(object? sender, EventArgs e)
+    {
+        var newPort = (int)_portInput.Value;
+        if (MessageBox.Show(
+                $"Change port to {newPort} and restart the application?",
+                "Confirm Restart",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+
+        _configWriter.SavePort(newPort);
+        Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true });
+        Application.Exit();
     }
 
     private static void UpdateToolStatus(Label label, string toolPath)
