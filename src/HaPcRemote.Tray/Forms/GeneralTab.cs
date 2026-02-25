@@ -99,26 +99,30 @@ internal sealed class GeneralTab : TabPage
 
     private void UpdatePortStatus(int port)
     {
-        try
+        // Check is deferred because Kestrel starts async after Build()
+        _ = Task.Run(async () =>
         {
-            using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
-            listener.Start();
-            listener.Stop();
-            // Port is free — Kestrel should be binding it, so it's likely already bound by us
-            _portStatusLabel.Text = $"{port} (listening)";
-            _portStatusLabel.ForeColor = Color.LightGreen;
-        }
-        catch (System.Net.Sockets.SocketException)
-        {
-            // Port is in use — expected if Kestrel already bound it
-            _portStatusLabel.Text = $"{port} (listening)";
-            _portStatusLabel.ForeColor = Color.LightGreen;
-        }
-        catch
-        {
-            _portStatusLabel.Text = $"{port} (unknown)";
-            _portStatusLabel.ForeColor = Color.Orange;
-        }
+            // Give Kestrel a moment to start
+            await Task.Delay(2000);
+            BeginInvoke(() =>
+            {
+                if (KestrelStatus.IsRunning)
+                {
+                    _portStatusLabel.Text = $"{port} (listening)";
+                    _portStatusLabel.ForeColor = Color.LightGreen;
+                }
+                else if (KestrelStatus.Error is not null)
+                {
+                    _portStatusLabel.Text = $"{port} (failed: {KestrelStatus.Error})";
+                    _portStatusLabel.ForeColor = Color.Salmon;
+                }
+                else
+                {
+                    _portStatusLabel.Text = $"{port} (starting...)";
+                    _portStatusLabel.ForeColor = Color.Orange;
+                }
+            });
+        });
     }
 
     private static void UpdateToolStatus(Label label, string toolPath)

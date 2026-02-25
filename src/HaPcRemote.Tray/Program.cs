@@ -12,8 +12,22 @@ var logProvider = new InMemoryLogProvider();
 var webCts = new CancellationTokenSource();
 
 var webApp = TrayWebHost.Build(logProvider);
-_ = webApp.RunAsync(webCts.Token);
+
+_ = Task.Run(async () =>
+{
+    try
+    {
+        await webApp.StartAsync(webCts.Token);
+        KestrelStatus.IsRunning = true;
+    }
+    catch (Exception ex)
+    {
+        KestrelStatus.IsRunning = false;
+        KestrelStatus.Error = ex.InnerException?.Message ?? ex.Message;
+    }
+});
 
 Application.Run(new TrayApplicationContext(webApp.Services, webCts, logProvider));
 
 webCts.Cancel();
+try { await webApp.StopAsync(TimeSpan.FromSeconds(5)); } catch { }
