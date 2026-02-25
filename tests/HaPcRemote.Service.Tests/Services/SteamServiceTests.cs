@@ -787,4 +787,24 @@ public class SteamServiceTests
         bindings.GamePcModeBindings["730"].ShouldBe("desktop");
         bindings.GamePcModeBindings["1245620"].ShouldBe("couch");
     }
+
+    // ── IsSteamRunning tests ──────────────────────────────────────────
+
+    [Fact]
+    public void IsSteamRunning_WhenPlatformReturnsTrue_ReturnsTrue()
+    {
+        A.CallTo(() => _platform.IsSteamRunning()).Returns(true);
+        var service = CreateService();
+
+        service.IsSteamRunning().ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsSteamRunning_WhenPlatformReturnsFalse_ReturnsFalse()
+    {
+        A.CallTo(() => _platform.IsSteamRunning()).Returns(false);
+        var service = CreateService();
+
+        service.IsSteamRunning().ShouldBeFalse();
+    }
 }

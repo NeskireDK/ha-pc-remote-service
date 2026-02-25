@@ -73,6 +73,8 @@ public sealed class LinuxSteamPlatform : ISteamPlatform
         return null;
     }
 
+    public bool IsSteamRunning() => Process.GetProcessesByName("steam").Length > 0;
+
     public void LaunchSteamUrl(string url)
     {
         // UseShellExecute on Linux delegates to xdg-open, which handles steam:// URIs

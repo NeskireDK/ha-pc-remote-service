@@ -26,6 +26,8 @@ public class WindowsSteamPlatform(ILogger<WindowsSteamPlatform> logger) : ISteam
         return key?.GetValue("RunningAppID") is int appId ? appId : 0;
     }
 
+    public bool IsSteamRunning() => Process.GetProcessesByName("steam").Length > 0;
+
     public void LaunchSteamUrl(string url)
     {
         logger.LogInformation("Launching Steam URL: {Url}", url);

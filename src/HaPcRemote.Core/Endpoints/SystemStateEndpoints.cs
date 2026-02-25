@@ -58,6 +58,10 @@ public static class SystemStateEndpoints
             try { steamBindings = steamService.GetBindings(); }
             catch (Exception ex) { logger.LogWarning(ex, "Failed to get steam bindings"); }
 
+            bool? steamReady = null;
+            try { steamReady = steamService.IsSteamRunning(); }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get Steam ready state"); }
+
             var state = new SystemState
             {
                 Audio = audio,
@@ -67,7 +71,8 @@ public static class SystemStateEndpoints
                 RunningGame = runningGame,
                 Modes = modes,
                 IdleSeconds = idleSeconds,
-                SteamBindings = steamBindings
+                SteamBindings = steamBindings,
+                SteamReady = steamReady
             };
 
             return Results.Json(
