@@ -38,57 +38,35 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
     }
 
     public void SaveMode(string name, ModeConfig mode)
-    {
-        lock (_lock)
-        {
-            var options = ReadInternal();
-            options.Modes[name] = mode;
-            WriteInternal(options);
-        }
-    }
+        => ModifyAndWrite(o => o.Modes[name] = mode);
 
     public void DeleteMode(string name)
-    {
-        lock (_lock)
-        {
-            var options = ReadInternal();
-            options.Modes.Remove(name);
-            WriteInternal(options);
-        }
-    }
+        => ModifyAndWrite(o => o.Modes.Remove(name));
+
+    public void RenameMode(string oldName, string newName, ModeConfig mode)
+        => ModifyAndWrite(o => { o.Modes.Remove(oldName); o.Modes[newName] = mode; });
 
     public void SavePowerSettings(PowerSettings settings)
-    {
-        lock (_lock)
-        {
-            var options = ReadInternal();
-            options.Power = settings;
-            WriteInternal(options);
-        }
-    }
+        => ModifyAndWrite(o => o.Power = settings);
 
     public void SavePort(int port)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1024);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
+        ModifyAndWrite(o => o.Port = port);
+    }
+
+    private void ModifyAndWrite(Action<PcRemoteOptions> modifier)
+    {
         lock (_lock)
         {
-            var options = ReadInternal();
-            options.Port = port;
-            WriteInternal(options);
+            var root = ReadJsonRoot();
+            var section = root[PcRemoteOptions.SectionName];
+            var options = section?.Deserialize<PcRemoteOptions>(WriteOptions) ?? new PcRemoteOptions();
+            modifier(options);
+            root[PcRemoteOptions.SectionName] = JsonSerializer.SerializeToNode(options, WriteOptions);
+            WriteJsonRoot(root);
         }
-    }
-
-    private PcRemoteOptions ReadInternal()
-    {
-        var root = ReadJsonRoot();
-        var section = root[PcRemoteOptions.SectionName];
-        return section?.Deserialize<PcRemoteOptions>(WriteOptions) ?? new PcRemoteOptions();
-    }
-
-    private void WriteInternal(PcRemoteOptions options)
-    {
-        var root = ReadJsonRoot();
-        root[PcRemoteOptions.SectionName] = JsonSerializer.SerializeToNode(options, WriteOptions);
-        WriteJsonRoot(root);
     }
 
     private JsonObject ReadJsonRoot()

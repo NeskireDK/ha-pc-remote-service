@@ -179,9 +179,9 @@ internal sealed class ModesTab : TabPage
             foreach (var p in profiles)
                 _monitorProfileCombo.Items.Add(p.Name);
         }
-        catch
+        catch (Exception ex)
         {
-            // Services may fail if tools aren't installed
+            System.Diagnostics.Debug.WriteLine($"Failed to refresh dropdowns: {ex.Message}");
         }
 
         RefreshAppDropdowns();
@@ -281,11 +281,11 @@ internal sealed class ModesTab : TabPage
             KillApp = GetSelectedAppKey(_killAppCombo)
         };
 
-        // If renaming (selected name differs from text box), delete old
+        // If renaming, use atomic rename; otherwise just save
         if (_modeList.SelectedItem is string oldName && oldName != name)
-            _configWriter.DeleteMode(oldName);
-
-        _configWriter.SaveMode(name, mode);
+            _configWriter.RenameMode(oldName, name, mode);
+        else
+            _configWriter.SaveMode(name, mode);
         LoadModes();
 
         // Re-select the saved mode

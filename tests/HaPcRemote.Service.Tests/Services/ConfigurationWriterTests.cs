@@ -216,6 +216,49 @@ public class ConfigurationWriterTests : IDisposable
         options.Power.SleepOnDisconnect.ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1023)]
+    [InlineData(65536)]
+    [InlineData(-1)]
+    public void SavePort_InvalidPort_Throws(int port)
+    {
+        var writer = CreateWriter();
+
+        Should.Throw<ArgumentOutOfRangeException>(() => writer.SavePort(port));
+    }
+
+    // ── RenameMode ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void RenameMode_AtomicallyRenamesMode()
+    {
+        var writer = CreateWriter();
+        writer.SaveMode("old-name", new ModeConfig { AudioDevice = "HDMI", Volume = 40 });
+
+        writer.RenameMode("old-name", "new-name", new ModeConfig { AudioDevice = "HDMI", Volume = 40 });
+
+        var options = writer.Read();
+        options.Modes.ShouldNotContainKey("old-name");
+        options.Modes.ShouldContainKey("new-name");
+        options.Modes["new-name"].AudioDevice.ShouldBe("HDMI");
+    }
+
+    [Fact]
+    public void RenameMode_PreservesOtherModes()
+    {
+        var writer = CreateWriter();
+        writer.SaveMode("couch", new ModeConfig { AudioDevice = "HDMI" });
+        writer.SaveMode("desktop", new ModeConfig { AudioDevice = "Speakers" });
+
+        writer.RenameMode("couch", "tv", new ModeConfig { AudioDevice = "HDMI" });
+
+        var options = writer.Read();
+        options.Modes.ShouldNotContainKey("couch");
+        options.Modes.ShouldContainKey("tv");
+        options.Modes.ShouldContainKey("desktop");
+    }
+
     // ── ModeConfig fields ─────────────────────────────────────────────
 
     [Fact]

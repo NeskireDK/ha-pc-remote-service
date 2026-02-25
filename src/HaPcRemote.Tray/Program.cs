@@ -6,8 +6,10 @@ Application.SetCompatibleTextRenderingDefault(false);
 Application.SetHighDpiMode(HighDpiMode.SystemAware);
 
 using var mutex = new Mutex(false, @"Local\HaPcRemoteTray");
-if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
-    return; // Another instance still running
+bool acquired;
+try { acquired = mutex.WaitOne(TimeSpan.FromSeconds(5)); }
+catch (AbandonedMutexException) { acquired = true; }
+if (!acquired) return;
 
 var logProvider = new InMemoryLogProvider();
 var webCts = new CancellationTokenSource();
@@ -19,12 +21,11 @@ _ = Task.Run(async () =>
     try
     {
         await webApp.StartAsync(webCts.Token);
-        KestrelStatus.IsRunning = true;
+        KestrelStatus.SetRunning();
     }
     catch (Exception ex)
     {
-        KestrelStatus.IsRunning = false;
-        KestrelStatus.Error = ex.InnerException?.Message ?? ex.Message;
+        KestrelStatus.SetFailed(ex.InnerException?.Message ?? ex.Message);
     }
 });
 

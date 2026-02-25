@@ -115,4 +115,11 @@ internal sealed class LogTab : TabPage
             AppendEntry(entry);
         _logBox.ResumeLayout();
     }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            _provider.OnLogEntry -= OnNewLogEntry;
+        base.Dispose(disposing);
+    }
 }

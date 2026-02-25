@@ -20,6 +20,9 @@ public interface IConfigurationWriter
     /// <summary>Delete a mode by name.</summary>
     void DeleteMode(string name);
 
+    /// <summary>Atomically rename a mode (delete old + save new in one write).</summary>
+    void RenameMode(string oldName, string newName, ModeConfig mode);
+
     /// <summary>Update power settings only.</summary>
     void SavePowerSettings(PowerSettings settings);
 

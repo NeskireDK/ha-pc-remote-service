@@ -135,13 +135,12 @@ internal sealed class GeneralTab : TabPage
 
     private void UpdatePortStatus()
     {
-        // Deferred check — Kestrel starts async after Build()
         _portStatusLabel.Text = "starting...";
         _portStatusLabel.ForeColor = Color.Orange;
 
         _ = Task.Run(async () =>
         {
-            await Task.Delay(2000);
+            await KestrelStatus.Started;
             BeginInvoke(() =>
             {
                 if (KestrelStatus.IsRunning)
@@ -149,16 +148,11 @@ internal sealed class GeneralTab : TabPage
                     _portStatusLabel.Text = "listening";
                     _portStatusLabel.ForeColor = Color.LightGreen;
                 }
-                else if (KestrelStatus.Error is not null)
+                else
                 {
                     _portStatusLabel.Text = $"failed: {KestrelStatus.Error}";
                     _portStatusLabel.ForeColor = Color.Salmon;
                     _portSaveButton.Visible = true;
-                }
-                else
-                {
-                    _portStatusLabel.Text = "starting...";
-                    _portStatusLabel.ForeColor = Color.Orange;
                 }
             });
         });
@@ -175,7 +169,9 @@ internal sealed class GeneralTab : TabPage
             return;
 
         _configWriter.SavePort(newPort);
-        Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true });
+        var exePath = Environment.ProcessPath
+            ?? throw new InvalidOperationException("Cannot determine process path for restart.");
+        Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
         Application.Exit();
     }
 
