@@ -52,7 +52,7 @@ public static class SystemStateEndpoints
 
             int? idleSeconds = null;
             try { idleSeconds = idleService.GetIdleSeconds(); }
-            catch (Exception ex) { logger.LogWarning(ex, "Failed to get idle time"); }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to get idle duration"); }
 
             var state = new SystemState
             {
