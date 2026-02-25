@@ -14,6 +14,7 @@ internal sealed class GamesTab : TabPage
     private readonly ComboBox _defaultModeCombo;
     private readonly DataGridView _gameGrid;
     private readonly Button _saveButton;
+    private readonly ToolTip _toolTip = new();
 
     public GamesTab(IServiceProvider services)
     {
@@ -50,7 +51,12 @@ internal sealed class GamesTab : TabPage
             FlatStyle = FlatStyle.Flat
         };
         layout.Controls.Add(MakeLabel("Default PC Mode:"), 0, 0);
-        layout.Controls.Add(_defaultModeCombo, 1, 0);
+        var defaultModePanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        defaultModePanel.Controls.Add(_defaultModeCombo);
+        defaultModePanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "Mode applied automatically before launching any Steam game.\n" +
+            "Set to \"(none)\" to disable automatic mode switching on game launch."));
+        layout.Controls.Add(defaultModePanel, 1, 0);
 
         // Game grid
         _gameGrid = new DataGridView
@@ -103,6 +109,12 @@ internal sealed class GamesTab : TabPage
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton
         };
+
+        _toolTip.SetToolTip(_gameGrid,
+            "Per-game PC mode override.\n" +
+            "(default) = use the Default PC Mode above\n" +
+            "(none) = launch without switching modes\n" +
+            "Any named mode = switch to that mode before launching this game");
 
         _gameGrid.Columns.AddRange(nameCol, appIdCol, modeCol);
         layout.Controls.Add(_gameGrid, 0, 1);
@@ -236,4 +248,19 @@ internal sealed class GamesTab : TabPage
         Anchor = AnchorStyles.Left,
         Padding = new Padding(0, 6, 0, 0)
     };
+
+    private static Label MakeHelpIcon(ToolTip toolTip, string helpText)
+    {
+        var label = new Label
+        {
+            Text = "ⓘ",
+            ForeColor = Color.FromArgb(120, 180, 255),
+            AutoSize = true,
+            Cursor = Cursors.Help,
+            Padding = new Padding(4, 5, 0, 0),
+            Font = new Font("Segoe UI", 9f)
+        };
+        toolTip.SetToolTip(label, helpText);
+        return label;
+    }
 }

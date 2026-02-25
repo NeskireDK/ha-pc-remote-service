@@ -12,6 +12,7 @@ namespace HaPcRemote.Tray.Forms;
 internal sealed class GeneralTab : TabPage
 {
     private readonly IConfigurationWriter _configWriter;
+    private readonly ToolTip _toolTip = new();
     private readonly ComboBox _logLevelCombo;
     private readonly CheckBox _autoUpdateCheck;
     private readonly NumericUpDown _portInput;
@@ -74,18 +75,34 @@ internal sealed class GeneralTab : TabPage
         portPanel.Controls.Add(_portInput);
         portPanel.Controls.Add(_portStatusLabel);
         portPanel.Controls.Add(_portSaveButton);
+        portPanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "HTTP port the service listens on.\n" +
+            "Home Assistant must be configured with the same port.\n" +
+            "Changes require a restart. Valid range: 1024–65535."));
         layout.Controls.Add(MakeLabel("Port:"), 0, row);
         layout.Controls.Add(portPanel, 1, row++);
         UpdatePortStatus();
 
         // NirSoft tools status
         _soundVolumeViewLabel = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
+        var svvPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        svvPanel.Controls.Add(_soundVolumeViewLabel);
+        svvPanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "NirSoft SoundVolumeView — required for audio device switching.\n" +
+            "Must be placed in the configured ToolsPath directory.\n" +
+            "Download: nirsoft.net/utils/sound_volume_view.html"));
         layout.Controls.Add(MakeLabel("SoundVolumeView:"), 0, row);
-        layout.Controls.Add(_soundVolumeViewLabel, 1, row++);
+        layout.Controls.Add(svvPanel, 1, row++);
 
         _multiMonitorToolLabel = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
+        var mmtPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        mmtPanel.Controls.Add(_multiMonitorToolLabel);
+        mmtPanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "NirSoft MultiMonitorTool — required for monitor profile switching.\n" +
+            "Must be placed in the configured ToolsPath directory.\n" +
+            "Download: nirsoft.net/utils/multi_monitor_tool.html"));
         layout.Controls.Add(MakeLabel("MultiMonitorTool:"), 0, row);
-        layout.Controls.Add(_multiMonitorToolLabel, 1, row++);
+        layout.Controls.Add(mmtPanel, 1, row++);
 
         UpdateToolStatus(_soundVolumeViewLabel, Path.Combine(options.ToolsPath, "SoundVolumeView.exe"));
         UpdateToolStatus(_multiMonitorToolLabel, Path.Combine(options.ToolsPath, "MultiMonitorTool.exe"));
@@ -114,8 +131,16 @@ internal sealed class GeneralTab : TabPage
         };
         _logLevelCombo.SelectedIndexChanged += OnLogLevelChanged;
 
+        var logPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        logPanel.Controls.Add(_logLevelCombo);
+        logPanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "Controls how much detail is written to the log.\n" +
+            "Error: only failures\n" +
+            "Warning: failures and unexpected conditions\n" +
+            "Info: normal operational events (recommended)\n" +
+            "Verbose: full request/response detail (for debugging)"));
         layout.Controls.Add(MakeLabel("Log Level:"), 0, row);
-        layout.Controls.Add(_logLevelCombo, 1, row++);
+        layout.Controls.Add(logPanel, 1, row++);
 
         // Auto-update
         _autoUpdateCheck = new CheckBox
@@ -126,6 +151,9 @@ internal sealed class GeneralTab : TabPage
             Checked = settings.AutoUpdate
         };
         _autoUpdateCheck.CheckedChanged += OnAutoUpdateChanged;
+        _toolTip.SetToolTip(_autoUpdateCheck,
+            "Automatically download and install new service releases from GitHub.\n" +
+            "The tray icon will notify you before restarting.");
 
         layout.Controls.Add(new Label { AutoSize = true }, 0, row);
         layout.Controls.Add(_autoUpdateCheck, 1, row);
@@ -205,6 +233,21 @@ internal sealed class GeneralTab : TabPage
         Anchor = AnchorStyles.Left,
         Padding = new Padding(0, 3, 0, 0)
     };
+
+    private static Label MakeHelpIcon(ToolTip toolTip, string helpText)
+    {
+        var label = new Label
+        {
+            Text = "ⓘ",
+            ForeColor = Color.FromArgb(120, 180, 255),
+            AutoSize = true,
+            Cursor = Cursors.Help,
+            Padding = new Padding(4, 4, 0, 0),
+            Font = new Font("Segoe UI", 9f)
+        };
+        toolTip.SetToolTip(label, helpText);
+        return label;
+    }
 
     private void OnLogLevelChanged(object? sender, EventArgs e)
     {

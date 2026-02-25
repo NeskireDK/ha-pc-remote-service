@@ -22,6 +22,7 @@ internal sealed class ModesTab : TabPage
     private readonly Button _saveButton;
     private readonly Button _deleteButton;
     private readonly Button _newButton;
+    private readonly ToolTip _toolTip = new();
 
     public ModesTab(IServiceProvider services)
     {
@@ -82,7 +83,7 @@ internal sealed class ModesTab : TabPage
         // Mode name
         _modeNameBox = new TextBox { BackColor = Color.FromArgb(50, 50, 50), ForeColor = Color.White, Width = 250, BorderStyle = BorderStyle.FixedSingle };
         editLayout.Controls.Add(MakeLabel("Name:"), 0, row);
-        editLayout.Controls.Add(_modeNameBox, 1, row++);
+        editLayout.Controls.Add(WithHelp(_modeNameBox, _toolTip, "Unique identifier for this mode.\nUsed in HA automations and the PC Mode select entity.\nExample: couch, desktop"), 1, row++);
 
         // Audio device (with "Don't change" option)
         _audioDeviceCombo = new ComboBox
@@ -94,7 +95,7 @@ internal sealed class ModesTab : TabPage
             FlatStyle = FlatStyle.Flat
         };
         editLayout.Controls.Add(MakeLabel("Audio Device:"), 0, row);
-        editLayout.Controls.Add(_audioDeviceCombo, 1, row++);
+        editLayout.Controls.Add(WithHelp(_audioDeviceCombo, _toolTip, "Audio output to switch to when this mode is activated.\nSelect \"(Don't change)\" to leave the current device untouched."), 1, row++);
 
         // Monitor profile
         _monitorProfileCombo = new ComboBox
@@ -106,7 +107,7 @@ internal sealed class ModesTab : TabPage
             FlatStyle = FlatStyle.Flat
         };
         editLayout.Controls.Add(MakeLabel("Monitor Profile:"), 0, row);
-        editLayout.Controls.Add(_monitorProfileCombo, 1, row++);
+        editLayout.Controls.Add(WithHelp(_monitorProfileCombo, _toolTip, "Monitor layout to apply when this mode is activated (via MultiMonitorTool).\nSelect \"(Don't change)\" to leave the current layout untouched."), 1, row++);
 
         // Volume
         var volumePanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
@@ -115,6 +116,7 @@ internal sealed class ModesTab : TabPage
         _volumeSlider.ValueChanged += (_, _) => _volumeLabel.Text = _volumeSlider.Value.ToString();
         volumePanel.Controls.Add(_volumeSlider);
         volumePanel.Controls.Add(_volumeLabel);
+        volumePanel.Controls.Add(MakeHelpIcon(_toolTip, "System volume (0–100) to set when this mode is activated."));
         editLayout.Controls.Add(MakeLabel("Volume:"), 0, row);
         editLayout.Controls.Add(volumePanel, 1, row++);
 
@@ -128,7 +130,7 @@ internal sealed class ModesTab : TabPage
             FlatStyle = FlatStyle.Flat
         };
         editLayout.Controls.Add(MakeLabel("Launch App:"), 0, row);
-        editLayout.Controls.Add(_launchAppCombo, 1, row++);
+        editLayout.Controls.Add(WithHelp(_launchAppCombo, _toolTip, "App to launch when this mode is activated.\nApps are defined in the Apps config section."), 1, row++);
 
         // Kill app
         _killAppCombo = new ComboBox
@@ -140,7 +142,7 @@ internal sealed class ModesTab : TabPage
             FlatStyle = FlatStyle.Flat
         };
         editLayout.Controls.Add(MakeLabel("Kill App:"), 0, row);
-        editLayout.Controls.Add(_killAppCombo, 1, row++);
+        editLayout.Controls.Add(WithHelp(_killAppCombo, _toolTip, "App to terminate when this mode is activated.\nUseful for killing Steam Big Picture when switching to desktop mode."), 1, row++);
 
         // Save button
         _saveButton = CreateButton("Save Mode");
@@ -312,6 +314,29 @@ internal sealed class ModesTab : TabPage
         Anchor = AnchorStyles.Left,
         Padding = new Padding(0, 6, 0, 0)
     };
+
+    private static FlowLayoutPanel WithHelp(Control control, ToolTip toolTip, string helpText)
+    {
+        var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        panel.Controls.Add(control);
+        panel.Controls.Add(MakeHelpIcon(toolTip, helpText));
+        return panel;
+    }
+
+    private static Label MakeHelpIcon(ToolTip toolTip, string helpText)
+    {
+        var label = new Label
+        {
+            Text = "ⓘ",
+            ForeColor = Color.FromArgb(120, 180, 255),
+            AutoSize = true,
+            Cursor = Cursors.Help,
+            Padding = new Padding(4, 5, 0, 0),
+            Font = new Font("Segoe UI", 9f)
+        };
+        toolTip.SetToolTip(label, helpText);
+        return label;
+    }
 
     private static Button CreateButton(string text) => new()
     {

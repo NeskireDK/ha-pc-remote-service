@@ -232,5 +232,46 @@ in tray with per-game dropdown.
 
 ## Backlog
 
-- [ ] Power settings tab — default power behavior (sleep on disconnect, etc.) *(service)*
+### 12. Auto-Sleep on Inactivity
+
+Auto-sleep the PC when it's been idle for a configurable duration. Conditions:
+no game running, no mouse/keyboard/gamepad input for X minutes → sleep.
+
+**Service-side:**
+- Config: `Power.AutoSleepAfterMinutes` in `appsettings.json` (0 = disabled)
+- Monitor loop: checks game state via `ISteamService` + input idle time via
+  `GetLastInputInfo` / `loginctl` — if both exceed threshold, trigger sleep
+- Power settings tab in tray with timeout slider/input
+- `GET/PUT /api/system/power` endpoints to read/write config remotely
+
+**HA integration:**
+- Number entity "Auto-Sleep Timeout" to adjust minutes from dashboard
+- Complements the post-session sleep blueprint (F4) which handles the
+  "game just ended" case — this covers the broader "PC sitting idle" scenario
+
+```json
+"Power": {
+  "AutoSleepAfterMinutes": 30
+}
+```
+
+- [ ] Service: inactivity monitor loop + `Power.AutoSleepAfterMinutes` config *(service)*
+- [ ] Service: Power settings tab in tray *(service)*
+- [ ] Service: `GET/PUT /api/system/power` endpoints *(service)*
+- [ ] Integration: number entity for auto-sleep timeout *(integration)*
+
+### 13. Help Tooltips for All UI Elements
+
+Add contextual help to every setting in the tray app. Each field gets a `ToolTip`
+with a small "ⓘ" icon label explaining what the setting does.
+
+- [ ] Service: add `ToolTip` component + help icons to Modes tab *(service)*
+- [ ] Service: add help icons to Games tab *(service)*
+- [ ] Service: add help icons to General tab *(service)*
+- [ ] Service: add help icons to Power tab (when built) *(service)*
+
+---
+
+### Other
+
 - [ ] Verify Linux headless daemon + systemd user service end-to-end *(service)*
