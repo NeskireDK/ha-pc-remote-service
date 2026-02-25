@@ -33,6 +33,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private Icon? _playingIcon;
     private bool _isGamePlaying;
 
+    private readonly SemaphoreSlim _updateLock = new(1, 1);
+
     private SettingsForm? _settingsForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _autoUpdateMenuItem;
@@ -231,7 +233,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (showProgress)
         {
             _updateMenuItem.Enabled = false;
-            _updateMenuItem.BackColor = default;
             _updateMenuItem.Text = "Checking...";
         }
 
@@ -286,17 +287,30 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (_updateMenuItem is null) return;
 
-        _updateMenuItem.Enabled = false;
-        _updateMenuItem.Text = "Updating…";
-
-        if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
+        if (!_updateLock.Wait(0))
         {
-            Application.Exit();
+            _logger.LogInformation("Update already in progress, skipping");
+            return;
         }
-        else
+
+        try
         {
-            _updateMenuItem.Text = $"Update to {release.TagName}";
-            _updateMenuItem.Enabled = true;
+            _updateMenuItem.Enabled = false;
+            _updateMenuItem.Text = "Updating…";
+
+            if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
+            {
+                Application.Exit();
+            }
+            else
+            {
+                _updateMenuItem.Text = $"Update to {release.TagName}";
+                _updateMenuItem.Enabled = true;
+            }
+        }
+        finally
+        {
+            _updateLock.Release();
         }
     }
 
@@ -326,6 +340,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             _cts.Cancel();
             _cts.Dispose();
+            _updateLock.Dispose();
             _updateTimer.Dispose();
             _steamPollTimer.Dispose();
             _playingIcon?.Dispose();

@@ -135,27 +135,35 @@ internal sealed class GeneralTab : TabPage
 
     private void UpdatePortStatus()
     {
+        if (KestrelStatus.Started.IsCompleted)
+        {
+            ApplyPortStatus();
+            return;
+        }
+
         _portStatusLabel.Text = "starting...";
         _portStatusLabel.ForeColor = Color.Orange;
 
         _ = Task.Run(async () =>
         {
             await KestrelStatus.Started;
-            BeginInvoke(() =>
-            {
-                if (KestrelStatus.IsRunning)
-                {
-                    _portStatusLabel.Text = "listening";
-                    _portStatusLabel.ForeColor = Color.LightGreen;
-                }
-                else
-                {
-                    _portStatusLabel.Text = $"failed: {KestrelStatus.Error}";
-                    _portStatusLabel.ForeColor = Color.Salmon;
-                    _portSaveButton.Visible = true;
-                }
-            });
+            BeginInvoke(ApplyPortStatus);
         });
+    }
+
+    private void ApplyPortStatus()
+    {
+        if (KestrelStatus.IsRunning)
+        {
+            _portStatusLabel.Text = "listening";
+            _portStatusLabel.ForeColor = Color.LightGreen;
+        }
+        else
+        {
+            _portStatusLabel.Text = $"failed: {KestrelStatus.Error}";
+            _portStatusLabel.ForeColor = Color.Salmon;
+            _portSaveButton.Visible = true;
+        }
     }
 
     private void OnPortSave(object? sender, EventArgs e)
