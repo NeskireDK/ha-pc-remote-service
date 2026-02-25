@@ -27,6 +27,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly UpdateChecker _updateChecker;
     private readonly System.Windows.Forms.Timer _updateTimer;
     private readonly string _profilesPath;
+    private readonly int _port;
     private readonly IServiceProvider _webServices;
     private readonly System.Windows.Forms.Timer _steamPollTimer;
     private readonly Icon _defaultIcon;
@@ -51,6 +52,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         var options = webServices.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
         _profilesPath = options.ProfilesPath;
+        _port = options.Port;
 
         _updateChecker = new UpdateChecker(loggerFactory.CreateLogger<UpdateChecker>());
 
@@ -98,6 +100,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add("Show Log", null, OnShowLog);
         menu.Items.Add("Show API Key", null, OnShowApiKey);
         menu.Items.Add("Open Profiles Folder", null, OnOpenProfilesFolder);
+        menu.Items.Add("API Explorer", null, OnOpenApiExplorer);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -146,6 +149,18 @@ internal sealed class TrayApplicationContext : ApplicationContext
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to open profiles folder: {Path}", _profilesPath);
+        }
+    }
+
+    private void OnOpenApiExplorer(object? sender, EventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo($"http://localhost:{_port}/debug") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to open API Explorer");
         }
     }
 

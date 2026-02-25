@@ -117,6 +117,7 @@ app.Use(async (context, next) =>
 });
 
 app.UseMiddleware<ApiKeyMiddleware>();
+app.MapDebugEndpoints();
 app.MapHealthEndpoints();
 app.MapSystemEndpoints();
 app.MapModeEndpoints();

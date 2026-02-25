@@ -119,6 +119,7 @@ internal static class TrayWebHost
         });
 
         app.UseMiddleware<ApiKeyMiddleware>();
+        app.MapDebugEndpoints();
         app.MapHealthEndpoints();
         app.MapSystemEndpoints();
         app.MapModeEndpoints();
