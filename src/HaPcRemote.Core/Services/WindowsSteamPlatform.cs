@@ -14,6 +14,12 @@ public class WindowsSteamPlatform(ILogger<WindowsSteamPlatform> logger) : ISteam
         return key?.GetValue("SteamPath") as string;
     }
 
+    public string? GetSteamUserId()
+    {
+        var steamPath = GetSteamPath();
+        return steamPath != null ? SteamUserIdResolver.Resolve(steamPath) : null;
+    }
+
     public int GetRunningAppId()
     {
         using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Valve\Steam");
