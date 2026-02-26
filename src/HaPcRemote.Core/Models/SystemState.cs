@@ -10,6 +10,7 @@ public sealed class SystemState
     public List<string>? Modes { get; init; }
     public int? IdleSeconds { get; init; }
     public SteamBindings? SteamBindings { get; init; }
+    public bool? SteamReady { get; init; }
 }
 
 public sealed class AudioState

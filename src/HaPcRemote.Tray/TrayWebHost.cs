@@ -96,6 +96,13 @@ internal static class TrayWebHost
 
         var app = builder.Build();
 
+        // Auto-register Steam app entry on first run
+        SteamAppBootstrapper.BootstrapIfNeeded(
+            app.Services.GetRequiredService<ISteamPlatform>(),
+            app.Services.GetRequiredService<IConfigurationWriter>(),
+            pcRemoteConfig,
+            app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(SteamAppBootstrapper)));
+
         // Global exception handler
         app.Use(async (context, next) =>
         {

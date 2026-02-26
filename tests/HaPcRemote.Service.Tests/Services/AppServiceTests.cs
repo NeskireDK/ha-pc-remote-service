@@ -122,7 +122,7 @@ public class AppServiceTests
 
         await service.LaunchAsync("notepad");
 
-        A.CallTo(() => launcher.LaunchAsync(@"C:\Windows\notepad.exe", "--new-window"))
+        A.CallTo(() => launcher.LaunchAsync(@"C:\Windows\notepad.exe", "--new-window", false))
             .MustHaveHappenedOnceExactly();
     }
 
@@ -143,7 +143,7 @@ public class AppServiceTests
 
         await service.LaunchAsync("calc");
 
-        A.CallTo(() => launcher.LaunchAsync("calc.exe", null))
+        A.CallTo(() => launcher.LaunchAsync("calc.exe", null, false))
             .MustHaveHappenedOnceExactly();
     }
 
@@ -203,6 +203,30 @@ public class AppServiceTests
         var result = await service.GetStatusAsync("ghost");
 
         result.IsRunning.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task LaunchAsync_UseShellExecuteTrue_PassesTrueToLauncher()
+    {
+        var launcher = A.Fake<IAppLauncher>();
+        var apps = new Dictionary<string, AppDefinitionOptions>
+        {
+            ["steam"] = new()
+            {
+                DisplayName = "Steam",
+                ExePath = @"C:\Program Files (x86)\Steam\steam.exe",
+                Arguments = "-bigpicture",
+                ProcessName = "steam",
+                UseShellExecute = true
+            }
+        };
+        var service = new AppService(CreateOptions(apps), launcher);
+
+        await service.LaunchAsync("steam");
+
+        A.CallTo(() => launcher.LaunchAsync(
+                @"C:\Program Files (x86)\Steam\steam.exe", "-bigpicture", true))
+            .MustHaveHappenedOnceExactly();
     }
 
     [Fact]

@@ -280,4 +280,50 @@ public class ConfigurationWriterTests : IDisposable
         result.LaunchApp.ShouldBe("steam-bigpicture");
         result.KillApp.ShouldBeNull();
     }
+
+    // ── SaveApp ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void SaveApp_WritesAndReadsBack()
+    {
+        var writer = CreateWriter();
+        var app = new AppDefinitionOptions
+        {
+            DisplayName = "Steam",
+            ExePath = @"C:\Program Files (x86)\Steam\steam.exe",
+            Arguments = "-bigpicture",
+            ProcessName = "steam",
+            UseShellExecute = false
+        };
+
+        writer.SaveApp("steam", app);
+
+        var result = writer.Read().Apps["steam"];
+        result.DisplayName.ShouldBe("Steam");
+        result.ExePath.ShouldBe(@"C:\Program Files (x86)\Steam\steam.exe");
+        result.Arguments.ShouldBe("-bigpicture");
+        result.ProcessName.ShouldBe("steam");
+        result.UseShellExecute.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SaveApp_OverwritesExistingKey()
+    {
+        var writer = CreateWriter();
+        writer.SaveApp("steam", new AppDefinitionOptions
+        {
+            DisplayName = "Steam Old",
+            ExePath = @"C:\old\steam.exe",
+            ProcessName = "steam"
+        });
+
+        writer.SaveApp("steam", new AppDefinitionOptions
+        {
+            DisplayName = "Steam New",
+            ExePath = @"C:\new\steam.exe",
+            ProcessName = "steam"
+        });
+
+        writer.Read().Apps["steam"].DisplayName.ShouldBe("Steam New");
+    }
 }

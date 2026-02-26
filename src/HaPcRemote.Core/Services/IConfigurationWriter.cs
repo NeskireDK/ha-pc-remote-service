@@ -31,4 +31,7 @@ public interface IConfigurationWriter
 
     /// <summary>Update Steam game-to-mode bindings.</summary>
     void SaveSteamBindings(SteamConfig steam);
+
+    /// <summary>Add or update a single app definition by key.</summary>
+    void SaveApp(string key, AppDefinitionOptions app);
 }

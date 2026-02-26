@@ -8,13 +8,13 @@ namespace HaPcRemote.Service.Services;
 /// </summary>
 public sealed class DirectAppLauncher : IAppLauncher
 {
-    public Task LaunchAsync(string exePath, string? arguments = null)
+    public Task LaunchAsync(string exePath, string? arguments = null, bool useShellExecute = false)
     {
         var startInfo = new ProcessStartInfo
         {
             FileName = exePath,
-            UseShellExecute = false,
-            CreateNoWindow = true
+            UseShellExecute = useShellExecute,
+            CreateNoWindow = !useShellExecute
         };
         if (!string.IsNullOrEmpty(arguments))
             startInfo.Arguments = arguments;

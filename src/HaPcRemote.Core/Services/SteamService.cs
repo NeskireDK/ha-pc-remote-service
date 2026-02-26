@@ -146,6 +146,8 @@ public class SteamService(
         };
     }
 
+    public bool IsSteamRunning() => platform.IsSteamRunning();
+
     /// <summary>
     /// Resolve which PC mode to apply for a given game.
     /// Per-game binding takes priority, then default, then none.

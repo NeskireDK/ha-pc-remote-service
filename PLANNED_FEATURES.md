@@ -230,6 +230,30 @@ in tray with per-game dropdown.
 
 ---
 
+## v1.2.2
+
+### 14. Steam Cold-Start Support
+
+`steam_ready` in system state signals when Steam is up and ready. Prevents game launch
+commands silently failing when Steam isn't running. Integration auto-launches Steam via
+the existing app system and waits for readiness before sending the game command.
+
+Auto-detects Steam path from registry on startup and writes a default `"steam"` app
+config entry if missing — no manual setup required.
+
+**Service:**
+- [ ] Add `SteamReady: bool` to `GET /api/system/state` response *(service)*
+- [ ] Add `UseShellExecute: bool` to `AppDefinitionOptions` (default `false`) *(service)*
+- [ ] Pass `UseShellExecute` through `DirectAppLauncher.LaunchAsync` *(service)*
+- [ ] On startup: detect Steam exe from registry, write default `"steam"` app entry (`-bigpicture` args) if not already configured *(service)*
+
+**Integration:**
+- [ ] Read `steam_ready` from system state in coordinator *(integration)*
+- [ ] Cold path: replace fixed 15 s sleep with poll-until-`steam_ready` (max 2 min) *(integration)*
+- [ ] Warm path: check `steam_ready`; if false → launch `"steam"` app, wait for `steam_ready`, then launch game *(integration)*
+
+---
+
 ## Backlog
 
 ### 12. Auto-Sleep on Inactivity

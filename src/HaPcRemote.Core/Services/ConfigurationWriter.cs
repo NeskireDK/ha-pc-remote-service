@@ -59,6 +59,9 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
     public void SaveSteamBindings(SteamConfig steam)
         => ModifyAndWrite(o => o.Steam = steam);
 
+    public void SaveApp(string key, AppDefinitionOptions app)
+        => ModifyAndWrite(o => o.Apps[key] = app);
+
 
     private void ModifyAndWrite(Action<PcRemoteOptions> modifier)
     {

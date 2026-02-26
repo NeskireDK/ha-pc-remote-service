@@ -6,5 +6,5 @@ namespace HaPcRemote.Service.Services;
 /// </summary>
 public interface IAppLauncher
 {
-    Task LaunchAsync(string exePath, string? arguments = null);
+    Task LaunchAsync(string exePath, string? arguments = null, bool useShellExecute = false);
 }
