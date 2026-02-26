@@ -155,8 +155,14 @@ internal sealed class GeneralTab : TabPage
             "Automatically download and install new service releases from GitHub.\n" +
             "The tray icon will notify you before restarting.");
 
+        var autoUpdatePanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        autoUpdatePanel.Controls.Add(_autoUpdateCheck);
+        autoUpdatePanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "Automatically download and install new service releases from GitHub.\n" +
+            "The tray icon will notify you before restarting."));
+
         layout.Controls.Add(new Label { AutoSize = true }, 0, row);
-        layout.Controls.Add(_autoUpdateCheck, 1, row);
+        layout.Controls.Add(autoUpdatePanel, 1, row);
 
         Controls.Add(layout);
     }
