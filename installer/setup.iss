@@ -37,6 +37,7 @@ Name: "{app}\monitor-profiles"
 
 [Icons]
 Name: "{commonstartup}\HA PC Remote Tray"; Filename: "{app}\{#TrayExeName}"; Comment: "HA PC Remote system tray"
+Name: "{commonstartmenu}\{#MyAppName}"; Filename: "{app}\{#TrayExeName}"; Comment: "HA PC Remote system tray"
 
 [Run]
 Filename: "{app}\{#TrayExeName}"; Flags: nowait runasoriginaluser

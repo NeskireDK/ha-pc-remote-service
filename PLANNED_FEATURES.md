@@ -387,11 +387,11 @@ Replace auto-save on change with an explicit Apply button. Settings are staged i
 
 ---
 
-### 20. Start Menu Shortcut
+### 20. Start Menu Shortcut *(done in v1.3.1)*
 
-Add a Start Menu shortcut to the Inno Setup installer so users can find and launch the tray app by searching in the Start menu. Currently the app only auto-starts via the startup folder — it has no searchable entry.
+Add a Start Menu shortcut to the Inno Setup installer so users can find and launch the tray app by searching in the Start menu. Previously the app only auto-started via the startup folder with no searchable entry.
 
-- [ ] Service: add `[Icons]` entry to installer script creating a Start Menu shortcut for `HaPcRemote.Tray.exe` *(service)*
+- [x] Service: add `[Icons]` entry to installer script creating a Start Menu shortcut for `HaPcRemote.Tray.exe` *(service)*
 
 ---
 
