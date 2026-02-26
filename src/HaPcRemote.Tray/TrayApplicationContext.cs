@@ -71,6 +71,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Visible = true,
             ContextMenuStrip = BuildContextMenu(settings)
         };
+        _notifyIcon.DoubleClick += OnShowSettings;
 
         _steamPollTimer = new System.Windows.Forms.Timer { Interval = 10_000 };
         _steamPollTimer.Tick += OnSteamPollTick;
