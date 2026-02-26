@@ -31,7 +31,7 @@ public class SteamAppBootstrapperTests : IDisposable
 
     [Fact]
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public void BootstrapIfNeeded_SteamNotInConfig_WritesDefaultEntry()
+    public void BootstrapIfNeeded_BothAbsent_WritesBothEntries()
     {
         if (!OperatingSystem.IsWindows()) return;
 
@@ -42,6 +42,13 @@ public class SteamAppBootstrapperTests : IDisposable
 
         A.CallTo(() => _writer.SaveApp("steam", A<AppDefinitionOptions>.That.Matches(a =>
             a.ExePath == exePath &&
+            a.Arguments == "" &&
+            a.ProcessName == "steam" &&
+            a.UseShellExecute == false)))
+            .MustHaveHappenedOnceExactly();
+
+        A.CallTo(() => _writer.SaveApp("steam-bigpicture", A<AppDefinitionOptions>.That.Matches(a =>
+            a.ExePath == exePath &&
             a.Arguments == "-bigpicture" &&
             a.ProcessName == "steam" &&
             a.UseShellExecute == false)))
@@ -50,16 +57,43 @@ public class SteamAppBootstrapperTests : IDisposable
 
     [Fact]
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public void BootstrapIfNeeded_SteamAlreadyInConfig_DoesNotWrite()
+    public void BootstrapIfNeeded_SteamPresentBigPictureAbsent_WritesOnlyBigPicture()
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        CreateFakeSteamExe();
+        var exePath = CreateFakeSteamExe();
         var options = new PcRemoteOptions
         {
             Apps = new Dictionary<string, AppDefinitionOptions>
             {
-                ["steam"] = new() { DisplayName = "Steam", ExePath = "steam.exe", ProcessName = "steam" }
+                ["steam"] = new() { DisplayName = "Steam", ExePath = exePath, ProcessName = "steam" }
+            }
+        };
+
+        SteamAppBootstrapper.BootstrapIfNeeded(_platform, _writer, options, _logger);
+
+        A.CallTo(() => _writer.SaveApp("steam", A<AppDefinitionOptions>._))
+            .MustNotHaveHappened();
+
+        A.CallTo(() => _writer.SaveApp("steam-bigpicture", A<AppDefinitionOptions>.That.Matches(a =>
+            a.ExePath == exePath &&
+            a.Arguments == "-bigpicture")))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public void BootstrapIfNeeded_BothPresent_DoesNotWrite()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var exePath = CreateFakeSteamExe();
+        var options = new PcRemoteOptions
+        {
+            Apps = new Dictionary<string, AppDefinitionOptions>
+            {
+                ["steam"] = new() { DisplayName = "Steam", ExePath = exePath, ProcessName = "steam" },
+                ["steam-bigpicture"] = new() { DisplayName = "Steam Big Picture", ExePath = exePath, ProcessName = "steam" }
             }
         };
 

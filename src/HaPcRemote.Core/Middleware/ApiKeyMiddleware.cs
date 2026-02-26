@@ -9,7 +9,7 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddlew
 {
     private const string ApiKeyHeaderName = "X-Api-Key";
 
-    private static readonly string[] ExemptPaths = ["/api/health"];
+    private static readonly string[] ExemptPaths = ["/api/health", "/api/steam/artwork"];
 
     public async Task InvokeAsync(HttpContext context, IOptionsMonitor<PcRemoteOptions> options)
     {
@@ -25,7 +25,7 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddlew
 
         // Only require auth for /api/ paths; skip non-API requests (favicon.ico, etc.)
         if (!path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
-            ExemptPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)))
+            ExemptPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
         {
             await next(context);
             return;

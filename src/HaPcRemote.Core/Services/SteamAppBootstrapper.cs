@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging;
 namespace HaPcRemote.Service.Services;
 
 /// <summary>
-/// Writes a default "steam" app entry to config on first run if Steam is installed
-/// and no "steam" key is present. Windows-only; no-op on other platforms.
+/// Writes default "steam" and "steam-bigpicture" app entries to config on every startup
+/// if Steam is installed and either entry is absent. Windows-only; no-op on other platforms.
 /// </summary>
 public static class SteamAppBootstrapper
 {
@@ -18,7 +18,10 @@ public static class SteamAppBootstrapper
         if (!OperatingSystem.IsWindows())
             return;
 
-        if (currentOptions.Apps.ContainsKey("steam"))
+        var needsSteam = !currentOptions.Apps.ContainsKey("steam");
+        var needsBigPicture = !currentOptions.Apps.ContainsKey("steam-bigpicture");
+
+        if (!needsSteam && !needsBigPicture)
             return;
 
         var steamPath = platform.GetSteamPath();
@@ -29,15 +32,32 @@ public static class SteamAppBootstrapper
         if (!File.Exists(exePath))
             return;
 
-        writer.SaveApp("steam", new AppDefinitionOptions
+        if (needsSteam)
         {
-            DisplayName = "Steam",
-            ExePath = exePath,
-            Arguments = "-bigpicture",
-            ProcessName = "steam",
-            UseShellExecute = false
-        });
+            writer.SaveApp("steam", new AppDefinitionOptions
+            {
+                DisplayName = "Steam",
+                ExePath = exePath,
+                Arguments = "",
+                ProcessName = "steam",
+                UseShellExecute = false
+            });
 
-        logger.LogInformation("Auto-registered Steam app entry: {ExePath}", exePath);
+            logger.LogInformation("Auto-registered Steam app entry: {ExePath}", exePath);
+        }
+
+        if (needsBigPicture)
+        {
+            writer.SaveApp("steam-bigpicture", new AppDefinitionOptions
+            {
+                DisplayName = "Steam Big Picture",
+                ExePath = exePath,
+                Arguments = "-bigpicture",
+                ProcessName = "steam",
+                UseShellExecute = false
+            });
+
+            logger.LogInformation("Auto-registered Steam Big Picture app entry: {ExePath}", exePath);
+        }
     }
 }

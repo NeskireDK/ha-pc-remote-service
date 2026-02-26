@@ -71,6 +71,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Visible = true,
             ContextMenuStrip = BuildContextMenu(settings)
         };
+        _notifyIcon.DoubleClick += OnShowSettings;
 
         _steamPollTimer = new System.Windows.Forms.Timer { Interval = 10_000 };
         _steamPollTimer.Tick += OnSteamPollTick;
@@ -125,7 +126,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private void OnShowLog(object? sender, EventArgs e)
     {
         EnsureSettingsForm();
-        _settingsForm!.ShowTab(3); // Log tab
+        _settingsForm!.ShowTab(4); // Log tab
     }
 
     private void EnsureSettingsForm()
