@@ -125,7 +125,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private void OnShowLog(object? sender, EventArgs e)
     {
         EnsureSettingsForm();
-        _settingsForm!.ShowTab(3); // Log tab
+        _settingsForm!.ShowTab(4); // Log tab
     }
 
     private void EnsureSettingsForm()
