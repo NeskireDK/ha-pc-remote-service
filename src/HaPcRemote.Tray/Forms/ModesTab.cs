@@ -24,6 +24,9 @@ internal sealed class ModesTab : TabPage
     private readonly Button _newButton;
     private readonly ToolTip _toolTip = new();
 
+    private const string NewModePlaceholder = "(new mode)";
+    private bool _hasPendingNew;
+
     public ModesTab(IServiceProvider services)
     {
         Text = "PC Modes";
@@ -123,7 +126,9 @@ internal sealed class ModesTab : TabPage
         // Launch app
         _launchAppCombo = new ComboBox
         {
-            DropDownStyle = ComboBoxStyle.DropDownList,
+            DropDownStyle = ComboBoxStyle.DropDown,
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+            AutoCompleteSource = AutoCompleteSource.CustomSource,
             Width = 250,
             BackColor = Color.FromArgb(50, 50, 50),
             ForeColor = Color.White,
@@ -135,7 +140,9 @@ internal sealed class ModesTab : TabPage
         // Kill app
         _killAppCombo = new ComboBox
         {
-            DropDownStyle = ComboBoxStyle.DropDownList,
+            DropDownStyle = ComboBoxStyle.DropDown,
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+            AutoCompleteSource = AutoCompleteSource.CustomSource,
             Width = 250,
             BackColor = Color.FromArgb(50, 50, 50),
             ForeColor = Color.White,
@@ -189,6 +196,8 @@ internal sealed class ModesTab : TabPage
         RefreshAppDropdowns();
     }
 
+    private static readonly string[] BuiltInAppKeys = ["steam", "steam-bigpicture"];
+
     private void RefreshAppDropdowns()
     {
         var apps = _options.Value.Apps;
@@ -198,12 +207,24 @@ internal sealed class ModesTab : TabPage
         _killAppCombo.Items.Clear();
         _killAppCombo.Items.Add(new AppDropdownItem(null, "(None)"));
 
+        var autoCompleteKeys = new AutoCompleteStringCollection();
+
         foreach (var (key, app) in apps)
         {
             var item = new AppDropdownItem(key, app.DisplayName);
             _launchAppCombo.Items.Add(item);
             _killAppCombo.Items.Add(item);
+            autoCompleteKeys.Add(key);
         }
+
+        foreach (var builtIn in BuiltInAppKeys)
+        {
+            if (!apps.ContainsKey(builtIn))
+                autoCompleteKeys.Add(builtIn);
+        }
+
+        _launchAppCombo.AutoCompleteCustomSource = autoCompleteKeys;
+        _killAppCombo.AutoCompleteCustomSource = autoCompleteKeys;
     }
 
     private static void SelectAppItem(ComboBox combo, string? appKey)
@@ -223,11 +244,20 @@ internal sealed class ModesTab : TabPage
             }
         }
 
-        combo.SelectedIndex = 0;
+        // Free-text key not in list — set text directly
+        combo.SelectedIndex = -1;
+        combo.Text = appKey;
     }
 
     private static string? GetSelectedAppKey(ComboBox combo)
-        => (combo.SelectedItem as AppDropdownItem)?.Key;
+    {
+        if (combo.SelectedItem is AppDropdownItem item)
+            return item.Key;
+
+        // Free-text path
+        var text = combo.Text.Trim();
+        return string.IsNullOrEmpty(text) ? null : text;
+    }
 
     private void LoadModes()
     {
@@ -240,6 +270,17 @@ internal sealed class ModesTab : TabPage
     private void OnModeSelected(object? sender, EventArgs e)
     {
         if (_modeList.SelectedItem is not string name) return;
+
+        if (name == NewModePlaceholder)
+        {
+            // Blank fields already set when placeholder was added — nothing to load
+            return;
+        }
+
+        // Selecting a real mode — discard the pending new placeholder
+        if (_hasPendingNew)
+            DiscardPendingNew();
+
         var options = _configWriter.Read();
         if (!options.Modes.TryGetValue(name, out var mode)) return;
 
@@ -251,9 +292,26 @@ internal sealed class ModesTab : TabPage
         SelectAppItem(_killAppCombo, mode.KillApp);
     }
 
+    private void DiscardPendingNew()
+    {
+        _hasPendingNew = false;
+        var idx = _modeList.Items.IndexOf(NewModePlaceholder);
+        if (idx >= 0)
+            _modeList.Items.RemoveAt(idx);
+    }
+
     private void OnNewMode(object? sender, EventArgs e)
     {
-        _modeList.ClearSelected();
+        // Remove any pre-existing placeholder before adding a fresh one
+        if (_hasPendingNew)
+            DiscardPendingNew();
+
+        // Insert placeholder row and select it
+        _modeList.Items.Add(NewModePlaceholder);
+        _hasPendingNew = true;
+        _modeList.SelectedItem = NewModePlaceholder;
+
+        // Blank the editor fields
         _modeNameBox.Text = "";
         if (_audioDeviceCombo.Items.Count > 0)
             _audioDeviceCombo.SelectedIndex = 0;
@@ -283,11 +341,15 @@ internal sealed class ModesTab : TabPage
             KillApp = GetSelectedAppKey(_killAppCombo)
         };
 
-        // If renaming, use atomic rename; otherwise just save
-        if (_modeList.SelectedItem is string oldName && oldName != name)
-            _configWriter.RenameMode(oldName, name, mode);
+        var selectedItem = _modeList.SelectedItem as string;
+
+        // If renaming an existing mode (not the placeholder), use atomic rename; otherwise just save
+        if (selectedItem is not null && selectedItem != NewModePlaceholder && selectedItem != name)
+            _configWriter.RenameMode(selectedItem, name, mode);
         else
             _configWriter.SaveMode(name, mode);
+
+        _hasPendingNew = false;
         LoadModes();
 
         // Re-select the saved mode
@@ -298,12 +360,31 @@ internal sealed class ModesTab : TabPage
     private void OnDeleteMode(object? sender, EventArgs e)
     {
         if (_modeList.SelectedItem is not string name) return;
+        if (name == NewModePlaceholder)
+        {
+            // Discard the uncommitted placeholder row
+            DiscardPendingNew();
+            _modeNameBox.Text = "";
+            if (_audioDeviceCombo.Items.Count > 0) _audioDeviceCombo.SelectedIndex = 0;
+            if (_monitorProfileCombo.Items.Count > 0) _monitorProfileCombo.SelectedIndex = 0;
+            _volumeSlider.Value = 50;
+            if (_launchAppCombo.Items.Count > 0) _launchAppCombo.SelectedIndex = 0;
+            if (_killAppCombo.Items.Count > 0) _killAppCombo.SelectedIndex = 0;
+            return;
+        }
+
         if (MessageBox.Show($"Delete mode '{name}'?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             return;
 
+        _hasPendingNew = false;
         _configWriter.DeleteMode(name);
         LoadModes();
-        OnNewMode(null, EventArgs.Empty);
+        _modeNameBox.Text = "";
+        if (_audioDeviceCombo.Items.Count > 0) _audioDeviceCombo.SelectedIndex = 0;
+        if (_monitorProfileCombo.Items.Count > 0) _monitorProfileCombo.SelectedIndex = 0;
+        _volumeSlider.Value = 50;
+        if (_launchAppCombo.Items.Count > 0) _launchAppCombo.SelectedIndex = 0;
+        if (_killAppCombo.Items.Count > 0) _killAppCombo.SelectedIndex = 0;
     }
 
     private static Label MakeLabel(string text) => new()

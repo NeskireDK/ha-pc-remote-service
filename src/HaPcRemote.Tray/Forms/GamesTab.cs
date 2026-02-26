@@ -120,7 +120,7 @@ internal sealed class GamesTab : TabPage
         layout.Controls.Add(_gameGrid, 0, 1);
         layout.SetColumnSpan(_gameGrid, 2);
 
-        // Save button
+        // Save button + game list help icon
         _saveButton = new Button
         {
             Text = "Save Bindings",
@@ -138,6 +138,11 @@ internal sealed class GamesTab : TabPage
             FlowDirection = FlowDirection.RightToLeft
         };
         btnPanel.Controls.Add(_saveButton);
+        btnPanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "Per-game PC mode override.\n" +
+            "(default) = use the Default PC Mode above\n" +
+            "(none) = launch without switching modes\n" +
+            "Any named mode = switch to that mode before launching this game"));
         layout.Controls.Add(btnPanel, 0, 2);
         layout.SetColumnSpan(btnPanel, 2);
 
