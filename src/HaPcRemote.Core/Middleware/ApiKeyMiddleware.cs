@@ -9,7 +9,7 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddlew
 {
     private const string ApiKeyHeaderName = "X-Api-Key";
 
-    private static readonly string[] ExemptPaths = ["/api/health"];
+    private static readonly string[] ExemptPaths = ["/api/health", "/api/steam/artwork"];
 
     public async Task InvokeAsync(HttpContext context, IOptionsMonitor<PcRemoteOptions> options)
     {
