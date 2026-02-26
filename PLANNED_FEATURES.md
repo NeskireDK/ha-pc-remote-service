@@ -258,7 +258,7 @@ config entry if missing — no manual setup required.
 
 ### Bugs
 
-- [ ] **Opening settings throws `ThreadStateException`** — `ModesTab` constructor sets `AutoCompleteMode` on `ComboBox` controls before a window handle exists. In .NET 10, setting `AutoCompleteMode` requires STA and triggers an OLE call that fails when the handle isn't created yet. Triggered by any tray action that opens the settings form (double-click, right-click → Show Log, etc.). Fix: remove `AutoCompleteMode`/`AutoCompleteSource` from the constructor and apply them in `OnHandleCreated`. *(service)*
+- [x] **Opening settings throws `ThreadStateException`** — `ModesTab` constructor sets `AutoCompleteMode` on `ComboBox` controls before a window handle exists. In .NET 10, setting `AutoCompleteMode` requires STA and triggers an OLE call that fails when the handle isn't created yet. Triggered by any tray action that opens the settings form (double-click, right-click → Show Log, etc.). Fix: remove `AutoCompleteMode`/`AutoCompleteSource` from the constructor and apply them in `OnHandleCreated`. *(service)*
 
 ---
 
