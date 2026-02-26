@@ -260,7 +260,7 @@ config entry if missing — no manual setup required.
 
 - [x] **Game artwork returns 401** — Fixed: added `/api/steam/artwork` prefix to `ExemptPaths` in `ApiKeyMiddleware`. *(service)*
 
-- [ ] **Non-Steam games show idle when launched via integration** — Root cause identified: `GetRunningGameAsync` reads `HKCU\SOFTWARE\Valve\Steam\RunningAppID`, which Steam only updates for games launched through its own UI — not via a `steam://rungameid/` URI from a third party. No clean fix without process-based detection (check if the shortcut's exe is running) or Steam API access. Deferred: process monitoring would require storing exe paths from shortcuts.vdf and polling per-game — out of scope for v1.3. *(service)*
+- [x] **Non-Steam games show idle when launched via integration** — Fixed: when `GetRunningAppId()` returns 0, `GetRunningGameAsync` now scans running process paths against shortcut `ExePath` fields parsed from `shortcuts.vdf`. First match returns the `SteamRunningGame`. *(service)*
 
 - [x] **turn_off connection error** — HA throws `CannotConnectError` on `switch/turn_off` and `media_player/turn_off` after sleep. PC suspends mid-request so `_TIMEOUT` fires → `TimeoutError` → `CannotConnectError` bubbles uncaught. Fixed: wrap `sleep()` in both `switch.py` and `media_player.py` to catch `CannotConnectError` and treat it as success. *(integration)*
 
@@ -284,7 +284,7 @@ config entry if missing — no manual setup required.
 
 ## Backlog
 
-### 12. Auto-Sleep on Inactivity
+### 12. Auto-Sleep on Inactivity *(done in v1.3)*
 
 Auto-sleep the PC when it's been idle for a configurable duration. Conditions:
 no game running, no mouse/keyboard/gamepad input for X minutes → sleep.
@@ -310,10 +310,10 @@ The current plan mentions gamepad integration as a prerequisite for detecting us
 }
 ```
 
-- [ ] Service: inactivity monitor loop + `Power.AutoSleepAfterMinutes` config *(service)*
-- [ ] Service: Power settings tab in tray *(service)*
-- [ ] Service: `GET/PUT /api/system/power` endpoints *(service)*
-- [ ] Integration: number entity for auto-sleep timeout *(integration)*
+- [x] Service: inactivity monitor loop + `Power.AutoSleepAfterMinutes` config *(service)*
+- [x] Service: Power settings tab in tray *(service)*
+- [x] Service: `GET/PUT /api/system/power` endpoints *(service)*
+- [x] Integration: number entity for auto-sleep timeout *(integration)*
 
 ### 13. Help Tooltips for All UI Elements *(done in v1.3)*
 
@@ -323,26 +323,17 @@ with a small "ⓘ" icon label explaining what the setting does.
 - [x] Service: add `ToolTip` component + help icons to Modes tab *(service)*
 - [x] Service: add help icons to Games tab *(service)*
 - [x] Service: add help icons to General tab *(service)*
-- [ ] Service: add help icons to Power tab (when built) *(service)*
+- [x] Service: add help icons to Power tab *(service)*
 
 ---
 
-### 19. Integration Brand Icons
+### 19. Integration Brand Icons *(done in v1.3)*
 
 HA 2026.3 supports bundling brand images directly in the custom integration — no external CDN or separate brands repo required. Local files take priority over CDN automatically.
 
-Add a `brand/` directory under `custom_components/pc_remote/` with:
+`brand/` directory added under `custom_components/pc_remote/` with `icon.png` and `dark_icon.png`. Logo variants not included (not required by HA).
 
-```
-custom_components/pc_remote/
-└── brand/
-    ├── icon.png          (256×256 integration icon)
-    ├── dark_icon.png
-    ├── logo.png          (full wordmark/logo)
-    └── dark_logo.png
-```
-
-- [ ] Integration: create `brand/` folder with `icon.png` and `logo.png` (light + dark variants) *(integration)*
+- [x] Integration: create `brand/` folder with `icon.png` and `dark_icon.png` *(integration)*
 
 ---
 
@@ -372,14 +363,13 @@ When clicking New in the Modes tab, a blank placeholder row is immediately inser
 
 ---
 
-### 15. Apply Button for Settings UI
+### 15. Apply Button for Settings UI *(done in v1.3)*
 
 Replace auto-save on change with an explicit Apply button. Settings are staged in memory and only written to disk when Apply is clicked. Discard/Cancel reverts unsaved changes.
 
-- [ ] Service: add Apply and Cancel buttons to each settings tab *(service)*
-- [ ] Service: defer config writes until Apply is clicked *(service)*
-- [ ] Service: mark tabs dirty when unsaved changes exist (e.g. tab title asterisk or button enabled state) *(service)*
-- [ ] Service: Cancel/discard reloads current config from disk and resets form fields *(service)*
+- [x] Service: add Apply and Cancel buttons to each settings tab *(service)*
+- [x] Service: defer config writes until Apply is clicked *(service)*
+- [x] Service: Cancel/discard reloads current config from disk and resets form fields *(service)*
 
 ---
 
