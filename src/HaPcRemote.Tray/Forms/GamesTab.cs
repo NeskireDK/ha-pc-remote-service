@@ -107,9 +107,7 @@ internal sealed class GamesTab : TabPage
             HeaderText = "PC Mode",
             FillWeight = 25,
             FlatStyle = FlatStyle.Flat,
-            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
-            AutoCompleteMode = AutoCompleteMode.None,
-            AutoCompleteSource = AutoCompleteSource.None
+            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton
         };
 
         _toolTip.SetToolTip(_gameGrid,
