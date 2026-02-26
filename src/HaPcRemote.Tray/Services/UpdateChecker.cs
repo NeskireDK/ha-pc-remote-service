@@ -40,6 +40,11 @@ internal sealed class UpdateChecker(ILogger<UpdateChecker> logger)
             logger.LogInformation("Update available: {CurrentVersion} -> {LatestVersion}", currentVersion, release.TagName);
             return new ReleaseInfo(release.TagName, installer.BrowserDownloadUrl);
         }
+        catch (HttpRequestException ex)
+        {
+            logger.LogDebug(ex, "Update check skipped (network unavailable)");
+            return null;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Update check failed");
