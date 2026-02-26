@@ -1,5 +1,7 @@
+using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Endpoints;
 
@@ -13,6 +15,7 @@ public static class SystemStateEndpoints
             ISteamService steamService,
             IModeService modeService,
             IIdleService idleService,
+            IOptionsMonitor<PcRemoteOptions> options,
             ILogger<SystemState> logger) =>
         {
             // Fire all async calls concurrently
@@ -72,7 +75,8 @@ public static class SystemStateEndpoints
                 Modes = modes,
                 IdleSeconds = idleSeconds,
                 SteamBindings = steamBindings,
-                SteamReady = steamReady
+                SteamReady = steamReady,
+                AutoSleepAfterMinutes = options.CurrentValue.Power.AutoSleepAfterMinutes
             };
 
             return Results.Json(

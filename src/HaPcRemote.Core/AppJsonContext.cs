@@ -37,6 +37,8 @@ namespace HaPcRemote.Service;
 [JsonSerializable(typeof(AudioState))]
 [JsonSerializable(typeof(SystemState))]
 [JsonSerializable(typeof(ApiResponse<SystemState>))]
+[JsonSerializable(typeof(PowerConfig))]
+[JsonSerializable(typeof(ApiResponse<PowerConfig>))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
