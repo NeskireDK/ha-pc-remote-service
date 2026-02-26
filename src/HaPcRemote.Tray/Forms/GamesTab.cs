@@ -132,12 +132,24 @@ internal sealed class GamesTab : TabPage
             Anchor = AnchorStyles.Right
         };
         _saveButton.Click += OnSave;
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(50, 50, 50),
+            ForeColor = Color.White,
+            Size = new Size(80, 28),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Right
+        };
+        cancelButton.Click += async (_, _) => await RefreshAsync();
         var btnPanel = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.RightToLeft
         };
         btnPanel.Controls.Add(_saveButton);
+        btnPanel.Controls.Add(cancelButton);
         btnPanel.Controls.Add(MakeHelpIcon(_toolTip,
             "Per-game PC mode override.\n" +
             "(default) = use the Default PC Mode above\n" +

@@ -8,4 +8,5 @@ public interface ISteamPlatform
     bool IsSteamRunning();
     void LaunchSteamUrl(string url);
     void KillProcessesInDirectory(string directory);
+    IEnumerable<string> GetRunningProcessPaths();
 }

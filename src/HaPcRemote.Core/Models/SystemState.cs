@@ -11,6 +11,7 @@ public sealed class SystemState
     public int? IdleSeconds { get; init; }
     public SteamBindings? SteamBindings { get; init; }
     public bool? SteamReady { get; init; }
+    public int? AutoSleepAfterMinutes { get; init; }
 }
 
 public sealed class AudioState

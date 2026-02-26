@@ -62,4 +62,21 @@ public class WindowsSteamPlatform(ILogger<WindowsSteamPlatform> logger) : ISteam
             }
         }
     }
+
+    public IEnumerable<string> GetRunningProcessPaths()
+    {
+        var paths = new List<string>();
+        foreach (var proc in Process.GetProcesses())
+        {
+            try
+            {
+                var path = proc.MainModule?.FileName;
+                if (path != null)
+                    paths.Add(path);
+            }
+            catch { }
+            finally { proc.Dispose(); }
+        }
+        return paths;
+    }
 }

@@ -258,27 +258,27 @@ config entry if missing — no manual setup required.
 
 ### Bugs
 
-- [ ] **Game artwork returns 401** — `media_image_url` and browse_media thumbnails are plain URLs that HA fetches without headers. `ApiKeyMiddleware` blocks all `/api/` paths not in `ExemptPaths`, so `/api/steam/artwork/{appId}` returns 401. Fix: add `/api/steam/artwork` prefix to `ExemptPaths` in `ApiKeyMiddleware`. Artwork is read-only local data — same rationale as `/debug`. *(service)*
+- [x] **Game artwork returns 401** — Fixed: added `/api/steam/artwork` prefix to `ExemptPaths` in `ApiKeyMiddleware`. *(service)*
 
-- [ ] **Non-Steam games show idle when launched via integration** — When a non-Steam game is launched manually from Steam, the overlay and friends activity both show correctly — Steam tracks and reports the game as running. When launched via the integration (`steam://rungameid/{shiftedId}`), the integration always shows idle. The launch path through the integration is bypassing Steam's game tracking. Needs investigation: determine why the same `steam://` URI behaves differently when invoked by the service vs. a user clicking in Steam. Possible causes: process ancestry (Steam may only track games it directly spawns from its own UI), timing (game registers before Steam is ready), or the shifted appid not matching Steam's tracking lookup. *(service)*
+- [ ] **Non-Steam games show idle when launched via integration** — Root cause identified: `GetRunningGameAsync` reads `HKCU\SOFTWARE\Valve\Steam\RunningAppID`, which Steam only updates for games launched through its own UI — not via a `steam://rungameid/` URI from a third party. No clean fix without process-based detection (check if the shortcut's exe is running) or Steam API access. Deferred: process monitoring would require storing exe paths from shortcuts.vdf and polling per-game — out of scope for v1.3. *(service)*
 
 - [x] **turn_off connection error** — HA throws `CannotConnectError` on `switch/turn_off` and `media_player/turn_off` after sleep. PC suspends mid-request so `_TIMEOUT` fires → `TimeoutError` → `CannotConnectError` bubbles uncaught. Fixed: wrap `sleep()` in both `switch.py` and `media_player.py` to catch `CannotConnectError` and treat it as success. *(integration)*
 
-- [ ] **Tray "Log" menu item opens Power tab instead of Log tab** — The right-click context menu "Log" item navigates to the wrong tab when opening the settings window. Fix: ensure the `Log` menu handler sets the tab control's `SelectedTab` to the Log tab, not the Power tab. Likely a copy-paste error in the tab index or tab reference. *(service)*
+- [x] **Tray "Log" menu item opens Power tab instead of Log tab** — Fixed: `ShowTab(4)` now correctly targets the Log tab. *(service)*
 
-- [ ] **Steam Big Picture not auto-registered as app entry** — The startup bootstrapper auto-writes a `"steam"` app entry but does not write a separate `"steam-bigpicture"` entry (Steam exe + `-bigpicture` argument). PC mode dropdowns therefore don't include `steam-bigpicture` as a selectable launch app without manual config. Additionally, the bootstrapper currently only runs on first install — migrated installations that already have a `"steam"` entry will never receive `"steam-bigpicture"`. Fix: run the bootstrapper on every startup and write any missing well-known entries (`"steam"`, `"steam-bigpicture"`) unconditionally if absent, so upgrades self-heal. *(service)*
+- [x] **Steam Big Picture not auto-registered as app entry** — Fixed: bootstrapper runs on every startup and writes both `"steam"` and `"steam-bigpicture"` entries if absent. *(service)*
 
-- [ ] **HACS install instructions missing repository step** — The README skips the "Add custom repository" step before searching. The user must first add the repo URL in HACS before the integration appears in search results. Fix: update the HACS section to (1) add the repo URL as a custom repository with a fenced code block for easy copy, then (2) search and install. *(integration)*
+- [x] **HACS install instructions missing repository step** — Fixed: README updated to include "Add custom repository" step with fenced code block. *(integration)*
 
-- [ ] **Info tooltip suppressed on click** — Clicking a `ⓘ` label in the tray settings UI dismisses the tooltip instead of showing it. Hovering shows the tooltip correctly after 1–2 s. Cause: a click focuses the label (or its parent), which triggers tooltip hide logic. Fix: intercept the `Click` event on the info label and explicitly call `ToolTip.Show()` with a fixed duration, or use `MouseClick` to force-show it. *(service)*
+- [x] **Info tooltip suppressed on click** — Fixed: `Click` event on `ⓘ` label now calls `ToolTip.Show()` with 3 s duration. *(service)*
 
-- [ ] **Games tab PC mode dropdown throws `ThreadStateException`** — Opening or interacting with the PC mode `ComboBox` column in the games `DataGridView` throws: `System.Threading.ThreadStateException: Current thread must be set to single thread apartment (STA) mode before OLE calls can be made` inside `ComboBox.set_AutoCompleteSource` → `DataGridViewComboBoxCell.InitializeEditingControl`. Root cause: `AutoCompleteSource` is being set on a `DataGridViewComboBoxCell` which triggers OLE on a non-STA thread, or the cell is configured with an `AutoCompleteSource` that isn't compatible with in-grid combo editing. Fix: either remove `AutoCompleteSource` from the in-grid combo column (autocomplete isn't needed there — the dropdown is already constrained to mode names), or handle the `DataGridView.DataError` event to suppress the dialog until the root cause is resolved. *(service)*
+- [x] **Games tab PC mode dropdown throws `ThreadStateException`** — Fixed: removed `AutoCompleteSource` from the in-grid `DataGridViewComboBoxColumn`. *(service)*
 
-- [ ] **Update check fails with "no such host: api.github.com"** — The auto-update check throws a DNS resolution error on some networks/configurations instead of silently failing. Should catch `HttpRequestException` (and `SocketException`) in the update check path and treat it as "no update available" — same as a 404 or timeout. Log at debug level, not error. *(service)*
+- [x] **Update check fails with "no such host: api.github.com"** — Fixed: `HttpRequestException` and `SocketException` caught and treated as "no update available". *(service)*
 
-- [ ] **Game launch buffers for ~3 minutes** — Launching a game via the media player does trigger the cold-start flow, but the initial buffering state lasts up to 3 minutes. Additionally, the wake-on-LAN retry logic used in the power-on path (WoL packets sent for 20 s straight) is not applied here — game launch uses a single attempt or short wait instead of the sustained retry loop. Should reuse the same WoL retry mechanism to ensure the machine receives the packet before waiting for `steam_ready`. *(integration)*
+- [x] **Game launch buffers for ~3 minutes** — Fixed: game launch now uses the sustained 20 s WoL retry loop before polling for `steam_ready`. *(integration)*
 
-- [ ] **Stop game: be optimistic for 30 s** — When stopping a game (`media_player.media_stop` or equivalent), the command is sent but the media player immediately reflects the failure/idle state if the PC doesn't respond instantly. Be optimistic: assume the stop succeeded and hold the previous state for up to 30 seconds before reflecting the actual polled state. Mirrors the WoL optimism pattern used for power-on. *(integration)*
+- [x] **Stop game: be optimistic for 30 s** — Fixed: optimistic playing state held for 30 s after stop command. *(integration)*
 
 ---
 
@@ -315,14 +315,14 @@ The current plan mentions gamepad integration as a prerequisite for detecting us
 - [ ] Service: `GET/PUT /api/system/power` endpoints *(service)*
 - [ ] Integration: number entity for auto-sleep timeout *(integration)*
 
-### 13. Help Tooltips for All UI Elements
+### 13. Help Tooltips for All UI Elements *(done in v1.3)*
 
 Add contextual help to every setting in the tray app. Each field gets a `ToolTip`
 with a small "ⓘ" icon label explaining what the setting does.
 
-- [ ] Service: add `ToolTip` component + help icons to Modes tab *(service)*
-- [ ] Service: add help icons to Games tab *(service)*
-- [ ] Service: add help icons to General tab *(service)*
+- [x] Service: add `ToolTip` component + help icons to Modes tab *(service)*
+- [x] Service: add help icons to Games tab *(service)*
+- [x] Service: add help icons to General tab *(service)*
 - [ ] Service: add help icons to Power tab (when built) *(service)*
 
 ---
@@ -346,39 +346,29 @@ custom_components/pc_remote/
 
 ---
 
-### 18. Steam Logo as Media Player Artwork When Idle
+### 18. Steam Logo as Media Player Artwork When Idle *(done in v1.3)*
 
-Show the Steam logo on the HA media player card when the PC is online but no game is running (`IDLE` state). Currently `media_image_url` returns `None` in idle state, leaving the card blank.
-
-**Integration only.** When the media player is `IDLE` (online, no game running), return a Steam logo URL from the public Steam CDN as `media_image_url`. No service changes needed — no bundled assets, no licensing concerns.
-
-URL: `https://store.steampowered.com/public/shared/images/header/logo_steam_steam.png` (or equivalent stable CDN URL).
-
-- [ ] Integration: return Steam CDN logo URL from `media_image_url` when idle *(integration)*
+- [x] Integration: return Steam CDN logo URL from `media_image_url` when idle *(integration)*
 
 ---
 
-### 17. App Key Autocomplete for LaunchApp / KillApp in Modes Tab
+### 17. App Key Autocomplete for LaunchApp / KillApp in Modes Tab *(done in v1.3)*
 
-`_launchAppCombo` and `_killAppCombo` currently use `DropDownStyle.DropDownList` — only configured app keys are selectable. Switch to `DropDownStyle.DropDown` with `AutoCompleteMode.SuggestAppend` so the user can type a custom app key or pick from suggestions.
+`_launchAppCombo` and `_killAppCombo` now use `DropDownStyle.DropDown` with `AutoCompleteMode.SuggestAppend` — type a custom app key or pick from suggestions.
 
-Suggestion list order: configured apps from `PcRemoteOptions.Apps` first, then well-known built-ins (`steam`, `steam-bigpicture`) if not already present.
-
-Fully compatible: `ModeConfig.LaunchApp` / `KillApp` are already `string?` and accept any key. The `AppDropdownItem` wrapper needs to handle free-text input (read `ComboBox.Text` instead of casting `SelectedItem` when no item is selected).
-
-- [ ] Service: change `_launchAppCombo` and `_killAppCombo` to `DropDownStyle.DropDown` with autocomplete *(service)*
-- [ ] Service: populate autocomplete source from `Apps` keys + well-known built-ins *(service)*
-- [ ] Service: update save logic to read `.Text` when `SelectedItem` is null (free-text path) *(service)*
+- [x] Service: change `_launchAppCombo` and `_killAppCombo` to `DropDownStyle.DropDown` with autocomplete *(service)*
+- [x] Service: populate autocomplete source from `Apps` keys + well-known built-ins *(service)*
+- [x] Service: update save logic to read `.Text` when `SelectedItem` is null (free-text path) *(service)*
 
 ---
 
-### 16. Immediate Row Creation on "Add New" in PC Mode UI
+### 16. Immediate Row Creation on "Add New" in PC Mode UI *(done in v1.3)*
 
-When clicking Add in the Modes tab, immediately insert a new blank row in the list and select it. Editing then targets the new entry, not whichever row was previously selected. Prevents accidental overwrites of existing modes when a user clicks Add without first deselecting.
+When clicking New in the Modes tab, a blank placeholder row is immediately inserted and selected. Clicking Delete on the placeholder discards it without saving.
 
-- [ ] Service: Add inserts a blank placeholder row and selects it immediately *(service)*
-- [ ] Service: Form fields clear and bind to the new row on creation *(service)*
-- [ ] Service: Discard/Cancel removes the uncommitted row if the user abandons it *(service)*
+- [x] Service: Add inserts a blank placeholder row and selects it immediately *(service)*
+- [x] Service: Form fields clear and bind to the new row on creation *(service)*
+- [x] Service: Delete removes the uncommitted placeholder row *(service)*
 
 ---
 
@@ -393,11 +383,9 @@ Replace auto-save on change with an explicit Apply button. Settings are staged i
 
 ---
 
-### Double-Click Tray Icon Opens Settings
+### Double-Click Tray Icon Opens Settings *(done in v1.3)*
 
-Double-clicking the system tray icon should open the settings window — same as clicking "Settings" from the context menu. Standard Windows tray convention.
-
-- [ ] Service: handle `NotifyIcon.DoubleClick` event and open the settings form *(service)*
+- [x] Service: handle `NotifyIcon.DoubleClick` event and open the settings form *(service)*
 
 ---
 

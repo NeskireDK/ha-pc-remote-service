@@ -129,8 +129,6 @@ internal sealed class GeneralTab : TabPage
             "Verbose" => "Verbose",
             _ => "Warning"
         };
-        _logLevelCombo.SelectedIndexChanged += OnLogLevelChanged;
-
         var logPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
         logPanel.Controls.Add(_logLevelCombo);
         logPanel.Controls.Add(MakeHelpIcon(_toolTip,
@@ -150,7 +148,6 @@ internal sealed class GeneralTab : TabPage
             AutoSize = true,
             Checked = settings.AutoUpdate
         };
-        _autoUpdateCheck.CheckedChanged += OnAutoUpdateChanged;
         _toolTip.SetToolTip(_autoUpdateCheck,
             "Automatically download and install new service releases from GitHub.\n" +
             "The tray icon will notify you before restarting.");
@@ -162,7 +159,18 @@ internal sealed class GeneralTab : TabPage
             "The tray icon will notify you before restarting."));
 
         layout.Controls.Add(new Label { AutoSize = true }, 0, row);
-        layout.Controls.Add(autoUpdatePanel, 1, row);
+        layout.Controls.Add(autoUpdatePanel, 1, row++);
+
+        // Apply + Cancel buttons
+        var applyButton = new Button { Text = "Apply", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(50, 130, 50), ForeColor = Color.White, Size = new Size(80, 28), Cursor = Cursors.Hand };
+        var cancelButton = new Button { Text = "Cancel", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(50, 50, 50), ForeColor = Color.White, Size = new Size(80, 28), Cursor = Cursors.Hand };
+        applyButton.Click += OnApply;
+        cancelButton.Click += OnCancel;
+        var buttonPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        buttonPanel.Controls.Add(applyButton);
+        buttonPanel.Controls.Add(cancelButton);
+        layout.Controls.Add(new Label(), 0, row);
+        layout.Controls.Add(buttonPanel, 1, row);
 
         Controls.Add(layout);
     }
@@ -256,7 +264,7 @@ internal sealed class GeneralTab : TabPage
         return label;
     }
 
-    private void OnLogLevelChanged(object? sender, EventArgs e)
+    private void OnApply(object? sender, EventArgs e)
     {
         var level = _logLevelCombo.SelectedItem?.ToString() ?? "Warning";
         var logLevel = level switch
@@ -272,13 +280,20 @@ internal sealed class GeneralTab : TabPage
 
         var s = TraySettings.Load();
         s.LogLevel = level;
+        s.AutoUpdate = _autoUpdateCheck.Checked;
         s.Save();
     }
 
-    private void OnAutoUpdateChanged(object? sender, EventArgs e)
+    private void OnCancel(object? sender, EventArgs e)
     {
         var s = TraySettings.Load();
-        s.AutoUpdate = _autoUpdateCheck.Checked;
-        s.Save();
+        _logLevelCombo.SelectedItem = s.LogLevel switch
+        {
+            "Error" => "Error",
+            "Info" => "Info",
+            "Verbose" => "Verbose",
+            _ => "Warning"
+        };
+        _autoUpdateCheck.Checked = s.AutoUpdate;
     }
 }

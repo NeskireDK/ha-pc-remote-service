@@ -157,6 +157,8 @@ public class SteamServiceTests
     public async Task GetRunningGame_NoGame_ReturnsNull()
     {
         A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        A.CallTo(() => _platform.GetRunningProcessPaths()).Returns([]);
         var service = CreateService();
 
         var result = await service.GetRunningGameAsync();
@@ -553,11 +555,13 @@ public class SteamServiceTests
         shortcuts[0].AppId.ShouldBe(-1234567890);
         shortcuts[0].IsShortcut.ShouldBeTrue();
         shortcuts[0].LastPlayed.ShouldBe(1700000000L);
+        shortcuts[0].ExePath.ShouldBe(@"C:\Games\custom.exe");
 
         shortcuts[1].Name.ShouldBe("Emulator Game");
         shortcuts[1].AppId.ShouldBe(-987654321);
         shortcuts[1].IsShortcut.ShouldBeTrue();
         shortcuts[1].LastPlayed.ShouldBe(1708000000L);
+        shortcuts[1].ExePath.ShouldBe(@"D:\Emulators\retro.exe");
     }
 
     [Fact]
@@ -576,6 +580,48 @@ public class SteamServiceTests
         var shortcuts = SteamService.ParseShortcuts(stream);
 
         shortcuts.ShouldBeEmpty();
+    }
+
+    // ── Process-based fallback tests ──────────────────────────────────
+
+    [Fact]
+    public async Task GetRunningGame_AppIdZero_NoShortcutsInCache_ReturnsNull()
+    {
+        // Fake FS: GetGamesAsync returns empty list, so no shortcuts exist in cache.
+        // GetRunningProcessPaths should NOT be called — no exe paths to match against.
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        var service = CreateService();
+
+        var result = await service.GetRunningGameAsync();
+
+        result.ShouldBeNull();
+        A.CallTo(() => _platform.GetRunningProcessPaths()).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task GetRunningGame_AppIdNonZero_DoesNotCallGetRunningProcessPaths()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(730);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        var service = CreateService();
+
+        var result = await service.GetRunningGameAsync();
+
+        A.CallTo(() => _platform.GetRunningProcessPaths()).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task GetRunningGame_AppIdZero_SteamNotInstalled_ReturnsNull()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _platform.GetSteamPath()).Returns((string?)null);
+        var service = CreateService();
+
+        var result = await service.GetRunningGameAsync();
+
+        result.ShouldBeNull();
+        A.CallTo(() => _platform.GetRunningProcessPaths()).MustNotHaveHappened();
     }
 
     // ── GenerateShortcutAppId tests ────────────────────────────────────

@@ -50,7 +50,7 @@ internal sealed class PowerTab : TabPage
         layout.Controls.Add(MakeLabel("Auto-Sleep (minutes):"), 0, 0);
         layout.Controls.Add(autoSleepPanel, 1, 0);
 
-        // Save button
+        // Save + Cancel buttons
         var saveButton = new Button
         {
             Text = "Save",
@@ -61,8 +61,21 @@ internal sealed class PowerTab : TabPage
             Cursor = Cursors.Hand
         };
         saveButton.Click += OnSave;
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(50, 50, 50),
+            ForeColor = Color.White,
+            Size = new Size(100, 30),
+            Cursor = Cursors.Hand
+        };
+        cancelButton.Click += OnCancel;
+        var buttonPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        buttonPanel.Controls.Add(saveButton);
+        buttonPanel.Controls.Add(cancelButton);
         layout.Controls.Add(new Label(), 0, 1);
-        layout.Controls.Add(saveButton, 1, 1);
+        layout.Controls.Add(buttonPanel, 1, 1);
 
         Controls.Add(layout);
     }
@@ -74,6 +87,12 @@ internal sealed class PowerTab : TabPage
             AutoSleepAfterMinutes = (int)_autoSleepInput.Value
         });
         MessageBox.Show("Power settings saved.", "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void OnCancel(object? sender, EventArgs e)
+    {
+        var current = _configWriter.Read().Power;
+        _autoSleepInput.Value = Math.Clamp(current.AutoSleepAfterMinutes, 0, 480);
     }
 
     private static Label MakeLabel(string text) => new()

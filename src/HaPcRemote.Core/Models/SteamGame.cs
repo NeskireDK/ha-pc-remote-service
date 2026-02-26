@@ -6,4 +6,5 @@ public sealed class SteamGame
     public required string Name { get; init; }
     public required long LastPlayed { get; init; }
     public bool IsShortcut { get; init; }
+    public string? ExePath { get; init; }
 }
