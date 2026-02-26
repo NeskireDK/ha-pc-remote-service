@@ -127,8 +127,6 @@ internal sealed class ModesTab : TabPage
         _launchAppCombo = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDown,
-            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
-            AutoCompleteSource = AutoCompleteSource.CustomSource,
             Width = 250,
             BackColor = Color.FromArgb(50, 50, 50),
             ForeColor = Color.White,
@@ -141,8 +139,6 @@ internal sealed class ModesTab : TabPage
         _killAppCombo = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDown,
-            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
-            AutoCompleteSource = AutoCompleteSource.CustomSource,
             Width = 250,
             BackColor = Color.FromArgb(50, 50, 50),
             ForeColor = Color.White,
@@ -164,6 +160,15 @@ internal sealed class ModesTab : TabPage
         Controls.Add(leftPanel);
 
         LoadModes();
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        _launchAppCombo.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+        _launchAppCombo.AutoCompleteSource = AutoCompleteSource.CustomSource;
+        _killAppCombo.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+        _killAppCombo.AutoCompleteSource = AutoCompleteSource.CustomSource;
     }
 
     protected override async void OnVisibleChanged(EventArgs e)

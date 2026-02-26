@@ -254,6 +254,14 @@ config entry if missing — no manual setup required.
 
 ---
 
+## v1.3.1
+
+### Bugs
+
+- [ ] **Opening settings throws `ThreadStateException`** — `ModesTab` constructor sets `AutoCompleteMode` on `ComboBox` controls before a window handle exists. In .NET 10, setting `AutoCompleteMode` requires STA and triggers an OLE call that fails when the handle isn't created yet. Triggered by any tray action that opens the settings form (double-click, right-click → Show Log, etc.). Fix: remove `AutoCompleteMode`/`AutoCompleteSource` from the constructor and apply them in `OnHandleCreated`. *(service)*
+
+---
+
 ## v1.3
 
 ### Bugs
@@ -376,6 +384,14 @@ Replace auto-save on change with an explicit Apply button. Settings are staged i
 ### Double-Click Tray Icon Opens Settings *(done in v1.3)*
 
 - [x] Service: handle `NotifyIcon.DoubleClick` event and open the settings form *(service)*
+
+---
+
+### 20. Start Menu Shortcut
+
+Add a Start Menu shortcut to the Inno Setup installer so users can find and launch the tray app by searching in the Start menu. Currently the app only auto-starts via the startup folder — it has no searchable entry.
+
+- [ ] Service: add `[Icons]` entry to installer script creating a Start Menu shortcut for `HaPcRemote.Tray.exe` *(service)*
 
 ---
 
