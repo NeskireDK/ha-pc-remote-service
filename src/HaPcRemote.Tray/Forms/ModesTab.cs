@@ -123,7 +123,9 @@ internal sealed class ModesTab : TabPage
         // Launch app
         _launchAppCombo = new ComboBox
         {
-            DropDownStyle = ComboBoxStyle.DropDownList,
+            DropDownStyle = ComboBoxStyle.DropDown,
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+            AutoCompleteSource = AutoCompleteSource.CustomSource,
             Width = 250,
             BackColor = Color.FromArgb(50, 50, 50),
             ForeColor = Color.White,
@@ -135,7 +137,9 @@ internal sealed class ModesTab : TabPage
         // Kill app
         _killAppCombo = new ComboBox
         {
-            DropDownStyle = ComboBoxStyle.DropDownList,
+            DropDownStyle = ComboBoxStyle.DropDown,
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+            AutoCompleteSource = AutoCompleteSource.CustomSource,
             Width = 250,
             BackColor = Color.FromArgb(50, 50, 50),
             ForeColor = Color.White,
@@ -189,6 +193,8 @@ internal sealed class ModesTab : TabPage
         RefreshAppDropdowns();
     }
 
+    private static readonly string[] BuiltInAppKeys = ["steam", "steam-bigpicture"];
+
     private void RefreshAppDropdowns()
     {
         var apps = _options.Value.Apps;
@@ -198,12 +204,24 @@ internal sealed class ModesTab : TabPage
         _killAppCombo.Items.Clear();
         _killAppCombo.Items.Add(new AppDropdownItem(null, "(None)"));
 
+        var autoCompleteKeys = new AutoCompleteStringCollection();
+
         foreach (var (key, app) in apps)
         {
             var item = new AppDropdownItem(key, app.DisplayName);
             _launchAppCombo.Items.Add(item);
             _killAppCombo.Items.Add(item);
+            autoCompleteKeys.Add(key);
         }
+
+        foreach (var builtIn in BuiltInAppKeys)
+        {
+            if (!apps.ContainsKey(builtIn))
+                autoCompleteKeys.Add(builtIn);
+        }
+
+        _launchAppCombo.AutoCompleteCustomSource = autoCompleteKeys;
+        _killAppCombo.AutoCompleteCustomSource = autoCompleteKeys;
     }
 
     private static void SelectAppItem(ComboBox combo, string? appKey)
@@ -223,11 +241,20 @@ internal sealed class ModesTab : TabPage
             }
         }
 
-        combo.SelectedIndex = 0;
+        // Free-text key not in list — set text directly
+        combo.SelectedIndex = -1;
+        combo.Text = appKey;
     }
 
     private static string? GetSelectedAppKey(ComboBox combo)
-        => (combo.SelectedItem as AppDropdownItem)?.Key;
+    {
+        if (combo.SelectedItem is AppDropdownItem item)
+            return item.Key;
+
+        // Free-text path
+        var text = combo.Text.Trim();
+        return string.IsNullOrEmpty(text) ? null : text;
+    }
 
     private void LoadModes()
     {
