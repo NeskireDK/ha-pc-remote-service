@@ -40,7 +40,10 @@ public class SteamService(
     {
         var appId = platform.GetRunningAppId();
         if (appId == 0)
-            return null;
+        {
+            // Process-based fallback for non-Steam shortcuts
+            return await TryFindRunningShortcutAsync();
+        }
 
         // Warm the cache if not yet populated
         if (_cachedGames == null || _cachedGames.Count == 0)
@@ -65,6 +68,28 @@ public class SteamService(
 
         name ??= $"Unknown ({appId})";
         return new SteamRunningGame { AppId = appId, Name = name };
+    }
+
+    private async Task<SteamRunningGame?> TryFindRunningShortcutAsync()
+    {
+        // Warm the cache if needed
+        if (_cachedGames == null || _cachedGames.Count == 0)
+        {
+            try { await GetGamesAsync(); }
+            catch (InvalidOperationException) { return null; }
+        }
+
+        var shortcuts = _cachedGames?.Where(g => g.IsShortcut && g.ExePath != null).ToList();
+        if (shortcuts == null || shortcuts.Count == 0)
+            return null;
+
+        var runningPaths = platform.GetRunningProcessPaths().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var match = shortcuts.FirstOrDefault(s => runningPaths.Contains(s.ExePath!));
+        if (match == null)
+            return null;
+
+        return new SteamRunningGame { AppId = match.AppId, Name = match.Name };
     }
 
     public async Task<SteamRunningGame?> LaunchGameAsync(int appId)
@@ -260,6 +285,10 @@ public class SteamService(
             if (string.IsNullOrEmpty(appName))
                 continue;
 
+            var exe = entry["Exe"]?.ToString() ?? entry["exe"]?.ToString();
+            if (!string.IsNullOrEmpty(exe))
+                exe = exe.Trim('"');
+
             // Steam stores shortcut appid as a signed 32-bit int (high bit set).
             // Try appid first, then fallback to calculating from exe+appname.
             int appId;
@@ -271,8 +300,7 @@ public class SteamService(
             else
             {
                 // Fallback: generate the shortcut appid from exe + appname
-                var exe = entry["Exe"]?.ToString() ?? entry["exe"]?.ToString() ?? "";
-                appId = GenerateShortcutAppId(exe, appName);
+                appId = GenerateShortcutAppId(exe ?? "", appName);
             }
 
             var lastPlayedStr = entry["LastPlayTime"]?.ToString();
@@ -283,7 +311,8 @@ public class SteamService(
                 AppId = appId,
                 Name = appName,
                 LastPlayed = lastPlayed,
-                IsShortcut = true
+                IsShortcut = true,
+                ExePath = string.IsNullOrEmpty(exe) ? null : exe
             });
         }
 
