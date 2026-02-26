@@ -97,6 +97,7 @@ internal sealed class PowerTab : TabPage
             Font = new Font("Segoe UI", 9f)
         };
         toolTip.SetToolTip(label, helpText);
+        label.Click += (_, _) => toolTip.Show(helpText, label, 3000);
         return label;
     }
 }
