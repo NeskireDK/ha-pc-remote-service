@@ -10,7 +10,31 @@ the core use case.
 ## Blockers (fix before v1.0)
 
 These are documented bugs that undermine trust in the integration.
-
+- Stop game via Integration still shows game running for 30 seconds or more - Optimistic assumption not working
+- integration images not loading. Likely not served by service. Increase debug logging and endpoint testing.
+- Multiple unhandled exceptions in service ui. L
+  - List Games, Click PC mode dropdown
+    The following exception occurred in the DataGridView:
+    System.Threading.ThreadStateException: Current thread must be set to single thread apartment (STA) mode before OLE calls can be made. Ensure that your Main function has STAThreadAttribute marked on it.
+    at System.Windows.Forms.ComboBox.set_AutoCompleteSource(AutoCompleteSource value)
+    at System.Windows.Forms.DataGridViewComboBoxCell.InitializeEditingControl(Int32 rowIndex, Object initialFormattedValue, DataGridViewCellStyle dataGridViewCellStyle)
+    at System.Windows.Forms.DataGridView.InitializeEditingControlValue(DataGridViewCellStyle& dataGridViewCellStyle, DataGridViewCell dataGridViewCell)
+    To replace this default dialog please handle the DataError event.
+  - PC Modes tab throws error: See the end of this message for details on invoking 
+just-in-time (JIT) debugging instead of this dialog box.
+- PC will sleep immidiately coming out of a previous sleep due to timeout being 5000+ seconds idle
+- Apply / Save bindings buttons confusion. Centralize all buttons in footer and pull right. Except on PC modes tab.
+- Likewise for Save Restart button on General Tab, this should be part of Apply, with not need for restart, we just rerun the kestrel server with the new appsettings. 
+************** Exception Text **************
+System.Threading.ThreadStateException: Current thread must be set to single thread apartment (STA) mode before OLE calls can be made. Ensure that your Main function has STAThreadAttribute marked on it.
+   at System.Windows.Forms.ComboBox.set_AutoCompleteMode(AutoCompleteMode value)
+   at HaPcRemote.Tray.Forms.ModesTab.OnHandleCreated(EventArgs e)
+   at System.Windows.Forms.Control.WmCreate(Message& m)
+   at System.Windows.Forms.Control.WndProc(Message& m)
+   at System.Windows.Forms.ScrollableControl.WndProc(Message& m)
+   at System.Windows.Forms.NativeWindow.Callback(HWND hWnd, UInt32 msg, WPARAM wparam, LPARAM lparam)
+- Starting steam-bigpicture app while steam is already running results in nothing. If steam is closed, it will result in steam bigpciture mode launcing.
+- 
 - [x] **Steam: tray 503** — `POST /api/steam/run/{appId}` returns 200 even when the tray
   is not running and no game launches. Fixed in service v0.9.0: `IpcSteamPlatform` throws
   `TrayUnavailableException` → endpoint returns 503. *(service)*
