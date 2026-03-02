@@ -27,9 +27,11 @@ Documented bugs that undermine trust in the integration.
   subscribe to `SystemEvents.PowerModeChanged`; on `ResumeOrWake`, record the wake timestamp
   and cap reported idle to seconds-since-wake until real input resets the baseline. *(service)*
 
-- [ ] **Stop game: optimistic state not clearing** — After stop, the media player holds
+- [x] **Stop game: optimistic state not clearing** — After stop, the media player holds
   optimistic `playing` state for 30 s, but the game shows as still running beyond that
-  window. *(integration)*
+  window. Fixed: `_stop_issued_at` slides forward on each coordinator poll that still
+  reports the game running, so the 30 s window only starts after the service confirms
+  the game is gone. *(integration)*
 
 - [ ] **Artwork not loading** — Integration images not served correctly by the service.
   Needs debug logging on the artwork endpoint and end-to-end testing. *(service + integration)*
