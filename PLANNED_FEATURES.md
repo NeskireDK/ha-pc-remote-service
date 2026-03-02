@@ -45,6 +45,8 @@ Documented bugs that undermine trust in the integration.
   in right-aligned footer across all tabs (General, Games, Power, Log). PC Modes tab is
   the exception (has its own row management buttons). *(service)*
 
+- [ ] **Monitor switch: switching back to main display fails** — Switching to TV monitor works, but switching back to main display does not. Root cause unknown — may be a util/display-switching utility issue or a service-side issue. Needs debug logging added to the monitor-switch util response to understand what is returned when the reverse switch is attempted.
+
 - [x] **General tab: Save + Restart → Apply with live reload** — No restart required.
   Kestrel stops, rebuilds on the new port, and restarts in-process. `KestrelRestartService`
   singleton wires the delegate from Program.cs into DI so GeneralTab can call it directly.
