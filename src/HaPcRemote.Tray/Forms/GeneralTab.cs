@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Logging;
 using HaPcRemote.Service.Services;
@@ -11,7 +10,7 @@ namespace HaPcRemote.Tray.Forms;
 
 internal sealed class GeneralTab : TabPage
 {
-    private readonly IConfigurationWriter _configWriter;
+    private readonly KestrelRestartService _restartService;
     private readonly ToolTip _toolTip = new();
     private readonly ComboBox _logLevelCombo;
     private readonly CheckBox _autoUpdateCheck;
@@ -29,7 +28,7 @@ internal sealed class GeneralTab : TabPage
         ForeColor = Color.White;
         Padding = new Padding(20);
 
-        _configWriter = services.GetRequiredService<IConfigurationWriter>();
+        _restartService = services.GetRequiredService<KestrelRestartService>();
         var options = services.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
         _currentPort = options.Port;
 
@@ -59,7 +58,7 @@ internal sealed class GeneralTab : TabPage
         _portStatusLabel = new Label { AutoSize = true, Padding = new Padding(5, 3, 0, 0) };
         _portSaveButton = new Button
         {
-            Text = "Save & Restart",
+            Text = "Save & Apply",
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(50, 50, 50),
             ForeColor = Color.White,
@@ -78,7 +77,8 @@ internal sealed class GeneralTab : TabPage
         portPanel.Controls.Add(MakeHelpIcon(_toolTip,
             "HTTP port the service listens on.\n" +
             "Home Assistant must be configured with the same port.\n" +
-            "Changes require a restart. Valid range: 1024–65535."));
+            "The service restarts in-process — no UAC prompt or process relaunch.\n" +
+            "Valid range: 1024–65535."));
         layout.Controls.Add(MakeLabel("Port:"), 0, row);
         layout.Controls.Add(portPanel, 1, row++);
         UpdatePortStatus();
@@ -206,21 +206,45 @@ internal sealed class GeneralTab : TabPage
         }
     }
 
-    private void OnPortSave(object? sender, EventArgs e)
+    private async void OnPortSave(object? sender, EventArgs e)
     {
         var newPort = (int)_portInput.Value;
         if (MessageBox.Show(
-                $"Change port to {newPort} and restart the application?",
-                "Confirm Restart",
+                $"Change port to {newPort}?\nThe service will restart in-process — no process relaunch needed.",
+                "Confirm Port Change",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question) != DialogResult.Yes)
             return;
 
-        _configWriter.SavePort(newPort);
-        var exePath = Environment.ProcessPath
-            ?? throw new InvalidOperationException("Cannot determine process path for restart.");
-        Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
-        Application.Exit();
+        _portSaveButton.Enabled = false;
+        _portStatusLabel.Text = "restarting...";
+        _portStatusLabel.ForeColor = Color.Orange;
+
+        try
+        {
+            var restart = _restartService.RestartAsync
+                ?? throw new InvalidOperationException("RestartAsync delegate not set.");
+
+            await Task.Run(() => restart(newPort));
+
+            // Wait for Kestrel to report its new status
+            _ = Task.Run(async () =>
+            {
+                await KestrelStatus.Started;
+                BeginInvoke(() =>
+                {
+                    ApplyPortStatus();
+                    _portSaveButton.Visible = false;
+                    _portSaveButton.Enabled = true;
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            _portStatusLabel.Text = $"failed: {ex.Message}";
+            _portStatusLabel.ForeColor = Color.Salmon;
+            _portSaveButton.Enabled = true;
+        }
     }
 
     private static void UpdateToolStatus(Label label, string toolPath)

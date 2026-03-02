@@ -13,7 +13,7 @@ namespace HaPcRemote.Tray;
 
 internal static class TrayWebHost
 {
-    public static WebApplication Build(InMemoryLogProvider logProvider)
+    public static WebApplication Build(InMemoryLogProvider logProvider, KestrelRestartService? restartService = null)
     {
         var builder = WebApplication.CreateBuilder();
 
@@ -94,6 +94,12 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<ISteamService, SteamService>();
         builder.Services.AddSingleton<IConfigurationWriter>(
             new ConfigurationWriter(writableConfigPath));
+
+        // KestrelRestartService is a singleton registered in DI so GeneralTab can resolve it.
+        // Program.cs sets the RestartAsync delegate on it after the first app is built.
+        // On subsequent builds (after a restart) the same instance is passed in so the delegate persists.
+        var restart = restartService ?? new KestrelRestartService();
+        builder.Services.AddSingleton(restart);
 
         var app = builder.Build();
 

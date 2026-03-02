@@ -19,7 +19,42 @@ internal static class Program
         var logProvider = new InMemoryLogProvider();
         var webCts = new CancellationTokenSource();
 
+        // Build the initial web application.  KestrelRestartService is created inside Build()
+        // on the first call; we retrieve it so we can wire the RestartAsync delegate and pass
+        // the same instance into subsequent builds (so tabs resolve a stable singleton).
         var webApp = TrayWebHost.Build(logProvider);
+        var restartService = webApp.Services.GetRequiredService<KestrelRestartService>();
+
+        // Active web application reference — swapped on each restart.
+        WebApplication currentApp = webApp;
+        var restartLock = new SemaphoreSlim(1, 1);
+
+        restartService.RestartAsync = async newPort =>
+        {
+            await restartLock.WaitAsync();
+            try
+            {
+                KestrelStatus.Reset();
+
+                await currentApp.StopAsync(TimeSpan.FromSeconds(5));
+                await currentApp.DisposeAsync();
+
+                var newApp = TrayWebHost.Build(logProvider, restartService);
+                currentApp = newApp;
+
+                await newApp.StartAsync();
+                KestrelStatus.SetRunning();
+            }
+            catch (Exception ex)
+            {
+                KestrelStatus.SetFailed(ex.InnerException?.Message ?? ex.Message);
+                throw;
+            }
+            finally
+            {
+                restartLock.Release();
+            }
+        };
 
         _ = Task.Run(async () =>
         {
@@ -37,6 +72,6 @@ internal static class Program
         Application.Run(new TrayApplicationContext(webApp.Services, webCts, logProvider));
 
         webCts.Cancel();
-        try { webApp.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult(); } catch { }
+        try { currentApp.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult(); } catch { }
     }
 }
