@@ -43,8 +43,10 @@ Documented bugs that undermine trust in the integration.
   in right-aligned footer across all tabs (General, Games, Power, Log). PC Modes tab is
   the exception (has its own row management buttons). *(service)*
 
-- [ ] **General tab: Save + Restart → Apply with live reload** — No restart required.
-  Reload config and re-initialise Kestrel with new settings in-process. *(service)*
+- [x] **General tab: Save + Restart → Apply with live reload** — No restart required.
+  Kestrel stops, rebuilds on the new port, and restarts in-process. `KestrelRestartService`
+  singleton wires the delegate from Program.cs into DI so GeneralTab can call it directly.
+  No process relaunch, no UAC prompt. *(service)*
 
 
 - [x] **Steam: tray 503** — `POST /api/steam/run/{appId}` returns 200 even when the tray
