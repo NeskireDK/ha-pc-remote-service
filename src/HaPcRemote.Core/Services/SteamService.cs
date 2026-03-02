@@ -33,6 +33,12 @@ public class SteamService(
         var games = await Task.Run(() => LoadInstalledGames(steamPath));
         _cachedGames = games;
         _cacheExpiry = DateTime.UtcNow + CacheDuration;
+
+        var shortcuts = games.Where(g => g.IsShortcut).ToList();
+        logger.LogDebug("Non-Steam shortcuts loaded: {Count} found", shortcuts.Count);
+        foreach (var s in shortcuts)
+            logger.LogDebug("  Shortcut [{AppId}] {Name}: ExePath={ExePath}", s.AppId, s.Name, s.ExePath ?? "(null)");
+
         return games;
     }
 
@@ -81,14 +87,39 @@ public class SteamService(
 
         var shortcuts = _cachedGames?.Where(g => g.IsShortcut && g.ExePath != null).ToList();
         if (shortcuts == null || shortcuts.Count == 0)
+        {
+            logger.LogDebug("Non-Steam detection: no shortcuts with ExePath in cache");
             return null;
+        }
 
-        var runningPaths = platform.GetRunningProcessPaths().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        logger.LogDebug("Non-Steam detection: checking {Count} shortcut(s)", shortcuts.Count);
+        foreach (var s in shortcuts)
+            logger.LogDebug("  Shortcut [{AppId}] {Name}: ExePath={ExePath}", s.AppId, s.Name, s.ExePath);
 
-        var match = shortcuts.FirstOrDefault(s => runningPaths.Contains(s.ExePath!));
+        var runningPaths = platform.GetRunningProcessPaths().ToList();
+        logger.LogDebug("Non-Steam detection: {Count} running processes", runningPaths.Count);
+
+        // Check for filename-level matches to surface path mismatches
+        foreach (var s in shortcuts)
+        {
+            var exeName = Path.GetFileName(s.ExePath!);
+            var candidates = runningPaths
+                .Where(p => Path.GetFileName(p).Equals(exeName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            foreach (var c in candidates)
+                logger.LogDebug("  Filename match for '{Name}': running={Running} | shortcut={Shortcut}",
+                    s.Name, c, s.ExePath);
+        }
+
+        var runningSet = runningPaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var match = shortcuts.FirstOrDefault(s => runningSet.Contains(s.ExePath!));
         if (match == null)
+        {
+            logger.LogDebug("Non-Steam detection: no exact path match found");
             return null;
+        }
 
+        logger.LogDebug("Non-Steam detection: matched [{AppId}] {Name}", match.AppId, match.Name);
         return new SteamRunningGame { AppId = match.AppId, Name = match.Name };
     }
 

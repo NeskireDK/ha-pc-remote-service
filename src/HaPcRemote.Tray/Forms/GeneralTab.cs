@@ -161,18 +161,16 @@ internal sealed class GeneralTab : TabPage
         layout.Controls.Add(new Label { AutoSize = true }, 0, row);
         layout.Controls.Add(autoUpdatePanel, 1, row++);
 
-        // Apply + Cancel buttons
-        var applyButton = new Button { Text = "Apply", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(50, 130, 50), ForeColor = Color.White, Size = new Size(80, 28), Cursor = Cursors.Hand };
-        var cancelButton = new Button { Text = "Cancel", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(50, 50, 50), ForeColor = Color.White, Size = new Size(80, 28), Cursor = Cursors.Hand };
+        Controls.Add(layout);
+
+        var applyButton = TabFooter.MakeSaveButton("Apply");
+        var cancelButton = TabFooter.MakeCancelButton();
         applyButton.Click += OnApply;
         cancelButton.Click += OnCancel;
-        var buttonPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
-        buttonPanel.Controls.Add(applyButton);
-        buttonPanel.Controls.Add(cancelButton);
-        layout.Controls.Add(new Label(), 0, row);
-        layout.Controls.Add(buttonPanel, 1, row);
-
-        Controls.Add(layout);
+        var footer = new TabFooter();
+        footer.Add(applyButton);
+        footer.Add(cancelButton);
+        Controls.Add(footer);
     }
 
     private void UpdatePortStatus()

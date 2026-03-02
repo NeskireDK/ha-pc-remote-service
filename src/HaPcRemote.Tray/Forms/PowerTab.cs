@@ -50,34 +50,16 @@ internal sealed class PowerTab : TabPage
         layout.Controls.Add(MakeLabel("Auto-Sleep (minutes):"), 0, 0);
         layout.Controls.Add(autoSleepPanel, 1, 0);
 
-        // Save + Cancel buttons
-        var saveButton = new Button
-        {
-            Text = "Save",
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            Size = new Size(100, 30),
-            Cursor = Cursors.Hand
-        };
-        saveButton.Click += OnSave;
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            Size = new Size(100, 30),
-            Cursor = Cursors.Hand
-        };
-        cancelButton.Click += OnCancel;
-        var buttonPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
-        buttonPanel.Controls.Add(saveButton);
-        buttonPanel.Controls.Add(cancelButton);
-        layout.Controls.Add(new Label(), 0, 1);
-        layout.Controls.Add(buttonPanel, 1, 1);
-
         Controls.Add(layout);
+
+        var saveButton = TabFooter.MakeSaveButton();
+        var cancelButton = TabFooter.MakeCancelButton();
+        saveButton.Click += OnSave;
+        cancelButton.Click += OnCancel;
+        var footer = new TabFooter();
+        footer.Add(saveButton);
+        footer.Add(cancelButton);
+        Controls.Add(footer);
     }
 
     private void OnSave(object? sender, EventArgs e)
