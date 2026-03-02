@@ -29,30 +29,14 @@ internal sealed class LogTab : TabPage
             WordWrap = false
         };
 
-        var clearButton = new Button
-        {
-            Text = "Clear",
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            Size = new Size(75, 28),
-            Cursor = Cursors.Hand
-        };
-        clearButton.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
+        var clearButton = TabFooter.MakeButton("Clear");
         clearButton.Click += (_, _) => _logBox.Clear();
 
-        var bottomPanel = new Panel
-        {
-            Height = 40,
-            Dock = DockStyle.Bottom,
-            BackColor = Color.FromArgb(30, 30, 30),
-            Padding = new Padding(0, 6, 8, 6)
-        };
-        clearButton.Dock = DockStyle.Right;
-        bottomPanel.Controls.Add(clearButton);
+        var footer = new TabFooter();
+        footer.Add(clearButton);
 
         Controls.Add(_logBox);
-        Controls.Add(bottomPanel);
+        Controls.Add(footer);
 
         _provider.OnLogEntry += OnNewLogEntry;
     }

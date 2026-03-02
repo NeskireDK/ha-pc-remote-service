@@ -19,7 +19,6 @@ internal sealed class ModesTab : TabPage
     private readonly Label _volumeLabel;
     private readonly ComboBox _launchAppCombo;
     private readonly ComboBox _killAppCombo;
-    private readonly Button _saveButton;
     private readonly Button _deleteButton;
     private readonly Button _newButton;
     private readonly ToolTip _toolTip = new();
@@ -147,17 +146,16 @@ internal sealed class ModesTab : TabPage
         editLayout.Controls.Add(MakeLabel("Kill App:"), 0, row);
         editLayout.Controls.Add(WithHelp(_killAppCombo, _toolTip, "App to terminate when this mode is activated.\nUseful for killing Steam Big Picture when switching to desktop mode."), 1, row++);
 
-        // Save button
-        _saveButton = CreateButton("Save Mode");
-        _saveButton.Width = 120;
-        _saveButton.Click += OnSaveMode;
-        editLayout.Controls.Add(new Label(), 0, row);
-        editLayout.Controls.Add(_saveButton, 1, row);
-
         rightPanel.Controls.Add(editLayout);
+
+        var saveButton = TabFooter.MakeSaveButton("Save Mode", 100);
+        saveButton.Click += OnSaveMode;
+        var footer = new TabFooter();
+        footer.Add(saveButton);
 
         Controls.Add(rightPanel);
         Controls.Add(leftPanel);
+        Controls.Add(footer);
 
         LoadModes();
     }

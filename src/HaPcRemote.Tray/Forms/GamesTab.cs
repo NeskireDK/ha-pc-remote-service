@@ -13,7 +13,6 @@ internal sealed class GamesTab : TabPage
 
     private readonly ComboBox _defaultModeCombo;
     private readonly DataGridView _gameGrid;
-    private readonly Button _saveButton;
     private readonly ToolTip _toolTip = new();
 
     public GamesTab(IServiceProvider services)
@@ -31,7 +30,7 @@ internal sealed class GamesTab : TabPage
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            RowCount = 3,
+            RowCount = 2,
             ColumnCount = 2,
             Padding = new Padding(0)
         };
@@ -39,7 +38,6 @@ internal sealed class GamesTab : TabPage
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
 
         // Default PC mode
         _defaultModeCombo = new ComboBox
@@ -120,45 +118,16 @@ internal sealed class GamesTab : TabPage
         layout.Controls.Add(_gameGrid, 0, 1);
         layout.SetColumnSpan(_gameGrid, 2);
 
-        // Save button + game list help icon
-        _saveButton = new Button
-        {
-            Text = "Save Bindings",
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            Size = new Size(120, 28),
-            Cursor = Cursors.Hand,
-            Anchor = AnchorStyles.Right
-        };
-        _saveButton.Click += OnSave;
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            Size = new Size(80, 28),
-            Cursor = Cursors.Hand,
-            Anchor = AnchorStyles.Right
-        };
-        cancelButton.Click += async (_, _) => await RefreshAsync();
-        var btnPanel = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.RightToLeft
-        };
-        btnPanel.Controls.Add(_saveButton);
-        btnPanel.Controls.Add(cancelButton);
-        btnPanel.Controls.Add(MakeHelpIcon(_toolTip,
-            "Per-game PC mode override.\n" +
-            "(default) = use the Default PC Mode above\n" +
-            "(none) = launch without switching modes\n" +
-            "Any named mode = switch to that mode before launching this game"));
-        layout.Controls.Add(btnPanel, 0, 2);
-        layout.SetColumnSpan(btnPanel, 2);
-
         Controls.Add(layout);
+
+        var saveButton = TabFooter.MakeSaveButton("Save Bindings", 110);
+        var cancelButton = TabFooter.MakeCancelButton();
+        saveButton.Click += OnSave;
+        cancelButton.Click += async (_, _) => await RefreshAsync();
+        var footer = new TabFooter();
+        footer.Add(saveButton);
+        footer.Add(cancelButton);
+        Controls.Add(footer);
     }
 
     protected override async void OnVisibleChanged(EventArgs e)

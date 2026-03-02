@@ -7,34 +7,44 @@ the core use case.
 
 ---
 
-## Blockers (fix before v1.0)
+## Blockers
 
-These are documented bugs that undermine trust in the integration.
-- Stop game via Integration still shows game running for 30 seconds or more - Optimistic assumption not working
-- integration images not loading. Likely not served by service. Increase debug logging and endpoint testing.
-- Multiple unhandled exceptions in service ui. L
-  - List Games, Click PC mode dropdown
-    The following exception occurred in the DataGridView:
-    System.Threading.ThreadStateException: Current thread must be set to single thread apartment (STA) mode before OLE calls can be made. Ensure that your Main function has STAThreadAttribute marked on it.
-    at System.Windows.Forms.ComboBox.set_AutoCompleteSource(AutoCompleteSource value)
-    at System.Windows.Forms.DataGridViewComboBoxCell.InitializeEditingControl(Int32 rowIndex, Object initialFormattedValue, DataGridViewCellStyle dataGridViewCellStyle)
-    at System.Windows.Forms.DataGridView.InitializeEditingControlValue(DataGridViewCellStyle& dataGridViewCellStyle, DataGridViewCell dataGridViewCell)
-    To replace this default dialog please handle the DataError event.
-  - PC Modes tab throws error: See the end of this message for details on invoking 
-just-in-time (JIT) debugging instead of this dialog box.
-- PC will sleep immidiately coming out of a previous sleep due to timeout being 5000+ seconds idle
-- Apply / Save bindings buttons confusion. Centralize all buttons in footer and pull right. Except on PC modes tab.
-- Likewise for Save Restart button on General Tab, this should be part of Apply, with not need for restart, we just rerun the kestrel server with the new appsettings. 
-************** Exception Text **************
-System.Threading.ThreadStateException: Current thread must be set to single thread apartment (STA) mode before OLE calls can be made. Ensure that your Main function has STAThreadAttribute marked on it.
-   at System.Windows.Forms.ComboBox.set_AutoCompleteMode(AutoCompleteMode value)
-   at HaPcRemote.Tray.Forms.ModesTab.OnHandleCreated(EventArgs e)
-   at System.Windows.Forms.Control.WmCreate(Message& m)
-   at System.Windows.Forms.Control.WndProc(Message& m)
-   at System.Windows.Forms.ScrollableControl.WndProc(Message& m)
-   at System.Windows.Forms.NativeWindow.Callback(HWND hWnd, UInt32 msg, WPARAM wparam, LPARAM lparam)
-- Starting steam-bigpicture app while steam is already running results in nothing. If steam is closed, it will result in steam bigpciture mode launcing.
-- 
+Documented bugs that undermine trust in the integration.
+
+- [ ] **ThreadStateException throughout tray UI** — Root cause: `Main()` entry point is
+  missing `[STAThread]`, so the process runs in MTA mode. COM/OLE calls anywhere in
+  WinForms fail. The v1.3.1 `OnHandleCreated` fix deferred the symptom in `ModesTab`
+  but didn't address the cause. Still throws in at least two places:
+  - Games tab → clicking PC mode dropdown in `DataGridView` (`ComboBox.set_AutoCompleteSource`
+    in `DataGridViewComboBoxCell.InitializeEditingControl`)
+  - Modes tab → `ComboBox.set_AutoCompleteMode` in `ModesTab.OnHandleCreated`
+  Fix: wrap entry point in explicit `static Program.Main()` with `[STAThread]`.
+  Implemented locally, uncommitted. *(service)*
+
+- [ ] **PC auto-sleeps immediately after waking** — `GetLastInputInfo` idle counter is not
+  reset by sleep/wake. After the PC wakes, the first inactivity check sees the accumulated
+  pre-sleep idle time (often 5000+ s) and triggers sleep immediately. Fix: record the last
+  wake time and ignore idle values that pre-date it. *(service)*
+
+- [ ] **Stop game: optimistic state not clearing** — After stop, the media player holds
+  optimistic `playing` state for 30 s, but the game shows as still running beyond that
+  window. *(integration)*
+
+- [ ] **Artwork not loading** — Integration images not served correctly by the service.
+  Needs debug logging on the artwork endpoint and end-to-end testing. *(service + integration)*
+
+- [ ] **Steam Big Picture launch idempotent** — Launching `steam-bigpicture` when Steam is
+  already running does nothing. Expected: switch to Big Picture mode regardless.
+  Fix: detect running Steam and pass `-bigpicture` flag instead of launching fresh. *(service)*
+
+- [ ] **Footer button UX** — Apply/Save/Cancel buttons inconsistently positioned. Centralise
+  in right-aligned footer across all tabs (General, Games, Power, Log). PC Modes tab is
+  the exception (has its own row management buttons). *(service)*
+
+- [ ] **General tab: Save + Restart → Apply with live reload** — No restart required.
+  Reload config and re-initialise Kestrel with new settings in-process. *(service)*
+
+
 - [x] **Steam: tray 503** — `POST /api/steam/run/{appId}` returns 200 even when the tray
   is not running and no game launches. Fixed in service v0.9.0: `IpcSteamPlatform` throws
   `TrayUnavailableException` → endpoint returns 503. *(service)*
@@ -286,6 +296,20 @@ config entry if missing — no manual setup required.
 
 ---
 
+## v1.3.2
+
+### Bugs
+
+- [ ] **WinForms tray runs in MTA thread** — Top-level C# statements don't automatically
+  apply `[STAThread]`, so the tray process runs in MTA mode. COM/OLE calls in WinForms
+  (autocomplete, clipboard, drag-and-drop, file dialogs) require STA and will throw
+  `InvalidOperationException` or `ThreadStateException` in MTA context. Root cause of the
+  v1.3.1 `ThreadStateException` — the `OnHandleCreated` fix mitigated the symptom but not
+  the cause. Fix: wrap entry point in an explicit `static Program.Main()` decorated with
+  `[STAThread]`. Implemented locally, uncommitted. *(service)*
+
+---
+
 ## v1.3
 
 ### Bugs
@@ -371,7 +395,12 @@ HA 2026.3 supports bundling brand images directly in the custom integration — 
 
 ### 18. Steam Logo as Media Player Artwork When Idle *(done in v1.3)*
 
-- [x] Integration: return Steam CDN logo URL from `media_image_url` when idle *(integration)*
+Shows the Steam icon (square, 960×960) when idle with no game running. Fetched once from
+Wikimedia CDN on first request, then served from a module-level in-memory cache for the
+lifetime of the HA session. Image is always proxied through HA (`media_image_remotely_accessible = False`).
+
+- [x] Integration: `media_image_url` returns Wikimedia Steam icon URL when idle *(integration)*
+- [x] Integration: `async_get_media_image()` overridden — returns cached bytes when idle, delegates to `super()` for game artwork *(integration)*
 
 ---
 
