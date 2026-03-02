@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="ValveKeyValue" Version="0.20.0.417" />
+    <PackageReference Include="Microsoft.Win32.SystemEvents" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>
