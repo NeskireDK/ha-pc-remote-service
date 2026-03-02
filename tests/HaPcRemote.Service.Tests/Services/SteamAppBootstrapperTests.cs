@@ -48,10 +48,10 @@ public class SteamAppBootstrapperTests : IDisposable
             .MustHaveHappenedOnceExactly();
 
         A.CallTo(() => _writer.SaveApp("steam-bigpicture", A<AppDefinitionOptions>.That.Matches(a =>
-            a.ExePath == exePath &&
-            a.Arguments == "-bigpicture" &&
+            a.ExePath == "steam://open/bigpicture" &&
+            a.Arguments == null &&
             a.ProcessName == "steam" &&
-            a.UseShellExecute == false)))
+            a.UseShellExecute == true)))
             .MustHaveHappenedOnceExactly();
     }
 
@@ -76,8 +76,9 @@ public class SteamAppBootstrapperTests : IDisposable
             .MustNotHaveHappened();
 
         A.CallTo(() => _writer.SaveApp("steam-bigpicture", A<AppDefinitionOptions>.That.Matches(a =>
-            a.ExePath == exePath &&
-            a.Arguments == "-bigpicture")))
+            a.ExePath == "steam://open/bigpicture" &&
+            a.Arguments == null &&
+            a.UseShellExecute == true)))
             .MustHaveHappenedOnceExactly();
     }
 
