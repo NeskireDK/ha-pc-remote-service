@@ -188,15 +188,17 @@ public class SteamService(
         var steamPath = platform.GetSteamPath();
         if (steamPath == null)
         {
-            logger.LogDebug("Artwork: Steam path not found for appId={AppId}", appId);
+            logger.LogWarning("Artwork: Steam path not found for appId={AppId}", appId);
             return null;
         }
 
+        var gameName = _cachedGames?.FirstOrDefault(g => g.AppId == appId)?.Name;
         var result = FindArtworkPath(steamPath, platform.GetSteamUserId(), appId, logger);
         if (result == null)
-            logger.LogDebug("Artwork: no file found for appId={AppId}", appId);
+            logger.LogError("Artwork: no cover found for appId={AppId} game={GameName}", appId, gameName ?? "unknown");
         else
-            logger.LogDebug("Artwork: serving {Path} ({Size} bytes)", result, new FileInfo(result).Length);
+            logger.LogDebug("Artwork: serving {Path} ({Size} bytes) for appId={AppId} game={GameName}",
+                result, new FileInfo(result).Length, appId, gameName ?? "unknown");
         return result;
     }
 
