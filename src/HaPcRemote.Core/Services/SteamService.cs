@@ -197,8 +197,8 @@ public class SteamService(
         if (result == null)
             logger.LogError("Artwork: no cover found for appId={AppId} game={GameName}", appId, gameName ?? "unknown");
         else
-            logger.LogDebug("Artwork: serving {Path} ({Size} bytes) for appId={AppId} game={GameName}",
-                result, new FileInfo(result).Length, appId, gameName ?? "unknown");
+            logger.LogDebug("Artwork: serving {Path} ({Size} KB) for appId={AppId} game={GameName}",
+                result, new FileInfo(result).Length / 1024, appId, gameName ?? "unknown");
         return result;
     }
 
@@ -551,7 +551,7 @@ public class SteamService(
                     var path = Path.Combine(gridDir, $"{fileId}p.{ext}");
                     if (File.Exists(path))
                     {
-                        logger?.LogDebug("Artwork: found in custom grid {Path} ({Size} bytes)", path, new FileInfo(path).Length);
+                        logger?.LogDebug("Artwork: found in custom grid {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
                         return path;
                     }
                 }
@@ -576,7 +576,7 @@ public class SteamService(
                 var path = Path.Combine(cacheDir, $"{fileId}_library_600x900.{ext}");
                 if (File.Exists(path))
                 {
-                    logger?.LogDebug("Artwork: found in library cache {Path} ({Size} bytes)", path, new FileInfo(path).Length);
+                    logger?.LogDebug("Artwork: found in library cache {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
                     return path;
                 }
             }
