@@ -51,13 +51,13 @@ public static class SteamAppBootstrapper
             writer.SaveApp("steam-bigpicture", new AppDefinitionOptions
             {
                 DisplayName = "Steam Big Picture",
-                ExePath = exePath,
-                Arguments = "-bigpicture",
+                ExePath = "steam://open/bigpicture",
+                Arguments = null,
                 ProcessName = "steam",
-                UseShellExecute = false
+                UseShellExecute = true
             });
 
-            logger.LogInformation("Auto-registered Steam Big Picture app entry: {ExePath}", exePath);
+            logger.LogInformation("Auto-registered Steam Big Picture app entry via steam:// URI");
         }
     }
 }
