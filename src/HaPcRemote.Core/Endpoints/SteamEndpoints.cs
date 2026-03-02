@@ -50,15 +50,21 @@ public static class SteamEndpoints
                 AppJsonContext.Default.ApiResponse);
         });
 
-        group.MapGet("/artwork/{appId:int}", (int appId, ISteamService steamService) =>
+        group.MapGet("/artwork/{appId:int}", (int appId, ISteamService steamService,
+            ILogger<SteamService> logger) =>
         {
+            logger.LogDebug("Artwork request: appId={AppId}", appId);
             var path = steamService.GetArtworkPath(appId);
+            logger.LogDebug("Artwork resolved path: {Path}", path ?? "(null)");
+            logger.LogDebug("Artwork file exists: {Exists}", path != null && File.Exists(path));
+
             if (path == null)
                 return Results.NotFound();
 
             if (!ContentTypeProvider.TryGetContentType(path, out var contentType))
                 contentType = "application/octet-stream";
 
+            logger.LogDebug("Artwork content-type: {ContentType}", contentType);
             return Results.File(path, contentType);
         });
 
