@@ -21,10 +21,11 @@ Documented bugs that undermine trust in the integration.
   Fix: wrap entry point in explicit `static Program.Main()` with `[STAThread]`.
   Implemented locally, uncommitted. *(service)*
 
-- [ ] **PC auto-sleeps immediately after waking** — `GetLastInputInfo` idle counter is not
+- [x] **PC auto-sleeps immediately after waking** — `GetLastInputInfo` idle counter is not
   reset by sleep/wake. After the PC wakes, the first inactivity check sees the accumulated
-  pre-sleep idle time (often 5000+ s) and triggers sleep immediately. Fix: record the last
-  wake time and ignore idle values that pre-date it. *(service)*
+  pre-sleep idle time (often 5000+ s) and triggers sleep immediately. Fixed post-v1.3.2:
+  subscribe to `SystemEvents.PowerModeChanged`; on `ResumeOrWake`, record the wake timestamp
+  and cap reported idle to seconds-since-wake until real input resets the baseline. *(service)*
 
 - [ ] **Stop game: optimistic state not clearing** — After stop, the media player holds
   optimistic `playing` state for 30 s, but the game shows as still running beyond that
@@ -33,9 +34,10 @@ Documented bugs that undermine trust in the integration.
 - [ ] **Artwork not loading** — Integration images not served correctly by the service.
   Needs debug logging on the artwork endpoint and end-to-end testing. *(service + integration)*
 
-- [ ] **Steam Big Picture launch idempotent** — Launching `steam-bigpicture` when Steam is
-  already running does nothing. Expected: switch to Big Picture mode regardless.
-  Fix: detect running Steam and pass `-bigpicture` flag instead of launching fresh. *(service)*
+- [x] **Steam Big Picture launch idempotent** — Launching `steam-bigpicture` when Steam is
+  already running does nothing. Fixed post-v1.3.2: launch via `steam://open/bigpicture` URI
+  (via `xdg-open` / `ShellExecute`) instead of re-launching the Steam process. The URI is
+  handled by the running Steam instance and switches to Big Picture regardless of current state. *(service)*
 
 - [ ] **Footer button UX** — Apply/Save/Cancel buttons inconsistently positioned. Centralise
   in right-aligned footer across all tabs (General, Games, Power, Log). PC Modes tab is
