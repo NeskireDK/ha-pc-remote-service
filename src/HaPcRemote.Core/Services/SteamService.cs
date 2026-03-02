@@ -187,9 +187,19 @@ public class SteamService(
     {
         var steamPath = platform.GetSteamPath();
         if (steamPath == null)
+        {
+            logger.LogWarning("Artwork: Steam path not found for appId={AppId}", appId);
             return null;
+        }
 
-        return FindArtworkPath(steamPath, platform.GetSteamUserId(), appId);
+        var gameName = _cachedGames?.FirstOrDefault(g => g.AppId == appId)?.Name;
+        var result = FindArtworkPath(steamPath, platform.GetSteamUserId(), appId, logger);
+        if (result == null)
+            logger.LogError("Artwork: no cover found for appId={AppId} game={GameName}", appId, gameName ?? "unknown");
+        else
+            logger.LogDebug("Artwork: serving {Path} ({Size} KB) for appId={AppId} game={GameName}",
+                result, new FileInfo(result).Length / 1024, appId, gameName ?? "unknown");
+        return result;
     }
 
     public SteamBindings GetBindings()
@@ -523,10 +533,12 @@ public class SteamService(
     /// 1. Custom grid art: userdata/{steamid}/config/grid/{appId}p.{ext}
     /// 2. Library cache: appcache/librarycache/{appId}_library_600x900.{ext}
     /// </summary>
-    internal static string? FindArtworkPath(string steamPath, string? steamUserId, int appId)
+    internal static string? FindArtworkPath(string steamPath, string? steamUserId, int appId, ILogger? logger = null)
     {
         // For non-Steam shortcuts, use unsigned representation for filenames
         var fileId = IsShortcutAppId(appId) ? ((uint)appId).ToString() : appId.ToString();
+        logger?.LogDebug("Artwork: lookup appId={AppId} fileId={FileId} isShortcut={IsShortcut}",
+            appId, fileId, IsShortcutAppId(appId));
 
         // Priority 1: Custom grid art (user-set posters)
         if (steamUserId != null)
@@ -538,9 +550,21 @@ public class SteamService(
                 {
                     var path = Path.Combine(gridDir, $"{fileId}p.{ext}");
                     if (File.Exists(path))
+                    {
+                        logger?.LogDebug("Artwork: found in custom grid {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
                         return path;
+                    }
                 }
+                logger?.LogDebug("Artwork: not found in custom grid {GridDir}", gridDir);
             }
+            else
+            {
+                logger?.LogDebug("Artwork: custom grid dir missing {GridDir}", gridDir);
+            }
+        }
+        else
+        {
+            logger?.LogDebug("Artwork: no steamUserId, skipping custom grid lookup");
         }
 
         // Priority 2: Steam CDN library cache
@@ -551,8 +575,16 @@ public class SteamService(
             {
                 var path = Path.Combine(cacheDir, $"{fileId}_library_600x900.{ext}");
                 if (File.Exists(path))
+                {
+                    logger?.LogDebug("Artwork: found in library cache {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
                     return path;
+                }
             }
+            logger?.LogDebug("Artwork: not found in library cache {CacheDir}", cacheDir);
+        }
+        else
+        {
+            logger?.LogDebug("Artwork: library cache dir missing {CacheDir}", cacheDir);
         }
 
         return null;
