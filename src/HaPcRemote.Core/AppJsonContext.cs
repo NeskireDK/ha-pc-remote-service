@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using HaPcRemote.Service.Models;
+using HaPcRemote.Service.Services;
 
 namespace HaPcRemote.Service;
 
@@ -39,6 +40,8 @@ namespace HaPcRemote.Service;
 [JsonSerializable(typeof(ApiResponse<SystemState>))]
 [JsonSerializable(typeof(PowerConfig))]
 [JsonSerializable(typeof(ApiResponse<PowerConfig>))]
+[JsonSerializable(typeof(UpdateResult))]
+[JsonSerializable(typeof(ApiResponse<UpdateResult>))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
