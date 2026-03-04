@@ -111,16 +111,16 @@ public class AppServiceBigPictureTests
     }
 
     [Fact]
-    public async Task KillAsync_BigPicture_DoesNotKillSteamProcess()
+    public async Task KillAsync_BigPicture_SendsCloseUri()
     {
-        // Big Picture kill should NOT kill the steam process — just reset the tracker.
-        // We verify this indirectly: if steam.exe were killed, Steam would close entirely.
-        // The test succeeds if no exception is thrown (no process kill attempted for
-        // a non-existent process) and the tracker is marked stopped.
+        var launcher = A.Fake<IAppLauncher>();
         var tracker = A.Fake<IBigPictureTracker>();
-        var service = new AppService(CreateOptions(), A.Fake<IAppLauncher>(), tracker);
+        var service = new AppService(CreateOptions(), launcher, tracker);
 
-        await Should.NotThrowAsync(() => service.KillAsync("steam-bigpicture"));
+        await service.KillAsync("steam-bigpicture");
+
+        A.CallTo(() => launcher.LaunchAsync("steam://close/bigpicture", null, true))
+            .MustHaveHappenedOnceExactly();
         A.CallTo(() => tracker.MarkStopped()).MustHaveHappenedOnceExactly();
     }
 

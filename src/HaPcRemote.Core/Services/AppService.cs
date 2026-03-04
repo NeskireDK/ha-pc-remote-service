@@ -43,16 +43,17 @@ public class AppService(
             bigPictureTracker.MarkStarted();
     }
 
-    public Task KillAsync(string appKey)
+    public async Task KillAsync(string appKey)
     {
         var definition = GetDefinition(appKey);
 
         if (IsBigPicture(appKey))
         {
             bigPictureTracker.MarkStopped();
-            // Don't kill the steam process — just exit Big Picture mode.
-            // Killing steam.exe would close Steam entirely.
-            return Task.CompletedTask;
+            // Send the close URI instead of killing steam.exe.
+            // steam://close/bigpicture exits Big Picture without closing Steam.
+            await appLauncher.LaunchAsync("steam://close/bigpicture", null, true);
+            return;
         }
 
         var processes = Process.GetProcessesByName(definition.ProcessName);
@@ -61,8 +62,6 @@ public class AppService(
             using (process)
                 process.Kill(entireProcessTree: true);
         }
-
-        return Task.CompletedTask;
     }
 
     public Task<AppInfo> GetStatusAsync(string appKey)
