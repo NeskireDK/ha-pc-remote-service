@@ -72,18 +72,18 @@ public class SystemEndpointTests : EndpointTestBase
     }
 
     [Fact]
-    public async Task Restart_ReturnsOk_AndCallsService()
+    public async Task Reload_ReturnsOk_AndCallsService()
     {
         using var client = CreateClient();
 
-        var response = await client.PostAsync("/api/system/restart", null);
+        var response = await client.PostAsync("/api/system/reload", null);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<ApiResponse>(
             AppJsonContext.Default.ApiResponse);
         json.ShouldNotBeNull();
         json.Success.ShouldBeTrue();
-        json.Message.ShouldBe("Restart scheduled");
+        json.Message.ShouldBe("Service reload scheduled");
         A.CallTo(() => RestartService.ScheduleRestart()).MustHaveHappenedOnceExactly();
     }
 

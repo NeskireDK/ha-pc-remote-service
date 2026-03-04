@@ -29,11 +29,11 @@ public static class SystemEndpoints
             return Results.Json(ApiResponse.Ok(seconds.Value), AppJsonContext.Default.ApiResponseInt32);
         });
 
-        group.MapPost("/restart", (IRestartService restartService, ILogger<IRestartService> logger) =>
+        group.MapPost("/reload", (IRestartService restartService, ILogger<IRestartService> logger) =>
         {
-            logger.LogInformation("Restart requested via API");
+            logger.LogInformation("Service reload requested via API");
             restartService.ScheduleRestart();
-            return Results.Json(ApiResponse.Ok("Restart scheduled"), AppJsonContext.Default.ApiResponse);
+            return Results.Json(ApiResponse.Ok("Service reload scheduled"), AppJsonContext.Default.ApiResponse);
         });
 
         group.MapPost("/update", async (IUpdateService updateService, ILogger<IUpdateService> logger, CancellationToken ct) =>
