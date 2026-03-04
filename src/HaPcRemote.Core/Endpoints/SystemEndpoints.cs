@@ -29,6 +29,29 @@ public static class SystemEndpoints
             return Results.Json(ApiResponse.Ok(seconds.Value), AppJsonContext.Default.ApiResponseInt32);
         });
 
+        group.MapPost("/reload", (IRestartService restartService, ILogger<IRestartService> logger) =>
+        {
+            logger.LogInformation("Service reload requested via API");
+            restartService.ScheduleRestart();
+            return Results.Json(ApiResponse.Ok("Service reload scheduled"), AppJsonContext.Default.ApiResponse);
+        });
+
+        group.MapPost("/update", async (IUpdateService updateService, ILogger<IUpdateService> logger, CancellationToken ct) =>
+        {
+            logger.LogInformation("Update requested via API");
+            var result = await updateService.CheckAndApplyAsync(ct);
+            return result.Status switch
+            {
+                UpdateStatus.Failed => Results.Json(
+                    new ApiResponse<UpdateResult> { Success = false, Data = result, Message = result.Message },
+                    AppJsonContext.Default.ApiResponseUpdateResult,
+                    statusCode: StatusCodes.Status500InternalServerError),
+                _ => Results.Json(
+                    ApiResponse.Ok(result, result.Message),
+                    AppJsonContext.Default.ApiResponseUpdateResult)
+            };
+        });
+
         return group;
     }
 }

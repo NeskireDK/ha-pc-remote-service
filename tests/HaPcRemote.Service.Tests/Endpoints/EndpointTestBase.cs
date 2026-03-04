@@ -22,6 +22,8 @@ public class EndpointTestBase : IAsyncLifetime
     protected readonly IMonitorService MonitorService = A.Fake<IMonitorService>();
     protected readonly IIdleService IdleService = A.Fake<IIdleService>();
     protected readonly IConfigurationWriter ConfigWriter = A.Fake<IConfigurationWriter>();
+    protected readonly IRestartService RestartService = A.Fake<IRestartService>();
+    protected readonly IUpdateService UpdateService = A.Fake<IUpdateService>();
 
     private WebApplication? _app;
 
@@ -51,6 +53,8 @@ public class EndpointTestBase : IAsyncLifetime
         builder.Services.AddSingleton<IMonitorService>(MonitorService);
         builder.Services.AddSingleton(IdleService);
         builder.Services.AddSingleton(ConfigWriter);
+        builder.Services.AddSingleton(RestartService);
+        builder.Services.AddSingleton(UpdateService);
 
         // Real services that delegate to fakes
         builder.Services.AddHttpClient();
