@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.Versioning;
+using HaPcRemote.Service.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
@@ -63,6 +65,19 @@ public class WindowsSteamPlatform(ILogger<WindowsSteamPlatform> logger) : ISteam
         }
     }
 
+    public void KillProcess(int processId)
+    {
+        try
+        {
+            using var proc = Process.GetProcessById(processId);
+            proc.Kill(entireProcessTree: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to kill process {Pid}", processId);
+        }
+    }
+
     public IEnumerable<string> GetRunningProcessPaths()
     {
         var paths = new List<string>();
@@ -78,5 +93,41 @@ public class WindowsSteamPlatform(ILogger<WindowsSteamPlatform> logger) : ISteam
             finally { proc.Dispose(); }
         }
         return paths;
+    }
+
+    public IEnumerable<RunningProcess> GetRunningProcesses()
+    {
+        var processes = new List<RunningProcess>();
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT ProcessId, ExecutablePath, CommandLine FROM Win32_Process WHERE ExecutablePath IS NOT NULL");
+            using var results = searcher.Get();
+            foreach (var obj in results.OfType<ManagementObject>())
+            {
+                var pid = Convert.ToInt32(obj["ProcessId"]);
+                var path = obj["ExecutablePath"] as string;
+                var cmdLine = obj["CommandLine"] as string;
+                if (path != null)
+                    processes.Add(new RunningProcess(pid, path, cmdLine));
+                obj.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "WMI process query failed, falling back to Process API");
+            foreach (var proc in Process.GetProcesses())
+            {
+                try
+                {
+                    var path = proc.MainModule?.FileName;
+                    if (path != null)
+                        processes.Add(new RunningProcess(proc.Id, path, null));
+                }
+                catch { }
+                finally { proc.Dispose(); }
+            }
+        }
+        return processes;
     }
 }

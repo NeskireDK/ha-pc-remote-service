@@ -7,4 +7,7 @@ public sealed class SteamGame
     public required long LastPlayed { get; init; }
     public bool IsShortcut { get; init; }
     public string? ExePath { get; init; }
+    public string? LaunchOptions { get; init; }
 }
+
+public sealed record RunningProcess(int Pid, string Path, string? CommandLine);

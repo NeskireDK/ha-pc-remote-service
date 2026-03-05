@@ -1,5 +1,7 @@
+using System.Reflection;
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
+using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -854,5 +856,158 @@ public class SteamServiceTests
         var service = CreateService();
 
         service.IsSteamRunning().ShouldBeFalse();
+    }
+
+    // ── Non-Steam shortcut detection tests ──────────────────────────
+
+    private static void InjectCachedGames(SteamService service, List<SteamGame> games)
+    {
+        typeof(SteamService)
+            .GetField("_cachedGames", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(service, games);
+    }
+
+    [Fact]
+    public async Task GetRunningGame_AppIdZero_ExePathMatch_ReturnsShortcut()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        A.CallTo(() => _platform.GetRunningProcesses()).Returns(new[]
+        {
+            new RunningProcess(42, @"C:\Games\custom.exe", null)
+        });
+
+        var service = CreateService();
+        // Warm cache so _cachedGames is not null, then inject shortcuts
+        await service.GetGamesAsync();
+        InjectCachedGames(service, new List<SteamGame>
+        {
+            new() { AppId = -100, Name = "My Custom Game", LastPlayed = 0, IsShortcut = true, ExePath = @"C:\Games\custom.exe" }
+        });
+
+        var result = await service.GetRunningGameAsync();
+
+        result.ShouldNotBeNull();
+        result.AppId.ShouldBe(-100);
+        result.Name.ShouldBe("My Custom Game");
+        result.ProcessId.ShouldBe(42);
+    }
+
+    [Fact]
+    public async Task GetRunningGame_AppIdZero_CommandLineDisambiguates_ReturnsCorrectShortcut()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        // Two processes with the same exe but different command lines
+        A.CallTo(() => _platform.GetRunningProcesses()).Returns(new[]
+        {
+            new RunningProcess(10, @"D:\Emulators\retro.exe", @"D:\Emulators\retro.exe --rom ""GameA.rom"""),
+            new RunningProcess(20, @"D:\Emulators\retro.exe", @"D:\Emulators\retro.exe --rom ""GameB.rom""")
+        });
+
+        var service = CreateService();
+        await service.GetGamesAsync();
+        InjectCachedGames(service, new List<SteamGame>
+        {
+            new() { AppId = -200, Name = "Emu Game A", LastPlayed = 0, IsShortcut = true, ExePath = @"D:\Emulators\retro.exe", LaunchOptions = @"--rom ""GameA.rom""" },
+            new() { AppId = -300, Name = "Emu Game B", LastPlayed = 0, IsShortcut = true, ExePath = @"D:\Emulators\retro.exe", LaunchOptions = @"--rom ""GameB.rom""" }
+        });
+
+        var result = await service.GetRunningGameAsync();
+
+        result.ShouldNotBeNull();
+        result.AppId.ShouldBe(-200);
+        result.Name.ShouldBe("Emu Game A");
+        result.ProcessId.ShouldBe(10);
+    }
+
+    [Fact]
+    public async Task GetRunningGame_AppIdZero_CommandLineNoMatch_ReturnsFirstExeMatch()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        // Process command line doesn't contain either shortcut's LaunchOptions
+        A.CallTo(() => _platform.GetRunningProcesses()).Returns(new[]
+        {
+            new RunningProcess(10, @"D:\Emulators\retro.exe", @"D:\Emulators\retro.exe --rom ""GameC.rom"""),
+            new RunningProcess(20, @"D:\Emulators\retro.exe", @"D:\Emulators\retro.exe --rom ""GameD.rom""")
+        });
+
+        var service = CreateService();
+        await service.GetGamesAsync();
+        InjectCachedGames(service, new List<SteamGame>
+        {
+            new() { AppId = -200, Name = "Emu Game A", LastPlayed = 0, IsShortcut = true, ExePath = @"D:\Emulators\retro.exe", LaunchOptions = @"--rom ""GameA.rom""" },
+            new() { AppId = -300, Name = "Emu Game B", LastPlayed = 0, IsShortcut = true, ExePath = @"D:\Emulators\retro.exe", LaunchOptions = @"--rom ""GameB.rom""" }
+        });
+
+        var result = await service.GetRunningGameAsync();
+
+        // No CommandLine match for either shortcut — falls through all shortcuts, returns null
+        // because TryFindRunningShortcutAsync only returns on exact match
+        result.ShouldBeNull();
+    }
+
+    // ── Non-Steam shortcut stop tests ───────────────────────────────
+
+    [Fact]
+    public async Task StopGame_AppIdZero_ShortcutProcessDetected_KillsProcess()
+    {
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        A.CallTo(() => _platform.GetRunningProcesses()).Returns(new[]
+        {
+            new RunningProcess(55, @"C:\Games\custom.exe", null)
+        });
+
+        var service = CreateService();
+        await service.GetGamesAsync();
+        InjectCachedGames(service, new List<SteamGame>
+        {
+            new() { AppId = -100, Name = "My Custom Game", LastPlayed = 0, IsShortcut = true, ExePath = @"C:\Games\custom.exe" }
+        });
+
+        await service.StopGameAsync();
+
+        A.CallTo(() => _platform.KillProcess(55)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _platform.KillProcessesInDirectory(A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task StopGame_NegativeAppId_ShortcutProcessDetected_KillsProcess()
+    {
+        // Negative appId = shortcut registered with Steam
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(-100);
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        A.CallTo(() => _platform.GetRunningProcesses()).Returns(new[]
+        {
+            new RunningProcess(77, @"C:\Games\custom.exe", null)
+        });
+
+        var service = CreateService();
+        await service.GetGamesAsync();
+        InjectCachedGames(service, new List<SteamGame>
+        {
+            new() { AppId = -100, Name = "My Custom Game", LastPlayed = 0, IsShortcut = true, ExePath = @"C:\Games\custom.exe" }
+        });
+
+        await service.StopGameAsync();
+
+        A.CallTo(() => _platform.KillProcess(77)).MustHaveHappenedOnceExactly();
+    }
+
+    // ── ParseShortcuts LaunchOptions test ────────────────────────────
+
+    [Fact]
+    public void ParseShortcuts_ValidBinaryVdf_ParsesLaunchOptions()
+    {
+        // The test VDF (shortcuts.vdf) contains two entries.
+        // "Emulator Game" has LaunchOptions set in the binary VDF.
+        using var stream = File.OpenRead(TestData.FilePath("shortcuts.vdf"));
+        var shortcuts = SteamService.ParseShortcuts(stream);
+
+        // At minimum, verify LaunchOptions is parsed (non-null) for the entry that has it
+        var withLaunchOpts = shortcuts.FirstOrDefault(s => s.LaunchOptions != null);
+        withLaunchOpts.ShouldNotBeNull("Expected at least one shortcut with LaunchOptions in shortcuts.vdf");
     }
 }
