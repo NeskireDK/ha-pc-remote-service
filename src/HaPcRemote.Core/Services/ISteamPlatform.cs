@@ -1,3 +1,5 @@
+using HaPcRemote.Service.Models;
+
 namespace HaPcRemote.Service.Services;
 
 public interface ISteamPlatform
@@ -8,5 +10,7 @@ public interface ISteamPlatform
     bool IsSteamRunning();
     void LaunchSteamUrl(string url);
     void KillProcessesInDirectory(string directory);
+    void KillProcess(int processId);
     IEnumerable<string> GetRunningProcessPaths();
+    IEnumerable<RunningProcess> GetRunningProcesses();
 }
