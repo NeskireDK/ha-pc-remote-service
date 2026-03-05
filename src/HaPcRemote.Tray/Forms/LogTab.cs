@@ -4,10 +4,11 @@ using Microsoft.Extensions.Logging;
 
 namespace HaPcRemote.Tray.Forms;
 
-internal sealed class LogTab : TabPage
+internal sealed class LogTab : TabPage, ISettingsTab
 {
     private readonly InMemoryLogProvider _provider;
     private readonly RichTextBox _logBox;
+    private readonly int _port;
 
     public LogTab(InMemoryLogProvider provider, int port)
     {
@@ -30,24 +31,26 @@ internal sealed class LogTab : TabPage
             WordWrap = false
         };
 
+        _port = port;
+
+        Controls.Add(_logBox);
+
+        _provider.OnLogEntry += OnNewLogEntry;
+    }
+
+    public IEnumerable<Button> CreateFooterButtons()
+    {
         var clearButton = TabFooter.MakeButton("Clear");
         clearButton.Click += (_, _) => _logBox.Clear();
 
         var debugButton = TabFooter.MakeButton("API Explorer");
         debugButton.Click += (_, _) =>
         {
-            try { Process.Start(new ProcessStartInfo($"http://localhost:{port}/api-explorer") { UseShellExecute = true }); }
+            try { Process.Start(new ProcessStartInfo($"http://localhost:{_port}/api-explorer") { UseShellExecute = true }); }
             catch { /* best effort */ }
         };
 
-        var footer = new TabFooter();
-        footer.Add(clearButton);
-        footer.Add(debugButton);
-
-        Controls.Add(_logBox);
-        Controls.Add(footer);
-
-        _provider.OnLogEntry += OnNewLogEntry;
+        return [clearButton, debugButton];
     }
 
     private void OnNewLogEntry(LogEntry entry)
