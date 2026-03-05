@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Tray.Forms;
 
-internal sealed class GeneralTab : TabPage
+internal sealed class GeneralTab : TabPage, ISettingsTab
 {
     private readonly KestrelRestartService _restartService;
     private readonly ToolTip _toolTip = new();
@@ -162,15 +162,15 @@ internal sealed class GeneralTab : TabPage
         layout.Controls.Add(autoUpdatePanel, 1, row++);
 
         Controls.Add(layout);
+    }
 
+    public IEnumerable<Button> CreateFooterButtons()
+    {
         var applyButton = TabFooter.MakeSaveButton("Apply");
         var cancelButton = TabFooter.MakeCancelButton();
         applyButton.Click += OnApply;
         cancelButton.Click += OnCancel;
-        var footer = new TabFooter();
-        footer.Add(applyButton);
-        footer.Add(cancelButton);
-        Controls.Add(footer);
+        return [applyButton, cancelButton];
     }
 
     private void UpdatePortStatus()

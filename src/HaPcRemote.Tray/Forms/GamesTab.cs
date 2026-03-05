@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Tray.Forms;
 
-internal sealed class GamesTab : TabPage
+internal sealed class GamesTab : TabPage, ISettingsTab
 {
     private readonly IConfigurationWriter _configWriter;
     private readonly ISteamService _steamService;
@@ -119,15 +119,15 @@ internal sealed class GamesTab : TabPage
         layout.SetColumnSpan(_gameGrid, 2);
 
         Controls.Add(layout);
+    }
 
+    public IEnumerable<Button> CreateFooterButtons()
+    {
         var saveButton = TabFooter.MakeSaveButton("Save Bindings", 110);
         var cancelButton = TabFooter.MakeCancelButton();
         saveButton.Click += OnSave;
         cancelButton.Click += async (_, _) => await RefreshAsync();
-        var footer = new TabFooter();
-        footer.Add(saveButton);
-        footer.Add(cancelButton);
-        Controls.Add(footer);
+        return [saveButton, cancelButton];
     }
 
     protected override async void OnVisibleChanged(EventArgs e)

@@ -3,7 +3,7 @@ using HaPcRemote.Service.Services;
 
 namespace HaPcRemote.Tray.Forms;
 
-internal sealed class PowerTab : TabPage
+internal sealed class PowerTab : TabPage, ISettingsTab
 {
     private readonly IConfigurationWriter _configWriter;
     private readonly ToolTip _toolTip = new();
@@ -51,15 +51,15 @@ internal sealed class PowerTab : TabPage
         layout.Controls.Add(autoSleepPanel, 1, 0);
 
         Controls.Add(layout);
+    }
 
+    public IEnumerable<Button> CreateFooterButtons()
+    {
         var saveButton = TabFooter.MakeSaveButton();
         var cancelButton = TabFooter.MakeCancelButton();
         saveButton.Click += OnSave;
         cancelButton.Click += OnCancel;
-        var footer = new TabFooter();
-        footer.Add(saveButton);
-        footer.Add(cancelButton);
-        Controls.Add(footer);
+        return [saveButton, cancelButton];
     }
 
     private void OnSave(object? sender, EventArgs e)
