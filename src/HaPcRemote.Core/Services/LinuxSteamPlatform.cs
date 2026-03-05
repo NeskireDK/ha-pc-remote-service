@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using HaPcRemote.Service.Models;
 using ValveKeyValue;
 
 namespace HaPcRemote.Service.Services;
@@ -104,6 +105,19 @@ public sealed class LinuxSteamPlatform : ISteamPlatform
         }
     }
 
+    public void KillProcess(int processId)
+    {
+        try
+        {
+            using var proc = Process.GetProcessById(processId);
+            proc.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Process already exited or access denied
+        }
+    }
+
     public IEnumerable<string> GetRunningProcessPaths()
     {
         var paths = new List<string>();
@@ -119,5 +133,43 @@ public sealed class LinuxSteamPlatform : ISteamPlatform
             finally { proc.Dispose(); }
         }
         return paths;
+    }
+
+    public IEnumerable<RunningProcess> GetRunningProcesses()
+    {
+        var processes = new List<RunningProcess>();
+        if (!Directory.Exists("/proc")) return processes;
+
+        foreach (var dir in Directory.GetDirectories("/proc"))
+        {
+            var name = Path.GetFileName(dir);
+            if (!int.TryParse(name, out var pid)) continue;
+
+            try
+            {
+                // Resolve /proc/<pid>/exe symlink for the executable path
+                var exeLink = Path.Combine(dir, "exe");
+                var path = File.ResolveLinkTarget(exeLink, returnFinalTarget: true)?.FullName;
+                if (path is null) continue;
+
+                // Read /proc/<pid>/cmdline (null-delimited)
+                var cmdlineFile = Path.Combine(dir, "cmdline");
+                string? cmdLine = null;
+                if (File.Exists(cmdlineFile))
+                {
+                    var raw = File.ReadAllText(cmdlineFile);
+                    if (!string.IsNullOrEmpty(raw))
+                        cmdLine = raw.Replace('\0', ' ').TrimEnd();
+                }
+
+                processes.Add(new RunningProcess(pid, path, cmdLine));
+            }
+            catch
+            {
+                // Access denied or process exited between enumeration and read
+            }
+        }
+
+        return processes;
     }
 }
