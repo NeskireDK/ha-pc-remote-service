@@ -31,6 +31,14 @@ public static class SteamEndpoints
                 AppJsonContext.Default.ApiResponseSteamRunningGame);
         });
 
+        group.MapGet("/running/diagnostics", async (ISteamService steamService) =>
+        {
+            var diag = await steamService.GetRunningGameDiagnosticsAsync();
+            return Results.Json(
+                ApiResponse.Ok(diag),
+                AppJsonContext.Default.ApiResponseRunningGameDiagnostics);
+        });
+
         group.MapPost("/run/{appId:int}", async (int appId, ISteamService steamService,
             ILogger<SteamService> logger) =>
         {

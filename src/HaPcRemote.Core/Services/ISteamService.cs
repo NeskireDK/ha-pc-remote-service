@@ -6,6 +6,7 @@ public interface ISteamService
 {
     Task<List<SteamGame>> GetGamesAsync();
     Task<SteamRunningGame?> GetRunningGameAsync();
+    Task<RunningGameDiagnostics> GetRunningGameDiagnosticsAsync();
     Task<SteamRunningGame?> LaunchGameAsync(int appId);
     Task StopGameAsync();
     Task<string?> GetArtworkPathAsync(int appId);

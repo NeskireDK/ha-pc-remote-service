@@ -77,6 +77,96 @@ public class SteamService(
         return new SteamRunningGame { AppId = appId, Name = name };
     }
 
+    public async Task<RunningGameDiagnostics> GetRunningGameDiagnosticsAsync()
+    {
+        var steamAppId = platform.GetRunningAppId();
+
+        if (_cachedGames == null || _cachedGames.Count == 0)
+        {
+            try { await GetGamesAsync(); }
+            catch (InvalidOperationException) { /* Steam path unavailable */ }
+        }
+
+        var shortcuts = _cachedGames?.Where(g => g.IsShortcut && g.ExePath != null).ToList()
+                        ?? [];
+        var runningProcesses = platform.GetRunningProcesses().ToList();
+        var processesByPath = runningProcesses
+            .GroupBy(p => p.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var traces = new List<ShortcutDetectionTrace>();
+        SteamRunningGame? result = null;
+
+        foreach (var shortcut in shortcuts)
+        {
+            var exeName = Path.GetFileName(shortcut.ExePath!);
+            var filenameMatches = runningProcesses
+                .Where(p => Path.GetFileName(p.Path).Equals(exeName, StringComparison.OrdinalIgnoreCase))
+                .Select(p => new ProcessMatch { Pid = p.Pid, Path = p.Path, CommandLine = p.CommandLine })
+                .ToList();
+
+            var exactPathMatch = processesByPath.TryGetValue(shortcut.ExePath!, out var matchingProcesses);
+            var matched = false;
+            int? matchedPid = null;
+            string? matchReason = null;
+
+            if (exactPathMatch && matchingProcesses!.Count > 0)
+            {
+                if (matchingProcesses.Count == 1 || string.IsNullOrEmpty(shortcut.LaunchOptions))
+                {
+                    matched = true;
+                    matchedPid = matchingProcesses[0].Pid;
+                    matchReason = "exe-path";
+                }
+                else
+                {
+                    var cmdMatch = matchingProcesses.FirstOrDefault(p =>
+                        p.CommandLine != null &&
+                        p.CommandLine.Contains(shortcut.LaunchOptions, StringComparison.OrdinalIgnoreCase));
+                    if (cmdMatch != null)
+                    {
+                        matched = true;
+                        matchedPid = cmdMatch.Pid;
+                        matchReason = "command-line";
+                    }
+                }
+            }
+
+            traces.Add(new ShortcutDetectionTrace
+            {
+                AppId = shortcut.AppId,
+                Name = shortcut.Name,
+                ExePath = shortcut.ExePath,
+                LaunchOptions = shortcut.LaunchOptions,
+                FilenameMatches = filenameMatches,
+                ExactPathMatch = exactPathMatch,
+                Matched = matched,
+                MatchedPid = matchedPid,
+                MatchReason = matchReason
+            });
+
+            if (matched && result == null)
+                result = new SteamRunningGame { AppId = shortcut.AppId, Name = shortcut.Name, ProcessId = matchedPid };
+        }
+
+        // If Steam reports a non-zero, non-shortcut appId, use that instead
+        if (steamAppId != 0 && !IsShortcutAppId(steamAppId))
+        {
+            var name = _cachedGames?.Find(g => g.AppId == steamAppId)?.Name ?? $"Unknown ({steamAppId})";
+            result = new SteamRunningGame { AppId = steamAppId, Name = name };
+        }
+
+        return new RunningGameDiagnostics
+        {
+            SteamReportedAppId = steamAppId,
+            SteamRunning = platform.IsSteamRunning(),
+            ShortcutsChecked = shortcuts.Count,
+            RunningProcessCount = runningProcesses.Count,
+            Traces = traces,
+            Result = result
+        };
+    }
+
     private async Task<SteamRunningGame?> TryFindRunningShortcutAsync()
     {
         // Warm the cache if needed
