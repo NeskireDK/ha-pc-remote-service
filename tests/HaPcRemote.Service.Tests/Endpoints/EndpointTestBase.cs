@@ -60,6 +60,7 @@ public class EndpointTestBase : IAsyncLifetime
         // Real services that delegate to fakes
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<AppService>();
+        builder.Services.AddSingleton<IAppService>(sp => sp.GetRequiredService<AppService>());
         builder.Services.AddSingleton<IModeService, ModeService>();
         builder.Services.AddSingleton<ISteamService, SteamService>();
         // MdnsAdvertiserService excluded — avoids UDP socket binding in tests

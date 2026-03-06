@@ -84,6 +84,7 @@ builder.Services.AddSingleton<ICliRunner, CliRunner>();
 builder.Services.AddSingleton<IAppLauncher, DirectAppLauncher>();
 builder.Services.AddSingleton<IBigPictureTracker, BigPictureTracker>();
 builder.Services.AddSingleton<AppService>();
+builder.Services.AddSingleton<IAppService>(sp => sp.GetRequiredService<AppService>());
 builder.Services.AddSingleton<IAudioService, LinuxAudioService>();
 builder.Services.AddSingleton<IMonitorService, LinuxMonitorService>();
 builder.Services.AddSingleton<IModeService, ModeService>();

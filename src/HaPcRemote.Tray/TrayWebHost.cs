@@ -85,6 +85,7 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<IAppLauncher, DirectAppLauncher>();
         builder.Services.AddSingleton<IBigPictureTracker, BigPictureTracker>();
         builder.Services.AddSingleton<AppService>();
+        builder.Services.AddSingleton<IAppService>(sp => sp.GetRequiredService<AppService>());
         builder.Services.AddSingleton<IAudioService, AudioService>();
         builder.Services.AddSingleton<IMonitorService, MonitorService>();
         builder.Services.AddSingleton<IModeService, ModeService>();

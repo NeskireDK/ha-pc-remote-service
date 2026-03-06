@@ -8,7 +8,7 @@ namespace HaPcRemote.Service.Services;
 public class AppService(
     IOptionsMonitor<PcRemoteOptions> options,
     IAppLauncher appLauncher,
-    IBigPictureTracker bigPictureTracker)
+    IBigPictureTracker bigPictureTracker) : IAppService
 {
     internal const string BigPictureKey = "steam-bigpicture";
 
