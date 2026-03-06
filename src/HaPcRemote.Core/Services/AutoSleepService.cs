@@ -9,7 +9,6 @@ namespace HaPcRemote.Service.Services;
 /// Background service that sleeps the PC when idle for the configured duration.
 /// Conditions: no Steam game running AND idle time exceeds threshold.
 /// </summary>
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public sealed class AutoSleepService(
     IOptionsMonitor<PcRemoteOptions> options,
     ISteamService steamService,
@@ -23,7 +22,8 @@ public sealed class AutoSleepService(
     {
         logger.LogInformation("Auto-sleep monitor started");
 
-        SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        if (OperatingSystem.IsWindows())
+            SystemEvents.PowerModeChanged += OnPowerModeChanged;
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -45,10 +45,12 @@ public sealed class AutoSleepService(
         }
         finally
         {
-            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            if (OperatingSystem.IsWindows())
+                SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         }
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode == PowerModes.Resume)

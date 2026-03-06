@@ -1,4 +1,3 @@
-using System.Runtime.Versioning;
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
@@ -8,7 +7,6 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Tests.Services;
 
-[SupportedOSPlatform("windows")]
 public class AutoSleepServiceTests
 {
     private readonly ISteamService _steamService = A.Fake<ISteamService>();

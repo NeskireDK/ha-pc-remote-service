@@ -11,6 +11,7 @@ public class SteamService(
     IModeService modeService,
     IOptionsMonitor<PcRemoteOptions> options,
     IHttpClientFactory httpClientFactory,
+    IEmulatorTracker emulatorTracker,
     ILogger<SteamService> logger) : ISteamService
 {
     private List<SteamGame>? _cachedGames;
@@ -239,6 +240,33 @@ public class SteamService(
             }
         }
 
+        // Fallback: if an emulator exe is running but we couldn't disambiguate via CommandLine,
+        // use the emulator tracker to return the last-launched game for that exe
+        foreach (var shortcut in shortcuts)
+        {
+            if (shortcut.ExePath == null || !processesByPath.ContainsKey(shortcut.ExePath))
+                continue;
+
+            var tracked = emulatorTracker.GetLastLaunched(shortcut.ExePath);
+            if (tracked == null)
+                continue;
+
+            var trackedShortcut = shortcuts.Find(s => s.AppId == tracked.Value.AppId);
+            if (trackedShortcut != null)
+            {
+                var proc = processesByPath[shortcut.ExePath][0];
+                logger.LogDebug(
+                    "Non-Steam detection: matched [{AppId}] {Name} via emulator tracker (pid={Pid})",
+                    trackedShortcut.AppId, trackedShortcut.Name, proc.Pid);
+                return new SteamRunningGame
+                {
+                    AppId = trackedShortcut.AppId,
+                    Name = trackedShortcut.Name,
+                    ProcessId = proc.Pid
+                };
+            }
+        }
+
         logger.LogDebug("Non-Steam detection: no exact path match found");
         return null;
     }
@@ -271,6 +299,17 @@ public class SteamService(
         var launchId = IsShortcutAppId(appId)
             ? ((long)(uint)appId << 32) | 0x02000000
             : appId;
+
+        // Track emulator launch for non-Steam shortcuts before launching
+        if (IsShortcutAppId(appId))
+        {
+            var game = _cachedGames?.Find(g => g.AppId == appId);
+            if (game?.ExePath != null)
+            {
+                emulatorTracker.TrackLaunch(game.ExePath, appId, game.Name);
+                logger.LogDebug("Tracked emulator launch: [{AppId}] {Name} via {ExePath}", appId, game.Name, game.ExePath);
+            }
+        }
 
         platform.LaunchSteamUrl($"steam://rungameid/{launchId}");
 

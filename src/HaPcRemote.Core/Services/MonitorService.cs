@@ -41,6 +41,11 @@ public class MonitorService(IOptionsMonitor<PcRemoteOptions> options, ICliRunner
         return Task.FromResult(profiles);
     }
 
+    public Task SaveProfileAsync(string profileName)
+    {
+        throw new NotSupportedException("Saving monitor profiles is not supported on Windows. Use MultiMonitorTool to create .cfg files manually.");
+    }
+
     public async Task ApplyProfileAsync(string profileName)
     {
         if (profileName.Contains('/') || profileName.Contains('\\') || profileName.Contains(".."))
