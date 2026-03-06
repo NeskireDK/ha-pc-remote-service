@@ -24,6 +24,7 @@ public class EndpointTestBase : IAsyncLifetime
     protected readonly IConfigurationWriter ConfigWriter = A.Fake<IConfigurationWriter>();
     protected readonly IRestartService RestartService = A.Fake<IRestartService>();
     protected readonly IUpdateService UpdateService = A.Fake<IUpdateService>();
+    protected readonly IEmulatorTracker EmulatorTracker = A.Fake<IEmulatorTracker>();
 
     private WebApplication? _app;
 
@@ -56,6 +57,7 @@ public class EndpointTestBase : IAsyncLifetime
         builder.Services.AddSingleton(RestartService);
         builder.Services.AddSingleton(UpdateService);
         builder.Services.AddSingleton<IBigPictureTracker, BigPictureTracker>();
+        builder.Services.AddSingleton(EmulatorTracker);
 
         // Real services that delegate to fakes
         builder.Services.AddHttpClient();

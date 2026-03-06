@@ -94,6 +94,7 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<IPowerService, WindowsPowerService>();
         builder.Services.AddSingleton<IIdleService, WindowsIdleService>();
         builder.Services.AddSingleton<ISteamPlatform, WindowsSteamPlatform>();
+        builder.Services.AddSingleton<IEmulatorTracker, EmulatorTracker>();
         builder.Services.AddSingleton<ISteamService, SteamService>();
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
         builder.Services.AddSingleton<IConfigurationWriter>(

@@ -92,6 +92,7 @@ builder.Services.AddHostedService<MdnsAdvertiserService>();
 builder.Services.AddSingleton<IPowerService, LinuxPowerService>();
 builder.Services.AddSingleton<IIdleService, LinuxIdleService>();
 builder.Services.AddSingleton<ISteamPlatform, LinuxSteamPlatform>();
+builder.Services.AddSingleton<IEmulatorTracker, EmulatorTracker>();
 builder.Services.AddSingleton<ISteamService, SteamService>();
 builder.Services.AddSingleton<IUpdateService, NoOpUpdateService>();
 builder.Services.AddHostedService<AutoSleepService>();

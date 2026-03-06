@@ -16,13 +16,14 @@ public class SteamServiceTests
     private readonly IModeService _modeService = A.Fake<IModeService>();
     private readonly ILogger<SteamService> _logger = A.Fake<ILogger<SteamService>>();
     private readonly IHttpClientFactory _httpClientFactory = A.Fake<IHttpClientFactory>();
+    private readonly IEmulatorTracker _emulatorTracker = A.Fake<IEmulatorTracker>();
 
     private SteamService CreateService(PcRemoteOptions? options = null)
     {
         options ??= new PcRemoteOptions();
         var monitor = A.Fake<IOptionsMonitor<PcRemoteOptions>>();
         A.CallTo(() => monitor.CurrentValue).Returns(options);
-        return new SteamService(_platform, _modeService, monitor, _httpClientFactory, _logger);
+        return new SteamService(_platform, _modeService, monitor, _httpClientFactory, _emulatorTracker, _logger);
     }
 
     // ── ParseLibraryFolders tests (static) ───────────────────────────
