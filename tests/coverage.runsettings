@@ -5,23 +5,8 @@
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
-          <Include>
-            [HaPcRemote.Core]*,
-            [HaPcRemote.Shared]*
-          </Include>
-          <Exclude>
-            [HaPcRemote.Core]HaPcRemote.Service.AppJsonContext*,
-            [HaPcRemote.Core]Microsoft.AspNetCore.Http.Generated*,
-            [HaPcRemote.Core]HaPcRemote.Service.Configuration.ConfigPaths,
-            [HaPcRemote.Core]HaPcRemote.Service.Services.WindowsPowerService,
-            [HaPcRemote.Core]HaPcRemote.Service.Services.MdnsAdvertiserService,
-            [HaPcRemote.Core]HaPcRemote.Service.Services.CliRunner,
-            [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcJsonContext*,
-            [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcServer,
-            [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcClient,
-            [HaPcRemote.Tray]*
-          </Exclude>
+          <ExcludeByAttribute>GeneratedCodeAttribute</ExcludeByAttribute>
+          <Exclude>[HaPcRemote.Tray]*</Exclude>
         </Configuration>
       </DataCollector>
     </DataCollectors>
