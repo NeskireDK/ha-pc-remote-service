@@ -81,6 +81,16 @@ public static class MonitorEndpoints
                 AppJsonContext.Default.ApiResponse);
         });
 
+        group.MapPost("/save/{profile}", async (string profile, IMonitorService monitorService,
+            ILogger<IMonitorService> logger) =>
+        {
+            logger.LogInformation("Save monitor profile '{Profile}' requested", profile);
+            await monitorService.SaveProfileAsync(profile);
+            return Results.Json(
+                ApiResponse.Ok($"Monitor profile '{profile}' saved"),
+                AppJsonContext.Default.ApiResponse);
+        });
+
         return group;
     }
 }
