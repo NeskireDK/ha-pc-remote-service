@@ -116,6 +116,7 @@
         items: [
           { method: "GET", path: "/api/steam/games", desc: "List installed Steam games" },
           { method: "GET", path: "/api/steam/running", desc: "Currently running Steam game" },
+          { method: "GET", path: "/api/steam/running/diagnostics", desc: "Detection trace: per-shortcut matching details + process info" },
           { method: "POST", path: "/api/steam/run/{appId}", desc: "Launch a Steam game by app ID", params: [{ name: "appId", placeholder: "e.g. 730", segment: true }] },
           { method: "POST", path: "/api/steam/stop", desc: "Stop the running Steam game" },
           { method: "GET", path: "/api/steam/artwork/{appId}", desc: "Get game artwork image", params: [{ name: "appId", placeholder: "e.g. 730", segment: true }] },

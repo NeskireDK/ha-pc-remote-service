@@ -89,6 +89,8 @@ All endpoints except `/api/health` require the `X-Api-Key` header.
 | `GET` | `/api/system/idle` | Seconds since last keyboard/mouse input |
 | `POST` | `/api/system/mode/{name}` | Apply a named PC mode |
 | `POST` | `/api/system/sleep` | Suspend the PC |
+| `POST` | `/api/system/reload` | Graceful service restart |
+| `POST` | `/api/system/update` | Check and apply auto-update from GitHub |
 
 ### Audio
 
@@ -141,17 +143,30 @@ Requires Steam to be installed. Returns the top 20 most recently played games (i
 |--------|-------|-------------|
 | `GET` | `/api/steam/games` | List installed games + non-Steam shortcuts (sorted by last played, top 20) |
 | `GET` | `/api/steam/running` | Currently running game, or `null` if none |
+| `GET` | `/api/steam/running/diagnostics` | Detection trace: per-shortcut matching details, process info, match reasons |
 | `POST` | `/api/steam/run/{appId}` | Launch a game by Steam app ID (applies PC mode binding if configured) |
 | `POST` | `/api/steam/stop` | Stop the currently running game |
 | `GET` | `/api/steam/artwork/{appId}` | Serve game artwork from local Steam cache (grid → librarycache fallback) |
+| `GET` | `/api/steam/artwork/diagnostics` | Artwork diagnostics for all games |
+| `GET` | `/api/steam/artwork/{appId}/diagnostics` | Artwork diagnostics for a single game |
 | `GET` | `/api/steam/bindings` | Get game-to-PC-mode bindings |
 | `PUT` | `/api/steam/bindings` | Update game-to-PC-mode bindings |
 
-### Debug
+### Power
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| `GET` | `/debug` | API Explorer page (localhost-only, no auth) |
+| `GET` | `/api/system/power` | Get auto-sleep configuration |
+| `PUT` | `/api/system/power` | Update auto-sleep config (`{ autoSleepMinutes: N }`, 0 = disabled, max 480) |
+
+### Debug (localhost-only)
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api-explorer` | Interactive API explorer page with "Try it" buttons |
+| `GET` | `/api/debug/logs` | Recent service logs (query: `?lines=200&level=WRN&category=SteamService`) |
+| `GET` | `/api/steam/artwork/debug` | HTML artwork debug page — all games |
+| `GET` | `/api/steam/artwork/{appId}/debug` | HTML artwork debug page — single game |
 
 ## Configuration
 
