@@ -94,7 +94,7 @@ public class SteamAppBootstrapperTests : IDisposable
             Apps = new Dictionary<string, AppDefinitionOptions>
             {
                 ["steam"] = new() { DisplayName = "Steam", ExePath = exePath, ProcessName = "steam" },
-                ["steam-bigpicture"] = new() { DisplayName = "Steam Big Picture", ExePath = exePath, ProcessName = "steam" }
+                ["steam-bigpicture"] = new() { DisplayName = "Steam Big Picture", ExePath = "steam://open/bigpicture", ProcessName = "steam", UseShellExecute = true }
             }
         };
 
