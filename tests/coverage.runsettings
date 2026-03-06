@@ -6,13 +6,17 @@
         <Configuration>
           <Format>cobertura</Format>
           <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <Include>
+            [HaPcRemote.Core]*,
+            [HaPcRemote.Shared]*
+          </Include>
           <Exclude>
-            [HaPcRemote.Service]HaPcRemote.Service.AppJsonContext*,
-            [HaPcRemote.Service]Microsoft.AspNetCore.Http.Generated*,
-            [HaPcRemote.Service]HaPcRemote.Service.Configuration.ConfigPaths,
-            [HaPcRemote.Service]HaPcRemote.Service.Services.WindowsPowerService,
-            [HaPcRemote.Service]HaPcRemote.Service.Services.MdnsAdvertiserService,
-            [HaPcRemote.Service]HaPcRemote.Service.Services.CliRunner,
+            [HaPcRemote.Core]HaPcRemote.Service.AppJsonContext*,
+            [HaPcRemote.Core]Microsoft.AspNetCore.Http.Generated*,
+            [HaPcRemote.Core]HaPcRemote.Service.Configuration.ConfigPaths,
+            [HaPcRemote.Core]HaPcRemote.Service.Services.WindowsPowerService,
+            [HaPcRemote.Core]HaPcRemote.Service.Services.MdnsAdvertiserService,
+            [HaPcRemote.Core]HaPcRemote.Service.Services.CliRunner,
             [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcJsonContext*,
             [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcServer,
             [HaPcRemote.Shared]HaPcRemote.Shared.Ipc.IpcClient,
