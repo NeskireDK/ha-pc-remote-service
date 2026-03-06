@@ -3,6 +3,8 @@ using HaPcRemote.Service.Services;
 using Microsoft.Extensions.Logging;
 using Shouldly;
 
+#pragma warning disable CA1416 // Platform compatibility
+
 namespace HaPcRemote.Service.Tests.Services;
 
 public class LinuxIdleServiceTests

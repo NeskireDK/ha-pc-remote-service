@@ -50,6 +50,7 @@ public sealed class AutoSleepService(
         }
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode == PowerModes.Resume)

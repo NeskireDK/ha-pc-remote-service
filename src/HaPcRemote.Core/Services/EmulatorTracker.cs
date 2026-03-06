@@ -9,7 +9,8 @@ public class EmulatorTracker : IEmulatorTracker
 {
     private readonly ILogger<EmulatorTracker> _logger;
     private readonly string _filePath;
-    private readonly ConcurrentDictionary<string, EmulatorLaunchRecord> _launches = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, EmulatorLaunchRecord> _launches = new(
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
     private bool _loaded;
     private readonly object _loadLock = new();
 
