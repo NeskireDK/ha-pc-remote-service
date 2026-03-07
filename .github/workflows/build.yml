@@ -43,11 +43,56 @@ jobs:
       - name: Generate coverage report
         run: reportgenerator -reports:"coverage/**/coverage.cobertura.xml" -targetdir:coverage/report "-reporttypes:HtmlSummary;TextSummary;Cobertura;MarkdownSummaryGithub"
 
+      - name: Extract coverage metrics
+        id: coverage
+        run: |
+          LINE_RATE=$(grep -oP 'line-rate="\K[^"]+' coverage/report/Cobertura.xml | head -1)
+          LINE_PCT=$(awk "BEGIN {printf \"%.1f\", $LINE_RATE * 100}")
+          BRANCH_RATE=$(grep -oP 'branch-rate="\K[^"]+' coverage/report/Cobertura.xml | head -1)
+          BRANCH_PCT=$(awk "BEGIN {printf \"%.1f\", $BRANCH_RATE * 100}")
+          TEST_COUNT=$(grep -oP 'Passed:\s+\K\d+' coverage/report/Summary.txt || echo "0")
+          echo "line_pct=$LINE_PCT" >> $GITHUB_OUTPUT
+          echo "branch_pct=$BRANCH_PCT" >> $GITHUB_OUTPUT
+          echo "test_count=$TEST_COUNT" >> $GITHUB_OUTPUT
+          echo "### Coverage: ${LINE_PCT}% lines | ${BRANCH_PCT}% branches | ${TEST_COUNT} tests" >> $GITHUB_STEP_SUMMARY
+
       - name: Write coverage to job summary
         run: cat coverage/report/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Coverage threshold check
+        run: |
+          LINE_PCT=${{ steps.coverage.outputs.line_pct }}
+          THRESHOLD=50
+          echo "Line coverage: ${LINE_PCT}% (threshold: ${THRESHOLD}%)"
+          if (( $(echo "$LINE_PCT < $THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage ${LINE_PCT}% is below threshold ${THRESHOLD}%"
+            exit 1
+          fi
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/report/
+
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          LINE_PCT=${{ steps.coverage.outputs.line_pct }}
+          TEST_COUNT=${{ steps.coverage.outputs.test_count }}
+          if (( $(echo "$LINE_PCT >= 80" | bc -l) )); then COLOR="brightgreen"
+          elif (( $(echo "$LINE_PCT >= 60" | bc -l) )); then COLOR="green"
+          elif (( $(echo "$LINE_PCT >= 40" | bc -l) )); then COLOR="yellow"
+          else COLOR="red"; fi
+          mkdir -p badges
+          echo "{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${LINE_PCT}%\",\"color\":\"${COLOR}\"}" > badges/coverage.json
+          echo "{\"schemaVersion\":1,\"label\":\"tests\",\"message\":\"${TEST_COUNT} passed\",\"color\":\"brightgreen\"}" > badges/tests.json
+
+      - name: Deploy badge to gh-pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./badges
+          destination_dir: badges
+          keep_files: true

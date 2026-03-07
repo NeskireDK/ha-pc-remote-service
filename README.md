@@ -1,5 +1,9 @@
 # ha-pc-remote-service
 
+![Build](https://github.com/NeskireDK/ha-pc-remote-service/actions/workflows/build.yml/badge.svg)
+![Coverage](https://img.shields.io/endpoint?url=https://NeskireDK.github.io/ha-pc-remote-service/badges/coverage.json)
+![Tests](https://img.shields.io/endpoint?url=https://NeskireDK.github.io/ha-pc-remote-service/badges/tests.json)
+
 You use your PC for work during the day and gaming on your TV in the evening.
 Every time you switch, it's the same ritual — audio output, monitors, volume, Steam Big Picture.
 Every time you're done, you remember to put it to sleep.
