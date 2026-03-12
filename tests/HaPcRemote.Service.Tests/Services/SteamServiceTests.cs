@@ -812,6 +812,52 @@ public class SteamServiceTests
         A.CallTo(() => _platform.LaunchSteamUrl(A<string>._)).MustNotHaveHappened();
     }
 
+    [Fact]
+    public async Task LaunchGameAsync_ModeWithLaunchApp_DelaysBeforeGameLaunch()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "couch" },
+            Modes = new Dictionary<string, ModeConfig>
+            {
+                ["couch"] = new() { LaunchApp = "steam-bigpicture", MonitorProfile = "tv" }
+            }
+        };
+        var service = CreateService(options);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        _ = await service.LaunchGameAsync(730);
+        sw.Stop();
+
+        A.CallTo(() => _modeService.ApplyModeAsync("couch")).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
+        sw.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(2500);
+    }
+
+    [Fact]
+    public async Task LaunchGameAsync_ModeWithoutLaunchApp_NoDelay()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "desktop" },
+            Modes = new Dictionary<string, ModeConfig>
+            {
+                ["desktop"] = new() { MonitorProfile = "dual", AudioDevice = "Speakers" }
+            }
+        };
+        var service = CreateService(options);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        _ = await service.LaunchGameAsync(730);
+        sw.Stop();
+
+        A.CallTo(() => _modeService.ApplyModeAsync("desktop")).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
+        sw.ElapsedMilliseconds.ShouldBeLessThan(8000);
+    }
+
     // ── GetBindings tests ─────────────────────────────────────────
 
     [Fact]

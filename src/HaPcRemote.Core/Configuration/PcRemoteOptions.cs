@@ -39,4 +39,6 @@ public sealed class ModeConfig
     public int? Volume { get; set; }
     public string? LaunchApp { get; set; }
     public string? KillApp { get; set; }
+    public int? KillToLaunchDelayMs { get; set; }
+    public int? PostLaunchDelayMs { get; set; }
 }

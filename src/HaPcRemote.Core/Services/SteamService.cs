@@ -288,6 +288,16 @@ public class SteamService(
             {
                 await modeService.ApplyModeAsync(resolvedMode);
                 logger.LogInformation("Applied PC mode '{Mode}' for game {AppId}", resolvedMode, appId);
+
+                // If the mode launched an app (e.g. Big Picture), give it time to initialize
+                // before firing the game URI — Steam ignores rungameid while BP is loading.
+                if (options.CurrentValue.Modes.TryGetValue(resolvedMode, out var modeConfig)
+                    && !string.IsNullOrEmpty(modeConfig.LaunchApp))
+                {
+                    var postLaunchDelay = modeConfig.PostLaunchDelayMs ?? 3000;
+                    logger.LogDebug("Mode '{Mode}' launched '{App}', waiting {Delay}ms for it to initialize", resolvedMode, modeConfig.LaunchApp, postLaunchDelay);
+                    await Task.Delay(postLaunchDelay);
+                }
             }
             catch (KeyNotFoundException)
             {

@@ -30,6 +30,9 @@ public class ModeService(
         if (config.KillApp is not null)
             await appService.KillAsync(config.KillApp);
 
+        if (config.KillApp is not null && config.LaunchApp is not null)
+            await Task.Delay(config.KillToLaunchDelayMs ?? 1000);
+
         if (config.LaunchApp is not null)
             await appService.LaunchAsync(config.LaunchApp);
     }
