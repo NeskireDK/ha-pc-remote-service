@@ -4,6 +4,7 @@ using HaPcRemote.Service.Endpoints;
 using HaPcRemote.Service.Logging;
 using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
+using HaPcRemote.Service.Native;
 using HaPcRemote.Service.Services;
 using HaPcRemote.Shared.Configuration;
 using HaPcRemote.Tray.Logging;
@@ -87,7 +88,8 @@ internal static class TrayWebHost
         builder.Services.AddSingleton<AppService>();
         builder.Services.AddSingleton<IAppService>(sp => sp.GetRequiredService<AppService>());
         builder.Services.AddSingleton<IAudioService, AudioService>();
-        builder.Services.AddSingleton<IMonitorService, MonitorService>();
+        builder.Services.AddSingleton<IDisplayConfigApi, DisplayConfigHelper>();
+        builder.Services.AddSingleton<IMonitorService, WindowsMonitorService>();
         builder.Services.AddSingleton<IModeService, ModeService>();
         builder.Services.AddHostedService<MdnsAdvertiserService>();
         builder.Services.AddHostedService<AutoSleepService>();
