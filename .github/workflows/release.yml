@@ -127,10 +127,20 @@ jobs:
           cd ../HaPcRemote-linux-arm64
           tar czf ../../HaPcRemote-linux-arm64.tar.gz HaPcRemote.Headless
 
+      - name: Detect prerelease
+        id: prerelease
+        run: |
+          if [[ "${{ github.ref_name }}" == *-* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease == 'true' }}
           files: |
             HaPcRemote-win-x64.zip
             HaPcRemote-win-arm64.zip
