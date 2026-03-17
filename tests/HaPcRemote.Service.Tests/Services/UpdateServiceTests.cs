@@ -22,6 +22,14 @@ public class UpdateServiceTests
         A.CallTo(() => _httpClientFactory.CreateClient("GitHubUpdate")).Returns(client);
     }
 
+    private CapturingHttpMessageHandler SetupCapturingHandler(string json)
+    {
+        var handler = new CapturingHttpMessageHandler(json);
+        var client = new HttpClient(handler);
+        A.CallTo(() => _httpClientFactory.CreateClient("GitHubUpdate")).Returns(client);
+        return handler;
+    }
+
     private void SetupHttpSequence(params string[] jsonResponses)
     {
         var handler = new SequentialHttpMessageHandler(jsonResponses);
