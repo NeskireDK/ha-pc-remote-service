@@ -1,6 +1,7 @@
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Shouldly;
 
@@ -19,7 +20,7 @@ public class ModeServiceTests
         {
             Modes = modes ?? new Dictionary<string, ModeConfig>()
         });
-        return new ModeService(options, _audioService, _monitorService, _appService);
+        return new ModeService(options, _audioService, _monitorService, _appService, A.Fake<ILogger<ModeService>>());
     }
 
     // ── GetModeNames ─────────────────────────────────────────────────
@@ -104,6 +105,8 @@ public class ModeServiceTests
 
         A.CallTo(() => _audioService.SetDefaultDeviceAsync("Headphones"))
             .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _monitorService.SoloMonitorAsync(A<string>._))
+            .MustNotHaveHappened();
         A.CallTo(() => _monitorService.ApplyProfileAsync(A<string>._))
             .MustNotHaveHappened();
         A.CallTo(() => _audioService.SetVolumeAsync(A<int>._))
@@ -194,6 +197,8 @@ public class ModeServiceTests
 
         A.CallTo(() => _audioService.SetDefaultDeviceAsync(A<string>._))
             .MustNotHaveHappened();
+        A.CallTo(() => _monitorService.SoloMonitorAsync(A<string>._))
+            .MustNotHaveHappened();
         A.CallTo(() => _monitorService.ApplyProfileAsync(A<string>._))
             .MustNotHaveHappened();
         A.CallTo(() => _audioService.SetVolumeAsync(A<int>._))
@@ -281,5 +286,64 @@ public class ModeServiceTests
 
         A.CallTo(() => _audioService.SetVolumeAsync(100))
             .MustHaveHappenedOnceExactly();
+    }
+
+    // ── ApplyModeAsync — SoloMonitor ──────────────────────────────────
+
+    [Fact]
+    public async Task ApplyModeAsync_SoloMonitorSet_CallsSoloMonitorAsync()
+    {
+        var service = CreateService(new Dictionary<string, ModeConfig>
+        {
+            ["solo"] = new() { SoloMonitor = "GSM59A4" }
+        });
+
+        await service.ApplyModeAsync("solo");
+
+        A.CallTo(() => _monitorService.SoloMonitorAsync("GSM59A4"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task ApplyModeAsync_MonitorProfileThrowsNotSupported_ContinuesGracefully()
+    {
+        A.CallTo(() => _monitorService.ApplyProfileAsync(A<string>._))
+            .Throws(new NotSupportedException("Profiles not supported"));
+
+        var service = CreateService(new Dictionary<string, ModeConfig>
+        {
+            ["profile-fail"] = new()
+            {
+                AudioDevice = "Speakers",
+                MonitorProfile = "some-profile",
+                Volume = 50,
+                LaunchApp = "steam"
+            }
+        });
+
+        await service.ApplyModeAsync("profile-fail");
+
+        A.CallTo(() => _audioService.SetDefaultDeviceAsync("Speakers"))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _audioService.SetVolumeAsync(50))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _appService.LaunchAsync("steam"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task ApplyModeAsync_BothSoloAndProfile_UsesSoloOnly()
+    {
+        var service = CreateService(new Dictionary<string, ModeConfig>
+        {
+            ["both"] = new() { SoloMonitor = "GSM59A4", MonitorProfile = "dual-screen" }
+        });
+
+        await service.ApplyModeAsync("both");
+
+        A.CallTo(() => _monitorService.SoloMonitorAsync("GSM59A4"))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _monitorService.ApplyProfileAsync(A<string>._))
+            .MustNotHaveHappened();
     }
 }

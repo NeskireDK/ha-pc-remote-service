@@ -103,12 +103,12 @@
         group: "Monitors",
         items: [
           { method: "GET", path: "/api/monitor/list", desc: "List connected monitors" },
-          { method: "GET", path: "/api/monitor/profiles", desc: "List saved monitor profiles" },
+          { method: "GET", path: "/api/monitor/profiles", desc: "List saved monitor profiles (Linux only)" },
           { method: "POST", path: "/api/monitor/solo/{id}", desc: "Solo a single monitor", params: [{ name: "id", placeholder: "monitor id", segment: true }] },
           { method: "POST", path: "/api/monitor/enable/{id}", desc: "Enable a monitor", params: [{ name: "id", placeholder: "monitor id", segment: true }] },
           { method: "POST", path: "/api/monitor/disable/{id}", desc: "Disable a monitor", params: [{ name: "id", placeholder: "monitor id", segment: true }] },
           { method: "POST", path: "/api/monitor/primary/{id}", desc: "Set primary monitor", params: [{ name: "id", placeholder: "monitor id", segment: true }] },
-          { method: "POST", path: "/api/monitor/set/{profile}", desc: "Apply a monitor profile", params: [{ name: "profile", placeholder: "profile name", segment: true }] }
+          { method: "POST", path: "/api/monitor/set/{profile}", desc: "Apply a monitor profile (Linux only)", params: [{ name: "profile", placeholder: "profile name", segment: true }] }
         ]
       },
       {

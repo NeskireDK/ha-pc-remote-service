@@ -15,6 +15,7 @@ internal sealed class ModesTab : TabPage
     private readonly TextBox _modeNameBox;
     private readonly ComboBox _audioDeviceCombo;
     private readonly ComboBox _monitorProfileCombo;
+    private readonly ComboBox _soloMonitorCombo;
     private readonly TrackBar _volumeSlider;
     private readonly Label _volumeLabel;
     private readonly ComboBox _launchAppCombo;
@@ -109,7 +110,19 @@ internal sealed class ModesTab : TabPage
             FlatStyle = FlatStyle.Flat
         };
         editLayout.Controls.Add(MakeLabel("Monitor Profile:"), 0, row);
-        editLayout.Controls.Add(WithHelp(_monitorProfileCombo, _toolTip, "Monitor layout to apply when this mode is activated (via MultiMonitorTool).\nSelect \"(Don't change)\" to leave the current layout untouched."), 1, row++);
+        editLayout.Controls.Add(WithHelp(_monitorProfileCombo, _toolTip, "Monitor layout to apply when this mode is activated.\nSelect \"(Don't change)\" to leave the current layout untouched."), 1, row++);
+
+        // Solo monitor
+        _soloMonitorCombo = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 250,
+            BackColor = Color.FromArgb(50, 50, 50),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
+        editLayout.Controls.Add(MakeLabel("Solo Monitor:"), 0, row);
+        editLayout.Controls.Add(WithHelp(_soloMonitorCombo, _toolTip, "Monitor to keep as sole active display. Disables all others."), 1, row++);
 
         // Volume
         var volumePanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
@@ -190,6 +203,12 @@ internal sealed class ModesTab : TabPage
             var profiles = await _monitorService.GetProfilesAsync();
             foreach (var p in profiles)
                 _monitorProfileCombo.Items.Add(p.Name);
+
+            _soloMonitorCombo.Items.Clear();
+            _soloMonitorCombo.Items.Add(new MonitorDropdownItem(null, "(Don't change)"));
+            var monitors = await _monitorService.GetMonitorsAsync();
+            foreach (var m in monitors)
+                _soloMonitorCombo.Items.Add(new MonitorDropdownItem(m.MonitorId, $"{m.Name} ({m.MonitorId})"));
         }
         catch (Exception ex)
         {
@@ -290,6 +309,7 @@ internal sealed class ModesTab : TabPage
         _modeNameBox.Text = name;
         _audioDeviceCombo.SelectedItem = mode.AudioDevice ?? "(Don't change)";
         _monitorProfileCombo.SelectedItem = mode.MonitorProfile ?? "(Don't change)";
+        SelectMonitorItem(_soloMonitorCombo, mode.SoloMonitor);
         _volumeSlider.Value = mode.Volume ?? 50;
         SelectAppItem(_launchAppCombo, mode.LaunchApp);
         SelectAppItem(_killAppCombo, mode.KillApp);
@@ -314,15 +334,7 @@ internal sealed class ModesTab : TabPage
         _hasPendingNew = true;
         _modeList.SelectedItem = NewModePlaceholder;
 
-        // Blank the editor fields
-        _modeNameBox.Text = "";
-        if (_audioDeviceCombo.Items.Count > 0)
-            _audioDeviceCombo.SelectedIndex = 0;
-        if (_monitorProfileCombo.Items.Count > 0)
-            _monitorProfileCombo.SelectedIndex = 0;
-        _volumeSlider.Value = 50;
-        if (_launchAppCombo.Items.Count > 0) _launchAppCombo.SelectedIndex = 0;
-        if (_killAppCombo.Items.Count > 0) _killAppCombo.SelectedIndex = 0;
+        ResetEditorFields();
         _modeNameBox.Focus();
     }
 
@@ -339,6 +351,7 @@ internal sealed class ModesTab : TabPage
         {
             AudioDevice = _audioDeviceCombo.SelectedItem?.ToString() is "(Don't change)" ? null : _audioDeviceCombo.SelectedItem?.ToString(),
             MonitorProfile = _monitorProfileCombo.SelectedItem?.ToString() is "(Don't change)" ? null : _monitorProfileCombo.SelectedItem?.ToString(),
+            SoloMonitor = (_soloMonitorCombo.SelectedItem as MonitorDropdownItem)?.MonitorId,
             Volume = _volumeSlider.Value,
             LaunchApp = GetSelectedAppKey(_launchAppCombo),
             KillApp = GetSelectedAppKey(_killAppCombo)
@@ -367,12 +380,7 @@ internal sealed class ModesTab : TabPage
         {
             // Discard the uncommitted placeholder row
             DiscardPendingNew();
-            _modeNameBox.Text = "";
-            if (_audioDeviceCombo.Items.Count > 0) _audioDeviceCombo.SelectedIndex = 0;
-            if (_monitorProfileCombo.Items.Count > 0) _monitorProfileCombo.SelectedIndex = 0;
-            _volumeSlider.Value = 50;
-            if (_launchAppCombo.Items.Count > 0) _launchAppCombo.SelectedIndex = 0;
-            if (_killAppCombo.Items.Count > 0) _killAppCombo.SelectedIndex = 0;
+            ResetEditorFields();
             return;
         }
 
@@ -382,9 +390,15 @@ internal sealed class ModesTab : TabPage
         _hasPendingNew = false;
         _configWriter.DeleteMode(name);
         LoadModes();
+        ResetEditorFields();
+    }
+
+    private void ResetEditorFields()
+    {
         _modeNameBox.Text = "";
         if (_audioDeviceCombo.Items.Count > 0) _audioDeviceCombo.SelectedIndex = 0;
         if (_monitorProfileCombo.Items.Count > 0) _monitorProfileCombo.SelectedIndex = 0;
+        if (_soloMonitorCombo.Items.Count > 0) _soloMonitorCombo.SelectedIndex = 0;
         _volumeSlider.Value = 50;
         if (_launchAppCombo.Items.Count > 0) _launchAppCombo.SelectedIndex = 0;
         if (_killAppCombo.Items.Count > 0) _killAppCombo.SelectedIndex = 0;
@@ -433,9 +447,35 @@ internal sealed class ModesTab : TabPage
         Cursor = Cursors.Hand
     };
 
+    private static void SelectMonitorItem(ComboBox combo, string? monitorId)
+    {
+        if (string.IsNullOrEmpty(monitorId))
+        {
+            combo.SelectedIndex = 0;
+            return;
+        }
+
+        for (int i = 0; i < combo.Items.Count; i++)
+        {
+            if (combo.Items[i] is MonitorDropdownItem item && item.MonitorId == monitorId)
+            {
+                combo.SelectedIndex = i;
+                return;
+            }
+        }
+
+        combo.SelectedIndex = 0;
+    }
+
     private sealed class AppDropdownItem(string? key, string displayName)
     {
         public string? Key { get; } = key;
+        public override string ToString() => displayName;
+    }
+
+    private sealed class MonitorDropdownItem(string? monitorId, string displayName)
+    {
+        public string? MonitorId { get; } = monitorId;
         public override string ToString() => displayName;
     }
 }

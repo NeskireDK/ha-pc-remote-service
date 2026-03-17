@@ -1,4 +1,5 @@
 using HaPcRemote.Service.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
@@ -7,7 +8,8 @@ public class ModeService(
     IOptionsMonitor<PcRemoteOptions> options,
     IAudioService audioService,
     IMonitorService monitorService,
-    IAppService appService) : IModeService
+    IAppService appService,
+    ILogger<ModeService> logger) : IModeService
 {
     public IReadOnlyList<string> GetModeNames() =>
         options.CurrentValue.Modes.Keys.ToList();
@@ -21,8 +23,19 @@ public class ModeService(
         if (config.AudioDevice is not null)
             await audioService.SetDefaultDeviceAsync(config.AudioDevice);
 
-        if (config.MonitorProfile is not null)
-            await monitorService.ApplyProfileAsync(config.MonitorProfile);
+        if (config.SoloMonitor is not null)
+            await monitorService.SoloMonitorAsync(config.SoloMonitor);
+        else if (config.MonitorProfile is not null)
+        {
+            try
+            {
+                await monitorService.ApplyProfileAsync(config.MonitorProfile);
+            }
+            catch (NotSupportedException ex)
+            {
+                logger.LogWarning(ex, "Monitor profile '{Profile}' not applied — native DisplayConfig API doesn't support profiles", config.MonitorProfile);
+            }
+        }
 
         if (config.Volume.HasValue)
             await audioService.SetVolumeAsync(config.Volume.Value);

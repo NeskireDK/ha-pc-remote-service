@@ -47,7 +47,7 @@ Documented bugs that undermine trust in the integration.
   in right-aligned footer across all tabs (General, Games, Power, Log). PC Modes tab is
   the exception (has its own row management buttons). *(service)*
 
-- [ ] **Monitor switch: switching back to main display fails** — Switching to TV monitor works, but switching back to main display does not. Root cause unknown — may be a util/display-switching utility issue or a service-side issue. Needs debug logging added to the monitor-switch util response to understand what is returned when the reverse switch is attempted.
+- [x] **Monitor switch: switching back to main display fails** — Resolved in v1.7: replaced MultiMonitorTool with native Windows DisplayConfig API. Solo/enable/disable/primary all use direct P/Invoke calls.
 
 - [x] **General tab: Save + Restart → Apply with live reload** — No restart required.
   Kestrel stops, rebuilds on the new port, and restarts in-process. `KestrelRestartService`
@@ -359,6 +359,37 @@ config entry if missing — no manual setup required.
 ### Refactors
 
 - [x] **HTML/CSS as embedded resources** — Inline HTML/CSS extracted to `.html`/`.css` files in `Views/` folder, loaded via `EmbeddedResourceHelper`. Endpoints build only dynamic content. *(service)*
+
+---
+
+## v1.7
+
+### Native Windows Monitor API (DisplayConfig)
+
+Replaced MultiMonitorTool with native Windows CCD (Connecting and Configuring Displays) P/Invoke API. All monitor operations — list, solo, enable, disable, primary — now use direct Win32 calls via `SetDisplayConfig`/`QueryDisplayConfig`.
+
+- [x] `WindowsMonitorService` with full P/Invoke layer (`DisplayConfigApi.cs`, `DisplayConfigHelper.cs`) *(service)*
+- [x] EDID-based monitor IDs with collision disambiguation (`GSM59A4`, `GSM59A4#2`) *(service)*
+- [x] `SoloMonitor` field in `ModeConfig` — modes can switch monitors directly without profiles *(service)*
+- [x] `MonitorProfile` graceful fallback — catches `NotSupportedException` on Windows, logs warning *(service)*
+- [x] Old `MonitorService.cs` (MultiMonitorTool wrapper) deleted *(service)*
+- [x] ModesTab: solo monitor dropdown added, profile dropdown hidden when empty *(service)*
+- [x] GeneralTab: MultiMonitorTool status check removed *(service)*
+- [x] Comprehensive debug logging in `DisplayConfigHelper` and `WindowsMonitorService` *(service)*
+- [x] Fixed struct field order in `DISPLAYCONFIG_TARGET_DEVICE_NAME` (friendly name before device path) *(service)*
+
+### Media Player Wake Support
+
+`turn_on` now uses the same sustained WoL + health poll pattern as game launch. Shows `BUFFERING` state with "Waking PC..." during wake.
+
+- [x] Extracted `_wake_and_wait()` from `_wake_and_play()` *(integration)*
+- [x] `async_turn_on` sets `_wake_target` for buffering feedback, clears in `finally` *(integration)*
+
+### Service Version Sensor + Update Button
+
+- [x] `PcRemoteVersionSensor` — diagnostic sensor showing service version from health endpoint *(integration)*
+- [x] `PcRemoteUpdateButton` — config button triggering `POST /api/system/update` *(integration)*
+- [x] `trigger_update()` method added to API client *(integration)*
 
 ---
 

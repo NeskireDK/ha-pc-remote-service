@@ -19,7 +19,6 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
     private readonly Label _portStatusLabel;
     private readonly Button _portSaveButton;
     private readonly Label _soundVolumeViewLabel;
-    private readonly Label _multiMonitorToolLabel;
     private readonly int _currentPort;
 
     public GeneralTab(IServiceProvider services)
@@ -95,18 +94,7 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
         layout.Controls.Add(MakeLabel("SoundVolumeView:"), 0, row);
         layout.Controls.Add(svvPanel, 1, row++);
 
-        _multiMonitorToolLabel = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
-        var mmtPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
-        mmtPanel.Controls.Add(_multiMonitorToolLabel);
-        mmtPanel.Controls.Add(MakeHelpIcon(_toolTip,
-            "NirSoft MultiMonitorTool — required for monitor profile switching.\n" +
-            "Must be placed in the configured ToolsPath directory.\n" +
-            "Download: nirsoft.net/utils/multi_monitor_tool.html"));
-        layout.Controls.Add(MakeLabel("MultiMonitorTool:"), 0, row);
-        layout.Controls.Add(mmtPanel, 1, row++);
-
         UpdateToolStatus(_soundVolumeViewLabel, Path.Combine(options.ToolsPath, "SoundVolumeView.exe"));
-        UpdateToolStatus(_multiMonitorToolLabel, Path.Combine(options.ToolsPath, "MultiMonitorTool.exe"));
 
         // Separator
         layout.Controls.Add(new Label { AutoSize = true, Height = 10 }, 0, row++);

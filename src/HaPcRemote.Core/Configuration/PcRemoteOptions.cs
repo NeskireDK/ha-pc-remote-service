@@ -36,6 +36,7 @@ public sealed class ModeConfig
 {
     public string? AudioDevice { get; set; }
     public string? MonitorProfile { get; set; }
+    public string? SoloMonitor { get; set; }
     public int? Volume { get; set; }
     public string? LaunchApp { get; set; }
     public string? KillApp { get; set; }

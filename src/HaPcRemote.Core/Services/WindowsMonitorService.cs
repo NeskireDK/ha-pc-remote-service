@@ -49,6 +49,7 @@ internal sealed class WindowsMonitorService : IMonitorService
 
     internal List<MonitorInfo> QueryMonitors()
     {
+        _logger.LogDebug("QueryMonitors: starting enumeration");
         var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
         var monitors = new List<MonitorInfo>();
         var seen = new HashSet<(LUID adapterId, uint targetId)>();
@@ -56,39 +57,43 @@ internal sealed class WindowsMonitorService : IMonitorService
 
         _targetKeys.Clear();
 
+        _logger.LogDebug("QueryMonitors: processing {Count} paths", paths.Length);
+
         foreach (var path in paths)
         {
             if (path.targetInfo.targetAvailable == 0)
+            {
+                _logger.LogDebug("  Skipping unavailable target {TargetId}", path.targetInfo.id);
                 continue;
+            }
 
             var key = (path.targetInfo.adapterId, path.targetInfo.id);
+            var isActive = (path.flags & DISPLAYCONFIG_PATH_FLAGS.ACTIVE) != 0;
 
             // Prefer the active path when deduplicating
             if (seen.Contains(key))
             {
                 var existingIdx = monitors.FindIndex(m =>
                     _targetKeys.TryGetValue(m.MonitorId, out var k) && k == key);
-                if (existingIdx >= 0 && !monitors[existingIdx].IsActive
-                    && (path.flags & DISPLAYCONFIG_PATH_FLAGS.ACTIVE) != 0)
+                if (existingIdx >= 0 && !monitors[existingIdx].IsActive && isActive)
                 {
                     var oldId = monitors[existingIdx].MonitorId;
+                    _logger.LogDebug("  Replacing inactive duplicate {OldId} with active path", oldId);
                     monitors.RemoveAt(existingIdx);
                     _targetKeys.Remove(oldId);
 
-                    // Roll back the EDID count so the replacement gets the same index
                     var oldBaseId = oldId.Contains('#') ? oldId[..oldId.IndexOf('#')] : oldId;
                     if (edidCounts.TryGetValue(oldBaseId, out var c))
                         edidCounts[oldBaseId] = c - 1;
                 }
                 else
                 {
+                    _logger.LogDebug("  Skipping duplicate target {TargetId} (active={Active})", path.targetInfo.id, isActive);
                     continue;
                 }
             }
 
             seen.Add(key);
-
-            var isActive = (path.flags & DISPLAYCONFIG_PATH_FLAGS.ACTIVE) != 0;
 
             string friendlyName;
             ushort edidMfg, edidProduct;
@@ -112,7 +117,6 @@ internal sealed class WindowsMonitorService : IMonitorService
             count++;
             edidCounts[baseId] = count;
 
-            // First occurrence keeps the base ID; subsequent ones get #2, #3, etc.
             var monitorId = count == 1 ? baseId : $"{baseId}#{count}";
             _targetKeys[monitorId] = key;
 
@@ -137,9 +141,12 @@ internal sealed class WindowsMonitorService : IMonitorService
                     hz = targetMode.Value.targetVideoSignalInfo.vSyncFreq.ToHz();
             }
 
-            // Fallback: use refreshRate from path target info
             if (hz == 0)
                 hz = path.targetInfo.refreshRate.ToHz();
+
+            _logger.LogDebug(
+                "  Monitor: id={MonitorId} name=\"{FriendlyName}\" gdi={Gdi} {W}x{H}@{Hz}Hz active={Active} primary={Primary}",
+                monitorId, friendlyName, gdiName, width, height, hz, isActive, isPrimary);
 
             monitors.Add(new MonitorInfo
             {
@@ -154,6 +161,11 @@ internal sealed class WindowsMonitorService : IMonitorService
                 IsPrimary = isPrimary,
             });
         }
+
+        _logger.LogInformation("QueryMonitors: found {Count} monitors", monitors.Count);
+        foreach (var m in monitors)
+            _logger.LogDebug("  {Id}: \"{Name}\" ({Gdi}) {W}x{H}@{Hz}Hz active={Active} primary={Primary}",
+                m.MonitorId, m.MonitorName, m.Name, m.Width, m.Height, m.DisplayFrequency, m.IsActive, m.IsPrimary);
 
         return monitors;
     }
