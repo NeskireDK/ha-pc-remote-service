@@ -308,18 +308,35 @@ internal sealed class WindowsMonitorService : IMonitorService
 
         _logger.LogInformation("Solo monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
 
-        var targetKey = ResolveTargetKey(target);
-        ApplyWithRetry(() => BuildSoloConfig(targetKey, target.MonitorId));
-        InvalidateCache();
-
-        // Verify
-        var updated = QueryMonitors();
-        var activeMonitors = updated.Where(m => m.IsActive).ToList();
-        if (activeMonitors.Count != 1 || !MatchesId(activeMonitors[0], id))
+        for (var round = 0; round < MaxVerifyAttempts; round++)
         {
+            if (round > 0)
+            {
+                _logger.LogWarning("Solo monitor '{Id}' — retrying (round {Round}/{Max})", id, round + 1, MaxVerifyAttempts);
+                if (StepDelayMs > 0)
+                    await Task.Delay(StepDelayMs);
+                // Re-query to get fresh adapter IDs
+                monitors = QueryMonitors();
+                target = FindMonitor(monitors, id);
+            }
+
+            var targetKey = ResolveTargetKey(target);
+            ApplyWithRetry(() => BuildSoloConfig(targetKey, target.MonitorId));
+            InvalidateCache();
+
+            var updated = QueryMonitors();
+            var activeMonitors = updated.Where(m => m.IsActive).ToList();
+            if (activeMonitors.Count == 1 && MatchesId(activeMonitors[0], id))
+            {
+                _logger.LogDebug("Solo monitor '{Id}' verified successfully", id);
+                return;
+            }
+
             var activeNames = string.Join(", ", activeMonitors.Select(m => $"{m.MonitorName} ({m.MonitorId})"));
             _logger.LogWarning("Solo monitor '{Id}' may have failed — active monitors: [{Active}]", id, activeNames);
         }
+
+        _logger.LogWarning("Solo monitor '{Id}' could not be verified after {Max} rounds", id, MaxVerifyAttempts);
     }
 
     private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildSoloConfig(
@@ -361,37 +378,52 @@ internal sealed class WindowsMonitorService : IMonitorService
 
     private async Task SoloCompatibleAsync(string id)
     {
-        _logger.LogInformation("Solo monitor (compatible): {Id}", id);
-
-        // Step 1: Enable target if not active
-        var monitors = InvalidateAndQueryMonitors();
-        var target = FindMonitor(monitors, id);
-        if (!target.IsActive)
+        for (var round = 0; round < MaxVerifyAttempts; round++)
         {
-            await EnableCompatibleAsync(id);
-            monitors = InvalidateAndQueryMonitors();
-            target = FindMonitor(monitors, id);
-        }
+            if (round > 0)
+            {
+                _logger.LogWarning("Solo compatible '{Id}' — retrying (round {Round}/{Max})", id, round + 1, MaxVerifyAttempts);
+                if (StepDelayMs > 0)
+                    await Task.Delay(StepDelayMs);
+            }
 
-        // Step 2: Set primary (doesn't change which monitors are active)
-        if (!target.IsPrimary)
-            await SetPrimaryCompatibleAsync(id);
+            _logger.LogInformation("Solo monitor (compatible): {Id}", id);
 
-        // Step 3: Disable each other active monitor
-        var others = monitors.Where(m => m.IsActive && !MatchesId(m, id)).ToList();
-        foreach (var other in others)
-        {
-            await DisableCompatibleAsync(other.MonitorId);
-        }
+            // Step 1: Enable target if not active
+            var monitors = InvalidateAndQueryMonitors();
+            var target = FindMonitor(monitors, id);
+            if (!target.IsActive)
+            {
+                await EnableCompatibleAsync(id);
+                monitors = InvalidateAndQueryMonitors();
+                target = FindMonitor(monitors, id);
+            }
 
-        // Final verification
-        var final = InvalidateAndQueryMonitors();
-        var active = final.Where(m => m.IsActive).ToList();
-        if (active.Count != 1 || !MatchesId(active[0], id))
-        {
+            // Step 2: Set primary (doesn't change which monitors are active)
+            if (!target.IsPrimary)
+                await SetPrimaryCompatibleAsync(id);
+
+            // Step 3: Disable each other active monitor
+            var others = monitors.Where(m => m.IsActive && !MatchesId(m, id)).ToList();
+            foreach (var other in others)
+            {
+                await DisableCompatibleAsync(other.MonitorId);
+            }
+
+            // Final verification
+            var final_ = InvalidateAndQueryMonitors();
+            var active = final_.Where(m => m.IsActive).ToList();
+            if (active.Count == 1 && MatchesId(active[0], id))
+            {
+                _logger.LogDebug("Solo compatible '{Id}' verified successfully", id);
+                return;
+            }
+
             var activeNames = string.Join(", ", active.Select(m => $"{m.MonitorName} ({m.MonitorId})"));
             _logger.LogWarning("Solo compatible '{Id}' — unexpected result: [{Active}]", id, activeNames);
         }
+
+        _logger.LogWarning("Solo compatible '{Id}' could not be verified after {Max} rounds", id, MaxVerifyAttempts);
     }
 
     private async Task EnableCompatibleAsync(string id)
