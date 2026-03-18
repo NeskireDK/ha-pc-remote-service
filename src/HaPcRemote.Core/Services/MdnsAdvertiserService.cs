@@ -225,6 +225,7 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
 
     private byte[] BuildPacket(uint ptrTtl, uint srvTtl, uint txtTtl, uint aTtl)
     {
+        var port = options.CurrentValue.Port;
         using var ms = new MemoryStream(512);
         using var writer = new BinaryWriter(ms);
 
@@ -254,7 +255,7 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
         WriteBigEndian(writer, (ushort)(6 + srvTarget.Length));
         WriteBigEndian(writer, 0); // Priority
         WriteBigEndian(writer, 0); // Weight
-        WriteBigEndian(writer, (ushort)options.CurrentValue.Port); // Port
+        WriteBigEndian(writer, (ushort)port); // Port
         writer.Write(srvTarget);
 
         // TXT record

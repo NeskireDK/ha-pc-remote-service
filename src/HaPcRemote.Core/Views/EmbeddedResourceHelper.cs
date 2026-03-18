@@ -7,7 +7,7 @@ namespace HaPcRemote.Service.Views;
 public static class EmbeddedResourceHelper
 {
     private static readonly Assembly CurrentAssembly = typeof(EmbeddedResourceHelper).Assembly;
-    private static readonly ConcurrentDictionary<string, string> ResourceCache = new();
+    private static readonly ConcurrentDictionary<string, Lazy<string>> ResourceCache = new();
 
     /// <summary>
     /// Loads an embedded resource file from the Views folder.
@@ -19,7 +19,7 @@ public static class EmbeddedResourceHelper
     {
         var cacheKey = $"Views/{fileName}";
 
-        return ResourceCache.GetOrAdd(cacheKey, _ =>
+        return ResourceCache.GetOrAdd(cacheKey, _ => new Lazy<string>(() =>
         {
             var resourceName = $"HaPcRemote.Service.Views.{fileName}";
             using var stream = CurrentAssembly.GetManifestResourceStream(resourceName)
@@ -27,7 +27,7 @@ public static class EmbeddedResourceHelper
 
             using var reader = new StreamReader(stream, Encoding.UTF8);
             return reader.ReadToEnd();
-        });
+        })).Value;
     }
 
     /// <summary>
