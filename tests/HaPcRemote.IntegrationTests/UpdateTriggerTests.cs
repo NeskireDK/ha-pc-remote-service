@@ -1,5 +1,5 @@
 using System.Net;
-using HaPcRemote.IntegrationTests.Models;
+using HaPcRemote.Service.Models;
 using Shouldly;
 using Xunit.Abstractions;
 
