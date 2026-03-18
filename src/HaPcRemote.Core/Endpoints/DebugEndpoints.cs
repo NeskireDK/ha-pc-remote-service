@@ -1,5 +1,6 @@
 using System.Net;
 using HaPcRemote.Service.Configuration;
+using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Views;
 using HaPcRemote.Shared.Configuration;
 using Microsoft.Extensions.Options;
@@ -14,7 +15,10 @@ public static class DebugEndpoints
 
     public static IEndpointRouteBuilder MapDebugEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api-explorer", (HttpContext context, IOptionsMonitor<PcRemoteOptions> options) =>
+        var group = endpoints.MapGroup("/");
+        group.AddEndpointFilter<EndpointExceptionFilter>();
+
+        group.MapGet("/api-explorer", (HttpContext context, IOptionsMonitor<PcRemoteOptions> options) =>
         {
             var remote = context.Connection.RemoteIpAddress;
             if (remote is not null && !IPAddress.IsLoopback(remote))
@@ -25,7 +29,7 @@ public static class DebugEndpoints
             return Results.Content(html, "text/html");
         });
 
-        endpoints.MapGet("/api/debug/logs", (HttpContext context, int? lines, string? level, string? category) =>
+        group.MapGet("/api/debug/logs", (HttpContext context, int? lines, string? level, string? category) =>
         {
             var remote = context.Connection.RemoteIpAddress;
             if (remote is not null && !IPAddress.IsLoopback(remote))
