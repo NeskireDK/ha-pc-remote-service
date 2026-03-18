@@ -202,7 +202,7 @@ public sealed class UpdateService(IHttpClientFactory httpClientFactory, ILogger<
         return new Version(major, minor, patch, revision);
     }
 
-    private static string FormatVersion(Version v) =>
+    internal static string FormatVersion(Version v) =>
         v.Revision == int.MaxValue
             ? v.ToString(3)
             : $"{v.Major}.{v.Minor}.{v.Build}-rc.{v.Revision}";

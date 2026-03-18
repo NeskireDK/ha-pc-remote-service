@@ -344,7 +344,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private static string GetVersionString()
     {
         var version = UpdateService.GetCurrentVersion();
-        return version is null ? "" : $"v{version.ToString(3)}";
+        return version is null ? "" : $"v{UpdateService.FormatVersion(version)}";
     }
 
     private static Icon LoadAppIcon()

@@ -22,7 +22,9 @@ internal sealed class SettingsForm : Form
         IServiceProvider services,
         InMemoryLogProvider logProvider)
     {
-        Text = "HA PC Remote - Settings";
+        var version = UpdateService.GetCurrentVersion();
+        var versionStr = version is not null ? $" v{UpdateService.FormatVersion(version)}" : "";
+        Text = $"HA PC Remote{versionStr} - Settings";
         MinimumSize = new Size(600, 450);
 
         var settings = TraySettings.Load();
