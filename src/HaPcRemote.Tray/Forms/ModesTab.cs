@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Tray.Forms;
 
-internal sealed class ModesTab : TabPage
+internal sealed class ModesTab : TabPage, ISettingsTab
 {
     private readonly IConfigurationWriter _configWriter;
     private readonly IAudioService _audioService;
@@ -91,26 +91,12 @@ internal sealed class ModesTab : TabPage
         editLayout.Controls.Add(WithHelp(_modeNameBox, _toolTip, "Unique identifier for this mode.\nUsed in HA automations and the PC Mode select entity.\nExample: couch, desktop"), 1, row++);
 
         // Audio device (with "Don't change" option)
-        _audioDeviceCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _audioDeviceCombo = TabHelpers.MakeComboBox(250);
         editLayout.Controls.Add(MakeLabel("Audio Device:"), 0, row);
         editLayout.Controls.Add(WithHelp(_audioDeviceCombo, _toolTip, "Audio output to switch to when this mode is activated.\nSelect \"(Don't change)\" to leave the current device untouched."), 1, row++);
 
         // Solo monitor
-        _soloMonitorCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _soloMonitorCombo = TabHelpers.MakeComboBox(250);
         editLayout.Controls.Add(MakeLabel("Solo Monitor:"), 0, row);
         editLayout.Controls.Add(WithHelp(_soloMonitorCombo, _toolTip, "Monitor to keep as sole active display. Disables all others."), 1, row++);
 
@@ -126,39 +112,19 @@ internal sealed class ModesTab : TabPage
         editLayout.Controls.Add(volumePanel, 1, row++);
 
         // Launch app
-        _launchAppCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDown,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _launchAppCombo = TabHelpers.MakeComboBox(250, ComboBoxStyle.DropDown);
         editLayout.Controls.Add(MakeLabel("Launch App:"), 0, row);
         editLayout.Controls.Add(WithHelp(_launchAppCombo, _toolTip, "App to launch when this mode is activated.\nApps are defined in the Apps config section."), 1, row++);
 
         // Kill app
-        _killAppCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDown,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _killAppCombo = TabHelpers.MakeComboBox(250, ComboBoxStyle.DropDown);
         editLayout.Controls.Add(MakeLabel("Kill App:"), 0, row);
         editLayout.Controls.Add(WithHelp(_killAppCombo, _toolTip, "App to terminate when this mode is activated.\nUseful for killing Steam Big Picture when switching to desktop mode."), 1, row++);
 
         rightPanel.Controls.Add(editLayout);
 
-        var saveButton = TabFooter.MakeSaveButton("Save Mode", 100);
-        saveButton.Click += OnSaveMode;
-        var footer = new TabFooter();
-        footer.Add(saveButton);
-
         Controls.Add(rightPanel);
         Controls.Add(leftPanel);
-        Controls.Add(footer);
 
         LoadModes();
     }
@@ -319,6 +285,13 @@ internal sealed class ModesTab : TabPage
 
         ResetEditorFields();
         _modeNameBox.Focus();
+    }
+
+    public IEnumerable<Button> CreateFooterButtons()
+    {
+        var applyButton = TabFooter.MakeSaveButton("Apply");
+        applyButton.Click += OnSaveMode;
+        return [applyButton];
     }
 
     private void OnSaveMode(object? sender, EventArgs e)

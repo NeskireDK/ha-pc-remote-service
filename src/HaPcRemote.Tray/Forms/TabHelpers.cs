@@ -29,6 +29,15 @@ internal static class TabHelpers
         return label;
     }
 
+    public static ComboBox MakeComboBox(int width = 200, ComboBoxStyle style = ComboBoxStyle.DropDownList) => new()
+    {
+        DropDownStyle = style,
+        Width = width,
+        BackColor = Color.FromArgb(50, 50, 50),
+        ForeColor = Color.White,
+        FlatStyle = FlatStyle.Flat
+    };
+
     public static LogLevel ParseLogLevel(string level) => level switch
     {
         "Error"   => LogLevel.Error,
