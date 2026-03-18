@@ -16,16 +16,9 @@ public sealed class ShortcutDetectionTrace
     public required string Name { get; init; }
     public required string? ExePath { get; init; }
     public required string? LaunchOptions { get; init; }
-    public required List<ProcessMatch> FilenameMatches { get; init; }
+    public required List<RunningProcess> FilenameMatches { get; init; }
     public required bool ExactPathMatch { get; init; }
     public required bool Matched { get; init; }
     public int? MatchedPid { get; init; }
     public string? MatchReason { get; init; }
-}
-
-public sealed class ProcessMatch
-{
-    public required int Pid { get; init; }
-    public required string Path { get; init; }
-    public string? CommandLine { get; init; }
 }

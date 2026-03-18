@@ -98,7 +98,7 @@ public sealed class SteamService(
             var exeName = Path.GetFileName(shortcut.ExePath!);
             var filenameMatches = runningProcesses
                 .Where(p => Path.GetFileName(p.Path).Equals(exeName, StringComparison.OrdinalIgnoreCase))
-                .Select(p => new ProcessMatch { Pid = p.Pid, Path = p.Path, CommandLine = p.CommandLine })
+                .Select(p => new RunningProcess(p.Pid, p.Path, p.CommandLine))
                 .ToList();
 
             var exactPathMatch = processesByPath.TryGetValue(shortcut.ExePath!, out var matchingProcesses);

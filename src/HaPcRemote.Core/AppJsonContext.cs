@@ -42,7 +42,7 @@ namespace HaPcRemote.Service;
 [JsonSerializable(typeof(RunningGameDiagnostics))]
 [JsonSerializable(typeof(ApiResponse<RunningGameDiagnostics>))]
 [JsonSerializable(typeof(ShortcutDetectionTrace))]
-[JsonSerializable(typeof(ProcessMatch))]
+[JsonSerializable(typeof(RunningProcess))]
 [JsonSerializable(typeof(ArtworkDiagnostics))]
 [JsonSerializable(typeof(ApiResponse<ArtworkDiagnostics>))]
 [JsonSerializable(typeof(List<ArtworkDiagnostics>))]
