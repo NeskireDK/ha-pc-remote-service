@@ -87,4 +87,37 @@ public class SteamEndpointTests : EndpointTestBase
         json.ShouldNotBeNull();
         json.Success.ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task GetGames_SteamInstalled_ReturnsGameList()
+    {
+        // Non-existent path → empty list (no manifests), but does not throw
+        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/steam/games");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse<List<SteamGame>>>(
+            AppJsonContext.Default.ApiResponseListSteamGame);
+        json.ShouldNotBeNull();
+        json.Success.ShouldBeTrue();
+        json.Data.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task Stop_GameRunning_StopsGame_Returns200()
+    {
+        A.CallTo(() => SteamPlatform.GetRunningAppId()).Returns(730);
+        A.CallTo(() => SteamPlatform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
+        using var client = CreateClient();
+
+        var response = await client.PostAsync("/api/steam/stop", null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ApiResponse>(
+            AppJsonContext.Default.ApiResponse);
+        json.ShouldNotBeNull();
+        json.Success.ShouldBeTrue();
+    }
 }

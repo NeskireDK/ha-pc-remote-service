@@ -12,8 +12,10 @@ public class SteamService(
     IOptionsMonitor<PcRemoteOptions> options,
     IHttpClientFactory httpClientFactory,
     IEmulatorTracker emulatorTracker,
-    ILogger<SteamService> logger) : ISteamService
+    ILogger<SteamService> logger,
+    Func<int, Task>? delay = null) : ISteamService
 {
+    private readonly Func<int, Task> _delay = delay ?? (ms => Task.Delay(ms));
     private List<SteamGame>? _cachedGames;
     private DateTime _cacheExpiry;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
@@ -296,7 +298,7 @@ public class SteamService(
                 {
                     var postLaunchDelay = modeConfig.PostLaunchDelayMs ?? 3000;
                     logger.LogDebug("Mode '{Mode}' launched '{App}', waiting {Delay}ms for it to initialize", resolvedMode, modeConfig.LaunchApp, postLaunchDelay);
-                    await Task.Delay(postLaunchDelay);
+                    await _delay(postLaunchDelay);
                 }
             }
             catch (KeyNotFoundException)
@@ -440,6 +442,15 @@ public class SteamService(
     }
 
     public bool IsSteamRunning() => platform.IsSteamRunning();
+
+    /// <summary>
+    /// Seeds the game cache directly. Intended for test use only.
+    /// </summary>
+    internal void SetCachedGamesForTest(List<SteamGame> games)
+    {
+        _cachedGames = games;
+        _cacheExpiry = DateTime.UtcNow + CacheDuration;
+    }
 
     /// <summary>
     /// Resolve which PC mode to apply for a given game.

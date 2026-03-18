@@ -1,4 +1,3 @@
-using System.Reflection;
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
@@ -18,12 +17,12 @@ public class SteamServiceTests
     private readonly IHttpClientFactory _httpClientFactory = A.Fake<IHttpClientFactory>();
     private readonly IEmulatorTracker _emulatorTracker = A.Fake<IEmulatorTracker>();
 
-    private SteamService CreateService(PcRemoteOptions? options = null)
+    private SteamService CreateService(PcRemoteOptions? options = null, Func<int, Task>? delay = null)
     {
         options ??= new PcRemoteOptions();
         var monitor = A.Fake<IOptionsMonitor<PcRemoteOptions>>();
         A.CallTo(() => monitor.CurrentValue).Returns(options);
-        return new SteamService(_platform, _modeService, monitor, _httpClientFactory, _emulatorTracker, _logger);
+        return new SteamService(_platform, _modeService, monitor, _httpClientFactory, _emulatorTracker, _logger, delay);
     }
 
     // ── ParseLibraryFolders tests (static) ───────────────────────────
@@ -175,15 +174,24 @@ public class SteamServiceTests
     public async Task GetRunningGame_GameRunning_CacheWarm_ReturnsGameInfo()
     {
         A.CallTo(() => _platform.GetRunningAppId()).Returns(730);
-        A.CallTo(() => _platform.GetSteamPath()).Returns(@"C:\Steam");
+        A.CallTo(() => _platform.GetSteamPath()).Returns(@"C:\FakeNonExistentSteamPath_12345");
         var service = CreateService();
-        // Warm the cache manually via GetGamesAsync (returns empty list since filesystem is fake)
-        // Then set up the cache via reflection would be complex — instead just verify the result
-        // with an empty cache: name falls back to "Unknown (730)" but appId is correct
+
+        // Pre-warm the cache with a non-empty game list so the warm-path check (_cachedGames.Count == 0) doesn't re-trigger
+        await service.GetGamesAsync();
+        InjectCachedGames(service, [new SteamGame { AppId = 730, Name = "Counter-Strike 2", LastPlayed = 0 }]);
+
+        // Reset call count tracking so we can assert the warm path doesn't reload
+        Fake.ClearRecordedCalls(_platform);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(730);
+
         var result = await service.GetRunningGameAsync();
 
         result.ShouldNotBeNull();
         result.AppId.ShouldBe(730);
+        result.Name.ShouldBe("Counter-Strike 2");
+        // Cache was warm — GetSteamPath must not have been called to reload games
+        A.CallTo(() => _platform.GetSteamPath()).MustNotHaveHappened();
     }
 
     [Fact]
@@ -459,14 +467,13 @@ public class SteamServiceTests
     }
 
     [Fact]
-    public async Task GetGamesAsync_EmptySteamPath_Throws()
+    public async Task GetGamesAsync_NonExistentPath_ReturnsEmpty()
     {
-        A.CallTo(() => _platform.GetSteamPath()).Returns(string.Empty);
+        // GetSteamPath returns a non-null but non-existent path — libraryfolders.vdf won't exist
+        // so LoadInstalledGames returns empty list without throwing
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
         var service = CreateService();
 
-        // GetSteamPath returns empty string — treated as non-null but libraryfolders.vdf won't exist
-        // so should return empty list, not throw
-        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
         var result = await service.GetGamesAsync();
 
         result.ShouldBeEmpty();
@@ -823,16 +830,15 @@ public class SteamServiceTests
                 ["couch"] = new() { LaunchApp = "steam-bigpicture", SoloMonitor = "tv" }
             }
         };
-        var service = CreateService(options);
+        var delayMs = new List<int>();
+        var service = CreateService(options, delay: ms => { delayMs.Add(ms); return Task.CompletedTask; });
         A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
         _ = await service.LaunchGameAsync(730);
-        sw.Stop();
 
         A.CallTo(() => _modeService.ApplyModeAsync("couch")).MustHaveHappenedOnceExactly();
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
-        sw.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(2500);
+        delayMs.ShouldContain(3000); // default PostLaunchDelayMs
     }
 
     [Fact]
@@ -846,16 +852,15 @@ public class SteamServiceTests
                 ["desktop"] = new() { SoloMonitor = "dual", AudioDevice = "Speakers" }
             }
         };
-        var service = CreateService(options);
+        var delayMs = new List<int>();
+        var service = CreateService(options, delay: ms => { delayMs.Add(ms); return Task.CompletedTask; });
         A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
         _ = await service.LaunchGameAsync(730);
-        sw.Stop();
 
         A.CallTo(() => _modeService.ApplyModeAsync("desktop")).MustHaveHappenedOnceExactly();
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
-        sw.ElapsedMilliseconds.ShouldBeLessThan(8000);
+        delayMs.ShouldBeEmpty(); // no LaunchApp configured, no delay expected
     }
 
     // ── GetBindings tests ─────────────────────────────────────────
@@ -909,9 +914,7 @@ public class SteamServiceTests
 
     private static void InjectCachedGames(SteamService service, List<SteamGame> games)
     {
-        typeof(SteamService)
-            .GetField("_cachedGames", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .SetValue(service, games);
+        service.SetCachedGamesForTest(games);
     }
 
     [Fact]
