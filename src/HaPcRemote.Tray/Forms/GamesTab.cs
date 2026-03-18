@@ -44,14 +44,7 @@ internal sealed class GamesTab : TabPage, ISettingsTab
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         // Default PC mode
-        _defaultModeCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 200,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _defaultModeCombo = TabHelpers.MakeComboBox();
         layout.Controls.Add(MakeLabel("Default PC Mode:"), 0, 0);
         var defaultModePanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
         defaultModePanel.Controls.Add(_defaultModeCombo);
