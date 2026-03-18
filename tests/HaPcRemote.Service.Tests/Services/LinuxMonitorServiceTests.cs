@@ -103,6 +103,24 @@ public class LinuxMonitorServiceTests
             A<int>._)).MustHaveHappenedOnceExactly();
     }
 
+    // ── Idempotency tests ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task EnableMonitorAsync_AlreadyActive_DoesNotCallXrandr()
+    {
+        A.CallTo(() => _cliRunner.RunAsync("xrandr",
+            A<IEnumerable<string>>.That.Contains("--listmonitors"), A<int>._))
+            .Returns("Monitors: 1\n 0: +*DP-0 2560/597x1440/336+0+0  DP-0\n");
+
+        var service = CreateService();
+
+        await service.EnableMonitorAsync("DP-0"); // already active
+
+        A.CallTo(() => _cliRunner.RunAsync("xrandr",
+            A<IEnumerable<string>>.That.Contains("--auto"), A<int>._))
+            .MustNotHaveHappened();
+    }
+
     // ── SoloMonitorAsync tests ───────────────────────────────────────
 
     [Fact]
