@@ -371,7 +371,7 @@ public class WindowsMonitorServiceTests
             .MustNotHaveHappened();
     }
 
-        [Fact]
+    [Fact]
     public async Task EnableMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
         SetupTwoMonitorConfig();
@@ -410,7 +410,7 @@ public class WindowsMonitorServiceTests
             .MustNotHaveHappened();
     }
 
-        [Fact]
+    [Fact]
     public async Task DisableMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
         SetupTwoMonitorConfig();

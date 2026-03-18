@@ -4,7 +4,7 @@ namespace HaPcRemote.Service.Services;
 
 internal static class CsvParser
 {
-    public static List<string> SplitCsvLine(string line)
+    internal static List<string> SplitCsvLine(string line)
     {
         var fields = new List<string>();
         var current = new StringBuilder();

@@ -34,9 +34,10 @@ internal static class SteamArtworkService
                 foreach (var ext in ArtworkExtensions)
                 {
                     var path = Path.Combine(gridDir, $"{fileId}p.{ext}");
-                    if (File.Exists(path))
+                    var fi = new FileInfo(path);
+                    if (fi.Exists)
                     {
-                        logger?.LogDebug("Artwork: found in custom grid {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
+                        logger?.LogDebug("Artwork: found in custom grid {Path} ({Size} KB)", path, fi.Length / 1024);
                         return path;
                     }
                 }
@@ -63,9 +64,10 @@ internal static class SteamArtworkService
                 foreach (var ext in ArtworkExtensions)
                 {
                     var path = Path.Combine(cacheDir, $"{fileId}{suffix}.{ext}");
-                    if (File.Exists(path))
+                    var fi = new FileInfo(path);
+                    if (fi.Exists)
                     {
-                        logger?.LogDebug("Artwork: found in library cache {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
+                        logger?.LogDebug("Artwork: found in library cache {Path} ({Size} KB)", path, fi.Length / 1024);
                         return path;
                     }
                 }
@@ -98,8 +100,9 @@ internal static class SteamArtworkService
             foreach (var ext in ArtworkExtensions)
             {
                 var path = Path.Combine(gridDir, $"{fileId}p.{ext}");
-                var exists = File.Exists(path);
-                long? size = exists ? new FileInfo(path).Length : null;
+                var fii = new FileInfo(path);
+                var exists = fii.Exists;
+                long? size = exists ? fii.Length : null;
                 paths.Add(new ArtworkPathCheck { Path = path, Category = "Custom Grid", Exists = exists, SizeBytes = size });
                 if (exists && resolvedPath == null) resolvedPath = path;
             }
@@ -113,8 +116,9 @@ internal static class SteamArtworkService
             foreach (var ext in ArtworkExtensions)
             {
                 var path = Path.Combine(cacheDir, $"{fileId}{suffix}.{ext}");
-                var exists = File.Exists(path);
-                long? size = exists ? new FileInfo(path).Length : null;
+                var fii = new FileInfo(path);
+                var exists = fii.Exists;
+                long? size = exists ? fii.Length : null;
                 paths.Add(new ArtworkPathCheck { Path = path, Category = $"Library Cache ({suffix})", Exists = exists, SizeBytes = size });
                 if (exists && resolvedPath == null) resolvedPath = path;
             }
