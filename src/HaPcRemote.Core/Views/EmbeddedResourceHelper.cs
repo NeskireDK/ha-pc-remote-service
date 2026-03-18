@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
 
@@ -6,7 +7,7 @@ namespace HaPcRemote.Service.Views;
 public static class EmbeddedResourceHelper
 {
     private static readonly Assembly CurrentAssembly = typeof(EmbeddedResourceHelper).Assembly;
-    private static readonly Dictionary<string, string> ResourceCache = new();
+    private static readonly ConcurrentDictionary<string, string> ResourceCache = new();
 
     /// <summary>
     /// Loads an embedded resource file from the Views folder.
@@ -18,17 +19,15 @@ public static class EmbeddedResourceHelper
     {
         var cacheKey = $"Views/{fileName}";
 
-        if (ResourceCache.TryGetValue(cacheKey, out var cached))
-            return cached;
+        return ResourceCache.GetOrAdd(cacheKey, _ =>
+        {
+            var resourceName = $"HaPcRemote.Service.Views.{fileName}";
+            using var stream = CurrentAssembly.GetManifestResourceStream(resourceName)
+                ?? throw new FileNotFoundException($"Embedded resource not found: {resourceName}");
 
-        var resourceName = $"HaPcRemote.Service.Views.{fileName}";
-        using var stream = CurrentAssembly.GetManifestResourceStream(resourceName)
-            ?? throw new FileNotFoundException($"Embedded resource not found: {resourceName}");
-
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        var content = reader.ReadToEnd();
-        ResourceCache[cacheKey] = content;
-        return content;
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            return reader.ReadToEnd();
+        });
     }
 
     /// <summary>

@@ -86,5 +86,8 @@ app.MapAudioEndpoints();
 app.MapMonitorEndpoints();
 app.MapSteamEndpoints();
 app.MapArtworkDebugEndpoints();
+// MapPowerEndpoints() is intentionally omitted: the headless host does not register
+// IConfigurationWriter, so the PUT /api/system/power endpoint would fail at runtime.
+// Power config writes are only supported via the Tray host (Windows).
 
 await app.RunAsync();
