@@ -23,28 +23,37 @@ public sealed class SteamService(
 
     public async Task<List<SteamGame>> GetGamesAsync()
     {
-        if (_cachedGames != null && DateTime.UtcNow < _cacheExpiry)
-            return _cachedGames;
-
-        var steamPath = platform.GetSteamPath();
-        if (steamPath == null)
+        await _cacheLock.WaitAsync();
+        try
         {
-            if (_cachedGames != null)
+            if (_cachedGames is not null && DateTime.UtcNow < _cacheExpiry)
                 return _cachedGames;
 
-            throw new InvalidOperationException("Steam is not installed.");
+            var steamPath = platform.GetSteamPath();
+            if (steamPath == null)
+            {
+                if (_cachedGames is not null)
+                    return _cachedGames;
+
+                throw new InvalidOperationException("Steam is not installed.");
+            }
+
+            _libraryFolders = null;
+            var games = await Task.Run(() => LoadInstalledGames(steamPath));
+            _cachedGames = games;
+            _cacheExpiry = DateTime.UtcNow + CacheDuration;
+
+            var shortcuts = games.Where(g => g.IsShortcut).ToList();
+            logger.LogDebug("Non-Steam shortcuts loaded: {Count} found", shortcuts.Count);
+            foreach (var s in shortcuts)
+                logger.LogDebug("  Shortcut [{AppId}] {Name}: ExePath={ExePath}", s.AppId, s.Name, s.ExePath ?? "(null)");
+
+            return games;
         }
-
-        var games = await Task.Run(() => LoadInstalledGames(steamPath));
-        _cachedGames = games;
-        _cacheExpiry = DateTime.UtcNow + CacheDuration;
-
-        var shortcuts = games.Where(g => g.IsShortcut).ToList();
-        logger.LogDebug("Non-Steam shortcuts loaded: {Count} found", shortcuts.Count);
-        foreach (var s in shortcuts)
-            logger.LogDebug("  Shortcut [{AppId}] {Name}: ExePath={ExePath}", s.AppId, s.Name, s.ExePath ?? "(null)");
-
-        return games;
+        finally
+        {
+            _cacheLock.Release();
+        }
     }
 
     public async Task<SteamRunningGame?> GetRunningGameAsync()
@@ -436,17 +445,8 @@ public sealed class SteamService(
 
     private async Task EnsureCacheWarmAsync()
     {
-        await _cacheLock.WaitAsync();
-        try
-        {
-            if (_cachedGames is { Count: > 0 }) return;
-            try { await GetGamesAsync(); }
-            catch (InvalidOperationException) { /* Steam not installed */ }
-        }
-        finally
-        {
-            _cacheLock.Release();
-        }
+        try { await GetGamesAsync(); }
+        catch (InvalidOperationException) { /* Steam not installed */ }
     }
 
     /// <summary>
@@ -497,15 +497,10 @@ public sealed class SteamService(
         if (_libraryFolders is not null)
             return _libraryFolders;
 
-        var libraryFoldersPath = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
-        if (!File.Exists(libraryFoldersPath))
-        {
-            _libraryFolders = [];
-            return _libraryFolders;
-        }
+        var path = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
+        if (!File.Exists(path)) return [];   // don't cache
 
-        var vdfContent = File.ReadAllText(libraryFoldersPath);
-        _libraryFolders = SteamVdfParser.ParseLibraryFolders(vdfContent);
+        _libraryFolders = SteamVdfParser.ParseLibraryFolders(File.ReadAllText(path));
         return _libraryFolders;
     }
 
