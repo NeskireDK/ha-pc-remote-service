@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using HaPcRemote.Service.Logging;
 using HaPcRemote.Service.Services;
 using HaPcRemote.Service.Configuration;
@@ -31,7 +32,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly System.Windows.Forms.Timer _steamPollTimer;
     private readonly Icon _defaultIcon;
     private Icon? _playingIcon;
+    private IntPtr _playingIconHandle;
     private bool _isGamePlaying;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
 
     private readonly SemaphoreSlim _updateLock = new(1, 1);
 
@@ -193,8 +198,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
         using var g = Graphics.FromImage(bmp);
         using var brush = new SolidBrush(Color.Lime);
         g.FillEllipse(brush, bmp.Width - 7, bmp.Height - 7, 6, 6);
-        _playingIcon = Icon.FromHandle(bmp.GetHicon());
+        var hIcon = bmp.GetHicon();
         bmp.Dispose();
+        var newIcon = Icon.FromHandle(hIcon);
+        if (_playingIconHandle != IntPtr.Zero)
+        {
+            _playingIcon?.Dispose();
+            DestroyIcon(_playingIconHandle);
+        }
+        _playingIconHandle = hIcon;
+        _playingIcon = newIcon;
         return _playingIcon;
     }
 
@@ -362,6 +375,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _updateTimer.Dispose();
             _steamPollTimer.Dispose();
             _playingIcon?.Dispose();
+            if (_playingIconHandle != IntPtr.Zero)
+                DestroyIcon(_playingIconHandle);
             _settingsForm?.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
