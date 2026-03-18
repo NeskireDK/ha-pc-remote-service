@@ -24,6 +24,8 @@ internal sealed class UpdateChecker(ILogger<UpdateChecker> logger)
         try
         {
             var currentVersion = GetCurrentVersion();
+            logger.LogInformation("Update check starting — current: {Version}, prereleases: {Prereleases}",
+                currentVersion?.ToString() ?? "unknown", includePrereleases);
 
             if (includePrereleases)
             {

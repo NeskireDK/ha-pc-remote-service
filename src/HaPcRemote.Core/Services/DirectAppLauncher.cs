@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace HaPcRemote.Service.Services;
 
@@ -6,7 +7,7 @@ namespace HaPcRemote.Service.Services;
 /// Launches processes directly in the current user session.
 /// Used by the Tray host where no IPC is needed.
 /// </summary>
-public sealed class DirectAppLauncher : IAppLauncher
+public sealed class DirectAppLauncher(ILogger<DirectAppLauncher> logger) : IAppLauncher
 {
     public Task LaunchAsync(string exePath, string? arguments = null, bool useShellExecute = false)
     {
@@ -14,6 +15,8 @@ public sealed class DirectAppLauncher : IAppLauncher
         // .NET resolves the URI as a relative file path and fails.
         if (exePath.Contains("://"))
             useShellExecute = true;
+
+        logger.LogInformation("Launching: {ExePath} {Args} (shell={Shell})", exePath, arguments ?? "", useShellExecute);
 
         var startInfo = new ProcessStartInfo
         {
@@ -23,7 +26,17 @@ public sealed class DirectAppLauncher : IAppLauncher
         };
         if (!string.IsNullOrEmpty(arguments))
             startInfo.Arguments = arguments;
-        using var process = Process.Start(startInfo);
+
+        try
+        {
+            using var process = Process.Start(startInfo);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to launch '{ExePath}' (shell={Shell})", exePath, useShellExecute);
+            throw;
+        }
+
         return Task.CompletedTask;
     }
 }

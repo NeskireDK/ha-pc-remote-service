@@ -106,7 +106,7 @@ public class SteamAppBootstrapperTests : IDisposable
 
     [Fact]
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public void BootstrapIfNeeded_SteamPathNull_DoesNotWrite()
+    public void BootstrapIfNeeded_SteamPathNull_StillWritesBigPicture()
     {
         if (!OperatingSystem.IsWindows()) return;
 
@@ -115,13 +115,17 @@ public class SteamAppBootstrapperTests : IDisposable
 
         SteamAppBootstrapper.BootstrapIfNeeded(_platform, _writer, options, _logger);
 
-        A.CallTo(() => _writer.SaveApp(A<string>._, A<AppDefinitionOptions>._))
+        A.CallTo(() => _writer.SaveApp("steam", A<AppDefinitionOptions>._))
             .MustNotHaveHappened();
+
+        A.CallTo(() => _writer.SaveApp("steam-bigpicture", A<AppDefinitionOptions>.That.Matches(a =>
+            a.ExePath == "steam://open/bigpicture" && a.UseShellExecute == true)))
+            .MustHaveHappenedOnceExactly();
     }
 
     [Fact]
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public void BootstrapIfNeeded_SteamExeNotFound_DoesNotWrite()
+    public void BootstrapIfNeeded_SteamExeNotFound_StillWritesBigPicture()
     {
         if (!OperatingSystem.IsWindows()) return;
 
@@ -131,7 +135,11 @@ public class SteamAppBootstrapperTests : IDisposable
 
         SteamAppBootstrapper.BootstrapIfNeeded(_platform, _writer, options, _logger);
 
-        A.CallTo(() => _writer.SaveApp(A<string>._, A<AppDefinitionOptions>._))
+        A.CallTo(() => _writer.SaveApp("steam", A<AppDefinitionOptions>._))
             .MustNotHaveHappened();
+
+        A.CallTo(() => _writer.SaveApp("steam-bigpicture", A<AppDefinitionOptions>.That.Matches(a =>
+            a.ExePath == "steam://open/bigpicture" && a.UseShellExecute == true)))
+            .MustHaveHappenedOnceExactly();
     }
 }
