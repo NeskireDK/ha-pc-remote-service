@@ -1,4 +1,4 @@
-using HaPcRemote.IntegrationTests.Models;
+using HaPcRemote.Service.Models;
 using Shouldly;
 
 namespace HaPcRemote.IntegrationTests;

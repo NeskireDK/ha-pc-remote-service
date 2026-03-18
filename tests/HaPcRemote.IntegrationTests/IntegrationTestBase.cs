@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using HaPcRemote.IntegrationTests.Models;
+using HaPcRemote.Service.Models;
 using Microsoft.Extensions.Configuration;
 
 namespace HaPcRemote.IntegrationTests;

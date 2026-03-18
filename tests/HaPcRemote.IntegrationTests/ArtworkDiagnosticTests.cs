@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
-using HaPcRemote.IntegrationTests.Models;
+using HaPcRemote.Service.Models;
 using Shouldly;
 using Xunit.Abstractions;
 
