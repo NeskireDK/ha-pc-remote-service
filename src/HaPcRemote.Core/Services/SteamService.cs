@@ -2,46 +2,58 @@ using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using ValveKeyValue;
 
 namespace HaPcRemote.Service.Services;
 
-public class SteamService(
+public sealed class SteamService(
     ISteamPlatform platform,
     IModeService modeService,
     IOptionsMonitor<PcRemoteOptions> options,
     IHttpClientFactory httpClientFactory,
     IEmulatorTracker emulatorTracker,
-    ILogger<SteamService> logger) : ISteamService
+    ILogger<SteamService> logger,
+    Func<int, Task>? delay = null) : ISteamService
 {
+    private readonly Func<int, Task> _delay = delay ?? (ms => Task.Delay(ms));
     private List<SteamGame>? _cachedGames;
     private DateTime _cacheExpiry;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
+    private readonly SemaphoreSlim _cacheLock = new(1, 1);
+    private IReadOnlyList<string>? _libraryFolders;
 
     public async Task<List<SteamGame>> GetGamesAsync()
     {
-        if (_cachedGames != null && DateTime.UtcNow < _cacheExpiry)
-            return _cachedGames;
-
-        var steamPath = platform.GetSteamPath();
-        if (steamPath == null)
+        await _cacheLock.WaitAsync();
+        try
         {
-            if (_cachedGames != null)
+            if (_cachedGames is not null && DateTime.UtcNow < _cacheExpiry)
                 return _cachedGames;
 
-            throw new InvalidOperationException("Steam is not installed.");
+            var steamPath = platform.GetSteamPath();
+            if (steamPath == null)
+            {
+                if (_cachedGames is not null)
+                    return _cachedGames;
+
+                throw new InvalidOperationException("Steam is not installed.");
+            }
+
+            _libraryFolders = null;
+            var games = await Task.Run(() => LoadInstalledGames(steamPath));
+            _cachedGames = games;
+            _cacheExpiry = DateTime.UtcNow + CacheDuration;
+
+            var shortcuts = games.Where(g => g.IsShortcut).ToList();
+            logger.LogDebug("Non-Steam shortcuts loaded: {Count} found", shortcuts.Count);
+            foreach (var s in shortcuts)
+                logger.LogDebug("  Shortcut [{AppId}] {Name}: ExePath={ExePath}", s.AppId, s.Name, s.ExePath ?? "(null)");
+
+            return games;
         }
-
-        var games = await Task.Run(() => LoadInstalledGames(steamPath));
-        _cachedGames = games;
-        _cacheExpiry = DateTime.UtcNow + CacheDuration;
-
-        var shortcuts = games.Where(g => g.IsShortcut).ToList();
-        logger.LogDebug("Non-Steam shortcuts loaded: {Count} found", shortcuts.Count);
-        foreach (var s in shortcuts)
-            logger.LogDebug("  Shortcut [{AppId}] {Name}: ExePath={ExePath}", s.AppId, s.Name, s.ExePath ?? "(null)");
-
-        return games;
+        finally
+        {
+            _cacheLock.Release();
+        }
     }
 
     public async Task<SteamRunningGame?> GetRunningGameAsync()
@@ -54,11 +66,7 @@ public class SteamService(
         }
 
         // Warm the cache if not yet populated
-        if (_cachedGames == null || _cachedGames.Count == 0)
-        {
-            try { await GetGamesAsync(); }
-            catch (InvalidOperationException) { /* Steam path unavailable, continue without cache */ }
-        }
+        await EnsureCacheWarmAsync();
 
         var name = _cachedGames?.Find(g => g.AppId == appId)?.Name;
 
@@ -68,7 +76,7 @@ public class SteamService(
             var steamPath = platform.GetSteamPath();
             if (steamPath != null)
             {
-                name = IsShortcutAppId(appId)
+                name = SteamVdfParser.IsShortcutAppId(appId)
                     ? FindShortcutName(steamPath, appId)
                     : FindGameNameFromManifest(steamPath, appId);
             }
@@ -82,11 +90,7 @@ public class SteamService(
     {
         var steamAppId = platform.GetRunningAppId();
 
-        if (_cachedGames == null || _cachedGames.Count == 0)
-        {
-            try { await GetGamesAsync(); }
-            catch (InvalidOperationException) { /* Steam path unavailable */ }
-        }
+        await EnsureCacheWarmAsync();
 
         var shortcuts = _cachedGames?.Where(g => g.IsShortcut && g.ExePath != null).ToList()
                         ?? [];
@@ -103,7 +107,7 @@ public class SteamService(
             var exeName = Path.GetFileName(shortcut.ExePath!);
             var filenameMatches = runningProcesses
                 .Where(p => Path.GetFileName(p.Path).Equals(exeName, StringComparison.OrdinalIgnoreCase))
-                .Select(p => new ProcessMatch { Pid = p.Pid, Path = p.Path, CommandLine = p.CommandLine })
+                .Select(p => new RunningProcess(p.Pid, p.Path, p.CommandLine))
                 .ToList();
 
             var exactPathMatch = processesByPath.TryGetValue(shortcut.ExePath!, out var matchingProcesses);
@@ -151,8 +155,10 @@ public class SteamService(
         }
 
         // If Steam reports a non-zero, non-shortcut appId, use that instead
-        if (steamAppId != 0 && !IsShortcutAppId(steamAppId))
+        if (steamAppId != 0 && !SteamVdfParser.IsShortcutAppId(steamAppId))
         {
+            if (result != null)
+                logger.LogDebug("Overriding shortcut diagnostic result with standard game {AppId}", steamAppId);
             var name = _cachedGames?.Find(g => g.AppId == steamAppId)?.Name ?? $"Unknown ({steamAppId})";
             result = new SteamRunningGame { AppId = steamAppId, Name = name };
         }
@@ -171,11 +177,7 @@ public class SteamService(
     private async Task<SteamRunningGame?> TryFindRunningShortcutAsync()
     {
         // Warm the cache if needed
-        if (_cachedGames == null || _cachedGames.Count == 0)
-        {
-            try { await GetGamesAsync(); }
-            catch (InvalidOperationException) { return null; }
-        }
+        await EnsureCacheWarmAsync();
 
         var shortcuts = _cachedGames?.Where(g => g.IsShortcut && g.ExePath != null).ToList();
         if (shortcuts == null || shortcuts.Count == 0)
@@ -296,7 +298,7 @@ public class SteamService(
                 {
                     var postLaunchDelay = modeConfig.PostLaunchDelayMs ?? 3000;
                     logger.LogDebug("Mode '{Mode}' launched '{App}', waiting {Delay}ms for it to initialize", resolvedMode, modeConfig.LaunchApp, postLaunchDelay);
-                    await Task.Delay(postLaunchDelay);
+                    await _delay(postLaunchDelay);
                 }
             }
             catch (KeyNotFoundException)
@@ -306,12 +308,12 @@ public class SteamService(
         }
 
         // Non-Steam shortcuts use a shifted appid for the steam:// URI
-        var launchId = IsShortcutAppId(appId)
+        var launchId = SteamVdfParser.IsShortcutAppId(appId)
             ? ((long)(uint)appId << 32) | 0x02000000
             : appId;
 
         // Track emulator launch for non-Steam shortcuts before launching
-        if (IsShortcutAppId(appId))
+        if (SteamVdfParser.IsShortcutAppId(appId))
         {
             var game = _cachedGames?.Find(g => g.AppId == appId);
             if (game?.ExePath != null)
@@ -339,10 +341,10 @@ public class SteamService(
     {
         var appId = platform.GetRunningAppId();
         logger.LogInformation("StopGame: Steam reports running appId={AppId}, isShortcut={IsShortcut}",
-            appId, IsShortcutAppId(appId));
+            appId, SteamVdfParser.IsShortcutAppId(appId));
 
         // No Steam-tracked game running — try process-based shortcut detection
-        if (appId == 0 || IsShortcutAppId(appId))
+        if (appId == 0 || SteamVdfParser.IsShortcutAppId(appId))
         {
             logger.LogInformation("StopGame: attempting process-based shortcut detection (appId={AppId})", appId);
             var runningShortcut = await TryFindRunningShortcutAsync();
@@ -384,9 +386,9 @@ public class SteamService(
         }
 
         var gameName = _cachedGames?.FirstOrDefault(g => g.AppId == appId)?.Name;
-        var result = FindArtworkPath(steamPath, platform.GetSteamUserId(), appId, logger);
+        var result = SteamArtworkService.FindArtworkPath(steamPath, platform.GetSteamUserId(), appId, logger);
 
-        if (result == null && !IsShortcutAppId(appId))
+        if (result == null && !SteamVdfParser.IsShortcutAppId(appId))
         {
             result = await TryDownloadFromCdnAsync(steamPath, appId, gameName);
         }
@@ -441,6 +443,22 @@ public class SteamService(
 
     public bool IsSteamRunning() => platform.IsSteamRunning();
 
+    private async Task EnsureCacheWarmAsync()
+    {
+        try { await GetGamesAsync(); }
+        catch (InvalidOperationException) { /* Steam not installed */ }
+    }
+
+    /// <summary>
+    /// Seeds the game cache directly. Intended for test use only.
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    internal void SetCachedGamesForTest(List<SteamGame> games)
+    {
+        _cachedGames = games;
+        _cacheExpiry = DateTime.UtcNow + CacheDuration;
+    }
+
     /// <summary>
     /// Resolve which PC mode to apply for a given game.
     /// Per-game binding takes priority, then default, then none.
@@ -475,215 +493,21 @@ public class SteamService(
         return null;
     }
 
-    /// <summary>
-    /// Shortcut appids are generated by Steam from exe+appname and are always negative when
-    /// stored as a signed 32-bit int (high bit set).
-    /// </summary>
-    internal static bool IsShortcutAppId(int appId) => appId < 0;
-
-    // ── Static VDF parsers (testable without mocking) ────────────────
-
-    internal static List<string> ParseLibraryFolders(string vdfContent)
+    private IReadOnlyList<string> GetLibraryFolders(string steamPath)
     {
-        var paths = new List<string>();
-        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(vdfContent));
-        var kv = KVSerializer.Create(KVSerializationFormat.KeyValues1Text);
-        var data = kv.Deserialize(stream);
+        if (_libraryFolders is not null)
+            return _libraryFolders;
 
-        foreach (var folder in data)
-        {
-            var path = folder["path"]?.ToString();
-            if (!string.IsNullOrEmpty(path))
-                paths.Add(path.Replace(@"\\", @"\"));
-        }
+        var path = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
+        if (!File.Exists(path)) return [];   // don't cache
 
-        return paths;
+        _libraryFolders = SteamVdfParser.ParseLibraryFolders(File.ReadAllText(path));
+        return _libraryFolders;
     }
 
-    internal static SteamGame? ParseAppManifest(string acfContent)
+    private string? FindGameNameFromManifest(string steamPath, int appId)
     {
-        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(acfContent));
-        var kv = KVSerializer.Create(KVSerializationFormat.KeyValues1Text);
-        var data = kv.Deserialize(stream);
-
-        var appIdStr = data["appid"]?.ToString();
-        var name = data["name"]?.ToString();
-        var lastPlayedStr = data["LastPlayed"]?.ToString();
-        var lastUpdatedStr = data["LastUpdated"]?.ToString();
-
-        if (string.IsNullOrEmpty(appIdStr) || string.IsNullOrEmpty(name))
-            return null;
-
-        if (!int.TryParse(appIdStr, out var appId))
-            return null;
-
-        // Prefer LastPlayed (actual play history); fall back to LastUpdated (install/update time)
-        if (!long.TryParse(lastPlayedStr, out var lastPlayed))
-            long.TryParse(lastUpdatedStr, out lastPlayed);
-
-        return new SteamGame { AppId = appId, Name = name, LastPlayed = lastPlayed };
-    }
-
-    internal static string? ParseInstallDir(string acfContent)
-    {
-        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(acfContent));
-        var kv = KVSerializer.Create(KVSerializationFormat.KeyValues1Text);
-        var data = kv.Deserialize(stream);
-        return data["installdir"]?.ToString();
-    }
-
-    internal static List<SteamGame> ParseShortcuts(Stream stream, ILogger? logger = null)
-    {
-        var shortcuts = new List<SteamGame>();
-        var kv = KVSerializer.Create(KVSerializationFormat.KeyValues1Binary);
-        KVObject root;
-        try
-        {
-            root = kv.Deserialize(stream);
-        }
-        catch (Exception ex)
-        {
-            logger?.LogWarning(ex, "Shortcut parsing: failed to deserialize shortcuts.vdf");
-            return shortcuts;
-        }
-
-        foreach (var entry in root)
-        {
-            var appName = entry["AppName"]?.ToString()
-                          ?? entry["appname"]?.ToString();
-            if (string.IsNullOrEmpty(appName))
-                continue;
-
-            var rawExe = entry["Exe"]?.ToString() ?? entry["exe"]?.ToString();
-            logger?.LogDebug("Shortcut parsing [{Name}]: raw Exe field = {RawExe}", appName, rawExe ?? "(null)");
-
-            var (exe, exeArgs) = ParseExeField(rawExe);
-            logger?.LogDebug("Shortcut parsing [{Name}]: parsed ExePath={ExePath}, ExeArgs={ExeArgs}",
-                appName, exe ?? "(null)", exeArgs ?? "(null)");
-
-            // Steam stores shortcut appid as a signed 32-bit int (high bit set).
-            // Try appid first, then fallback to calculating from exe+appname.
-            int appId;
-            var appIdStr = entry["appid"]?.ToString();
-            if (!string.IsNullOrEmpty(appIdStr) && int.TryParse(appIdStr, out var parsed) && parsed != 0)
-            {
-                appId = parsed;
-            }
-            else
-            {
-                // Fallback: generate the shortcut appid from exe + appname
-                appId = GenerateShortcutAppId(exe ?? "", appName);
-            }
-
-            var launchOptions = entry["LaunchOptions"]?.ToString()
-                                ?? entry["launchoptions"]?.ToString();
-
-            // If the Exe field contained arguments and LaunchOptions is empty, use the extracted args
-            if (string.IsNullOrEmpty(launchOptions) && !string.IsNullOrEmpty(exeArgs))
-            {
-                launchOptions = exeArgs;
-                logger?.LogDebug("Shortcut parsing [{Name}]: promoted exe args to LaunchOptions={LaunchOptions}",
-                    appName, launchOptions);
-            }
-
-            var lastPlayedStr = entry["LastPlayTime"]?.ToString();
-            long.TryParse(lastPlayedStr, out var lastPlayed);
-
-            logger?.LogDebug("Shortcut parsing [{Name}]: AppId={AppId}, ExePath={ExePath}, LaunchOptions={LaunchOptions}",
-                appName, appId, exe ?? "(null)", launchOptions ?? "(null)");
-
-            shortcuts.Add(new SteamGame
-            {
-                AppId = appId,
-                Name = appName,
-                LastPlayed = lastPlayed,
-                IsShortcut = true,
-                ExePath = string.IsNullOrEmpty(exe) ? null : exe,
-                LaunchOptions = string.IsNullOrEmpty(launchOptions) ? null : launchOptions
-            });
-        }
-
-        return shortcuts;
-    }
-
-    /// <summary>
-    /// Parses the Exe field from shortcuts.vdf. Steam stores this as a quoted path
-    /// optionally followed by arguments, e.g.: "D:\emulator\emu.exe" -g "D:\games\rom.bin"
-    /// Returns (exePath, args) where args may be null.
-    /// </summary>
-    internal static (string? ExePath, string? Args) ParseExeField(string? raw)
-    {
-        if (string.IsNullOrEmpty(raw))
-            return (null, null);
-
-        var trimmed = raw.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-            return (null, null);
-
-        // Case 1: Quoted path — extract path between first pair of quotes, rest is args
-        if (trimmed.StartsWith('"'))
-        {
-            var closingQuote = trimmed.IndexOf('"', 1);
-            if (closingQuote > 1)
-            {
-                var exePath = trimmed[1..closingQuote];
-                var remainder = trimmed[(closingQuote + 1)..].Trim();
-                return (exePath, string.IsNullOrEmpty(remainder) ? null : remainder);
-            }
-
-            // Malformed: opening quote but no closing — strip quotes and return as-is
-            return (trimmed.Trim('"'), null);
-        }
-
-        // Case 2: Unquoted path — split on first space (if path doesn't contain spaces)
-        // But prefer checking if the whole string is a valid file path first
-        if (File.Exists(trimmed))
-            return (trimmed, null);
-
-        var spaceIdx = trimmed.IndexOf(' ');
-        if (spaceIdx > 0)
-        {
-            var candidate = trimmed[..spaceIdx];
-            var remainder = trimmed[(spaceIdx + 1)..].Trim();
-            return (candidate, string.IsNullOrEmpty(remainder) ? null : remainder);
-        }
-
-        return (trimmed, null);
-    }
-
-    /// <summary>
-    /// Generates a non-Steam shortcut appid using the same CRC algorithm Steam uses.
-    /// The result is always negative as a signed int32 (high bit set).
-    /// </summary>
-    internal static int GenerateShortcutAppId(string exe, string appName)
-    {
-        // Steam algorithm: CRC32(exe + appname) | 0x80000000
-        var input = System.Text.Encoding.UTF8.GetBytes(exe + appName);
-        var crc = Crc32(input);
-        return (int)(crc | 0x80000000);
-    }
-
-    private static uint Crc32(byte[] data)
-    {
-        const uint polynomial = 0xEDB88320;
-        var crc = 0xFFFFFFFF;
-        foreach (var b in data)
-        {
-            crc ^= b;
-            for (var i = 0; i < 8; i++)
-                crc = (crc & 1) != 0 ? (crc >> 1) ^ polynomial : crc >> 1;
-        }
-        return crc ^ 0xFFFFFFFF;
-    }
-
-    private static string? FindGameNameFromManifest(string steamPath, int appId)
-    {
-        var libraryFoldersPath = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
-        if (!File.Exists(libraryFoldersPath))
-            return null;
-
-        var vdfContent = File.ReadAllText(libraryFoldersPath);
-        var libraryPaths = ParseLibraryFolders(vdfContent);
+        var libraryPaths = GetLibraryFolders(steamPath);
 
         foreach (var libPath in libraryPaths)
         {
@@ -694,7 +518,7 @@ public class SteamService(
             try
             {
                 var content = File.ReadAllText(manifestPath);
-                var game = ParseAppManifest(content);
+                var game = SteamVdfParser.ParseAppManifest(content);
                 if (game != null)
                     return game.Name;
             }
@@ -713,14 +537,11 @@ public class SteamService(
         return shortcuts.Find(s => s.AppId == appId)?.Name;
     }
 
-    private static List<SteamGame> LoadInstalledGames(string steamPath)
+    private List<SteamGame> LoadInstalledGames(string steamPath)
     {
-        var libraryFoldersPath = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
-        if (!File.Exists(libraryFoldersPath))
+        var libraryPaths = GetLibraryFolders(steamPath);
+        if (libraryPaths.Count == 0)
             return [];
-
-        var vdfContent = File.ReadAllText(libraryFoldersPath);
-        var libraryPaths = ParseLibraryFolders(vdfContent);
 
         var games = new List<SteamGame>();
         foreach (var libPath in libraryPaths)
@@ -734,7 +555,7 @@ public class SteamService(
                 try
                 {
                     var content = File.ReadAllText(acfFile);
-                    var game = ParseAppManifest(content);
+                    var game = SteamVdfParser.ParseAppManifest(content);
                     if (game != null)
                         games.Add(game);
                 }
@@ -774,7 +595,7 @@ public class SteamService(
             try
             {
                 using var stream = File.OpenRead(shortcutsPath);
-                var parsed = ParseShortcuts(stream, null);
+                var parsed = SteamVdfParser.ParseShortcuts(stream, null);
                 shortcuts.AddRange(parsed);
             }
             catch
@@ -790,15 +611,10 @@ public class SteamService(
             .ToList();
     }
 
-    private static string? GetGameInstallDir(string steamPath, int appId)
+    private string? GetGameInstallDir(string steamPath, int appId)
     {
         // Search all library folders, not just the main Steam path
-        var libraryFoldersPath = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
-        if (!File.Exists(libraryFoldersPath))
-            return null;
-
-        var vdfContent = File.ReadAllText(libraryFoldersPath);
-        var libraryPaths = ParseLibraryFolders(vdfContent);
+        var libraryPaths = GetLibraryFolders(steamPath);
 
         foreach (var libPath in libraryPaths)
         {
@@ -809,7 +625,7 @@ public class SteamService(
                 continue;
 
             var content = File.ReadAllText(manifestPath);
-            var installDir = ParseInstallDir(content);
+            var installDir = SteamVdfParser.ParseInstallDir(content);
 
             if (!string.IsNullOrEmpty(installDir))
                 return Path.Combine(steamAppsDir, "common", installDir);
@@ -818,149 +634,16 @@ public class SteamService(
         return null;
     }
 
-    // ── Artwork resolution ────────────────────────────────────────────
-
-    private static readonly string[] ArtworkExtensions = ["png", "jpg", "jpeg", "webp"];
-
-    /// <summary>
-    /// Finds the artwork file for a given appId. Priority:
-    /// 1. Custom grid art: userdata/{steamid}/config/grid/{appId}p.{ext}
-    /// 2. Library cache: appcache/librarycache/{appId}_library_600x900.{ext}
-    /// 3. Library cache fallbacks: _library_hero, _header, _logo
-    /// For official games only (appId > 0), callers may try CDN after this returns null.
-    /// </summary>
-    internal static string? FindArtworkPath(string steamPath, string? steamUserId, int appId, ILogger? logger = null)
-    {
-        // For non-Steam shortcuts, use unsigned representation for filenames
-        var fileId = IsShortcutAppId(appId) ? ((uint)appId).ToString() : appId.ToString();
-        logger?.LogInformation("Artwork: lookup appId={AppId} fileId={FileId} isShortcut={IsShortcut}",
-            appId, fileId, IsShortcutAppId(appId));
-
-        // Priority 1: Custom grid art (user-set posters)
-        if (steamUserId != null)
-        {
-            var gridDir = Path.Combine(steamPath, "userdata", steamUserId, "config", "grid");
-            if (Directory.Exists(gridDir))
-            {
-                foreach (var ext in ArtworkExtensions)
-                {
-                    var path = Path.Combine(gridDir, $"{fileId}p.{ext}");
-                    if (File.Exists(path))
-                    {
-                        logger?.LogDebug("Artwork: found in custom grid {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
-                        return path;
-                    }
-                }
-                logger?.LogInformation("Artwork: not found in custom grid {GridDir}", gridDir);
-            }
-            else
-            {
-                logger?.LogWarning("Artwork: custom grid dir missing {GridDir}", gridDir);
-            }
-        }
-        else
-        {
-            logger?.LogInformation("Artwork: no steamUserId, skipping custom grid lookup");
-        }
-
-        // Priority 2: Steam local library cache (multiple filename variants)
-        var cacheDir = Path.Combine(steamPath, "appcache", "librarycache");
-        if (Directory.Exists(cacheDir))
-        {
-            // Steam caches artwork with these suffixes — try most useful first
-            string[] libraryCacheSuffixes = ["_library_600x900", "_library_hero", "_header", "_logo"];
-            foreach (var suffix in libraryCacheSuffixes)
-            {
-                foreach (var ext in ArtworkExtensions)
-                {
-                    var path = Path.Combine(cacheDir, $"{fileId}{suffix}.{ext}");
-                    if (File.Exists(path))
-                    {
-                        logger?.LogDebug("Artwork: found in library cache {Path} ({Size} KB)", path, new FileInfo(path).Length / 1024);
-                        return path;
-                    }
-                }
-            }
-            logger?.LogInformation("Artwork: not found in library cache {CacheDir} (checked {Count} suffix variants)",
-                cacheDir, libraryCacheSuffixes.Length);
-        }
-        else
-        {
-            logger?.LogWarning("Artwork: library cache dir missing {CacheDir}", cacheDir);
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Returns diagnostic info about all artwork paths checked for a given appId.
-    /// Does not download from CDN — purely local file checks.
-    /// </summary>
-    internal static ArtworkDiagnostics GetArtworkDiagnostics(string steamPath, string? steamUserId, int appId, string gameName)
-    {
-        var fileId = IsShortcutAppId(appId) ? ((uint)appId).ToString() : appId.ToString();
-        var paths = new List<ArtworkPathCheck>();
-        string? resolvedPath = null;
-
-        // Priority 1: Custom grid art
-        if (steamUserId != null)
-        {
-            var gridDir = Path.Combine(steamPath, "userdata", steamUserId, "config", "grid");
-            foreach (var ext in ArtworkExtensions)
-            {
-                var path = Path.Combine(gridDir, $"{fileId}p.{ext}");
-                var exists = File.Exists(path);
-                long? size = exists ? new FileInfo(path).Length : null;
-                paths.Add(new ArtworkPathCheck { Path = path, Category = "Custom Grid", Exists = exists, SizeBytes = size });
-                if (exists && resolvedPath == null) resolvedPath = path;
-            }
-        }
-
-        // Priority 2: Library cache
-        var cacheDir = Path.Combine(steamPath, "appcache", "librarycache");
-        string[] libraryCacheSuffixes = ["_library_600x900", "_library_hero", "_header", "_logo"];
-        foreach (var suffix in libraryCacheSuffixes)
-        {
-            foreach (var ext in ArtworkExtensions)
-            {
-                var path = Path.Combine(cacheDir, $"{fileId}{suffix}.{ext}");
-                var exists = File.Exists(path);
-                long? size = exists ? new FileInfo(path).Length : null;
-                paths.Add(new ArtworkPathCheck { Path = path, Category = $"Library Cache ({suffix})", Exists = exists, SizeBytes = size });
-                if (exists && resolvedPath == null) resolvedPath = path;
-            }
-        }
-
-        var cdnUrl = IsShortcutAppId(appId)
-            ? ""
-            : $"https://cdn.akamai.steamstatic.com/steam/apps/{appId}/library_600x900_2x.jpg";
-
-        return new ArtworkDiagnostics
-        {
-            AppId = appId,
-            FileId = fileId,
-            GameName = gameName,
-            IsShortcut = IsShortcutAppId(appId),
-            ResolvedPath = resolvedPath,
-            CdnUrl = cdnUrl,
-            PathsChecked = paths
-        };
-    }
-
     public async Task<ArtworkDiagnostics?> GetArtworkDiagnosticsAsync(int appId)
     {
         var steamPath = platform.GetSteamPath();
         if (steamPath == null) return null;
 
         // Warm cache if needed
-        if (_cachedGames == null || _cachedGames.Count == 0)
-        {
-            try { await GetGamesAsync(); }
-            catch (InvalidOperationException) { /* no Steam */ }
-        }
+        await EnsureCacheWarmAsync();
 
         var gameName = _cachedGames?.FirstOrDefault(g => g.AppId == appId)?.Name ?? $"Unknown ({appId})";
-        return GetArtworkDiagnostics(steamPath, platform.GetSteamUserId(), appId, gameName);
+        return SteamArtworkService.GetArtworkDiagnostics(steamPath, platform.GetSteamUserId(), appId, gameName);
     }
 
     public async Task<List<ArtworkDiagnostics>> GetAllArtworkDiagnosticsAsync()
@@ -970,6 +653,6 @@ public class SteamService(
         if (steamPath == null) return [];
 
         var steamUserId = platform.GetSteamUserId();
-        return games.Select(g => GetArtworkDiagnostics(steamPath, steamUserId, g.AppId, g.Name)).ToList();
+        return games.Select(g => SteamArtworkService.GetArtworkDiagnostics(steamPath, steamUserId, g.AppId, g.Name)).ToList();
     }
 }

@@ -6,7 +6,7 @@ namespace HaPcRemote.Service.Services;
 
 public sealed class ConfigurationWriter(string configPath) : IConfigurationWriter
 {
-    private static readonly JsonSerializerOptions WriteOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = null // PascalCase to match appsettings convention
@@ -23,7 +23,7 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
             if (section is null)
                 return new PcRemoteOptions();
 
-            return section.Deserialize<PcRemoteOptions>(WriteOptions) ?? new PcRemoteOptions();
+            return section.Deserialize<PcRemoteOptions>(JsonOptions) ?? new PcRemoteOptions();
         }
     }
 
@@ -32,7 +32,7 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
         lock (_lock)
         {
             var root = ReadJsonRoot();
-            root[PcRemoteOptions.SectionName] = JsonSerializer.SerializeToNode(options, WriteOptions);
+            root[PcRemoteOptions.SectionName] = JsonSerializer.SerializeToNode(options, JsonOptions);
             WriteJsonRoot(root);
         }
     }
@@ -62,6 +62,9 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
     public void SaveApp(string key, AppDefinitionOptions app)
         => ModifyAndWrite(o => o.Apps[key] = app);
 
+    public void SaveDisplaySwitching(DisplaySwitchingMode mode)
+        => ModifyAndWrite(o => o.DisplaySwitching = mode);
+
 
     private void ModifyAndWrite(Action<PcRemoteOptions> modifier)
     {
@@ -69,9 +72,9 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
         {
             var root = ReadJsonRoot();
             var section = root[PcRemoteOptions.SectionName];
-            var options = section?.Deserialize<PcRemoteOptions>(WriteOptions) ?? new PcRemoteOptions();
+            var options = section?.Deserialize<PcRemoteOptions>(JsonOptions) ?? new PcRemoteOptions();
             modifier(options);
-            root[PcRemoteOptions.SectionName] = JsonSerializer.SerializeToNode(options, WriteOptions);
+            root[PcRemoteOptions.SectionName] = JsonSerializer.SerializeToNode(options, JsonOptions);
             WriteJsonRoot(root);
         }
     }
@@ -91,6 +94,6 @@ public sealed class ConfigurationWriter(string configPath) : IConfigurationWrite
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        File.WriteAllText(configPath, root.ToJsonString(WriteOptions));
+        File.WriteAllText(configPath, root.ToJsonString(JsonOptions));
     }
 }

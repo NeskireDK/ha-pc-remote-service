@@ -1,15 +1,17 @@
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Tray.Forms;
 
-internal sealed class ModesTab : TabPage
+internal sealed class ModesTab : TabPage, ISettingsTab
 {
     private readonly IConfigurationWriter _configWriter;
     private readonly IAudioService _audioService;
     private readonly IMonitorService _monitorService;
     private readonly IOptions<PcRemoteOptions> _options;
+    private readonly ILogger<ModesTab> _logger;
 
     private readonly ListBox _modeList;
     private readonly TextBox _modeNameBox;
@@ -37,6 +39,7 @@ internal sealed class ModesTab : TabPage
         _audioService = services.GetRequiredService<IAudioService>();
         _monitorService = services.GetRequiredService<IMonitorService>();
         _options = services.GetRequiredService<IOptions<PcRemoteOptions>>();
+        _logger = services.GetRequiredService<ILogger<ModesTab>>();
 
         // Left panel: mode list + buttons
         var leftPanel = new Panel { Dock = DockStyle.Left, Width = 180, Padding = new Padding(0, 0, 10, 0) };
@@ -88,26 +91,12 @@ internal sealed class ModesTab : TabPage
         editLayout.Controls.Add(WithHelp(_modeNameBox, _toolTip, "Unique identifier for this mode.\nUsed in HA automations and the PC Mode select entity.\nExample: couch, desktop"), 1, row++);
 
         // Audio device (with "Don't change" option)
-        _audioDeviceCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _audioDeviceCombo = TabHelpers.MakeComboBox(250);
         editLayout.Controls.Add(MakeLabel("Audio Device:"), 0, row);
         editLayout.Controls.Add(WithHelp(_audioDeviceCombo, _toolTip, "Audio output to switch to when this mode is activated.\nSelect \"(Don't change)\" to leave the current device untouched."), 1, row++);
 
         // Solo monitor
-        _soloMonitorCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _soloMonitorCombo = TabHelpers.MakeComboBox(250);
         editLayout.Controls.Add(MakeLabel("Solo Monitor:"), 0, row);
         editLayout.Controls.Add(WithHelp(_soloMonitorCombo, _toolTip, "Monitor to keep as sole active display. Disables all others."), 1, row++);
 
@@ -123,39 +112,19 @@ internal sealed class ModesTab : TabPage
         editLayout.Controls.Add(volumePanel, 1, row++);
 
         // Launch app
-        _launchAppCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDown,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _launchAppCombo = TabHelpers.MakeComboBox(250, ComboBoxStyle.DropDown);
         editLayout.Controls.Add(MakeLabel("Launch App:"), 0, row);
         editLayout.Controls.Add(WithHelp(_launchAppCombo, _toolTip, "App to launch when this mode is activated.\nApps are defined in the Apps config section."), 1, row++);
 
         // Kill app
-        _killAppCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDown,
-            Width = 250,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _killAppCombo = TabHelpers.MakeComboBox(250, ComboBoxStyle.DropDown);
         editLayout.Controls.Add(MakeLabel("Kill App:"), 0, row);
         editLayout.Controls.Add(WithHelp(_killAppCombo, _toolTip, "App to terminate when this mode is activated.\nUseful for killing Steam Big Picture when switching to desktop mode."), 1, row++);
 
         rightPanel.Controls.Add(editLayout);
 
-        var saveButton = TabFooter.MakeSaveButton("Save Mode", 100);
-        saveButton.Click += OnSaveMode;
-        var footer = new TabFooter();
-        footer.Add(saveButton);
-
         Controls.Add(rightPanel);
         Controls.Add(leftPanel);
-        Controls.Add(footer);
 
         LoadModes();
     }
@@ -193,7 +162,7 @@ internal sealed class ModesTab : TabPage
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Failed to refresh dropdowns: {ex.Message}");
+            _logger.LogError(ex, "Failed to refresh dropdowns");
         }
 
         RefreshAppDropdowns();
@@ -318,6 +287,13 @@ internal sealed class ModesTab : TabPage
         _modeNameBox.Focus();
     }
 
+    public IEnumerable<Button> CreateFooterButtons()
+    {
+        var applyButton = TabFooter.MakeSaveButton("Apply");
+        applyButton.Click += OnSaveMode;
+        return [applyButton];
+    }
+
     private void OnSaveMode(object? sender, EventArgs e)
     {
         var name = _modeNameBox.Text.Trim();
@@ -382,14 +358,7 @@ internal sealed class ModesTab : TabPage
         if (_killAppCombo.Items.Count > 0) _killAppCombo.SelectedIndex = 0;
     }
 
-    private static Label MakeLabel(string text) => new()
-    {
-        Text = text,
-        ForeColor = Color.White,
-        AutoSize = true,
-        Anchor = AnchorStyles.Left,
-        Padding = new Padding(0, 6, 0, 0)
-    };
+    private static Label MakeLabel(string text) => TabHelpers.MakeLabel(text);
 
     private static FlowLayoutPanel WithHelp(Control control, ToolTip toolTip, string helpText)
     {
@@ -399,21 +368,7 @@ internal sealed class ModesTab : TabPage
         return panel;
     }
 
-    private static Label MakeHelpIcon(ToolTip toolTip, string helpText)
-    {
-        var label = new Label
-        {
-            Text = "ⓘ",
-            ForeColor = Color.FromArgb(120, 180, 255),
-            AutoSize = true,
-            Cursor = Cursors.Help,
-            Padding = new Padding(4, 5, 0, 0),
-            Font = new Font("Segoe UI", 9f)
-        };
-        toolTip.SetToolTip(label, helpText);
-        label.Click += (_, _) => toolTip.Show(helpText, label, 3000);
-        return label;
-    }
+    private static Label MakeHelpIcon(ToolTip toolTip, string helpText) => TabHelpers.MakeHelpIcon(toolTip, helpText);
 
     private static Button CreateButton(string text) => new()
     {

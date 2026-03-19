@@ -1,6 +1,7 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
+using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
 
 namespace HaPcRemote.Service.Endpoints;
@@ -10,6 +11,7 @@ public static class HealthEndpoints
     public static RouteGroupBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api");
+        group.AddEndpointFilter<EndpointExceptionFilter>();
 
         group.MapGet("/health", () =>
         {

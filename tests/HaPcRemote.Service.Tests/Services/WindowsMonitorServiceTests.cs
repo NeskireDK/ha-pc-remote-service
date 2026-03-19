@@ -1,8 +1,11 @@
+using System.ComponentModel;
 using FakeItEasy;
+using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Native;
 using HaPcRemote.Service.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Shouldly;
 using static HaPcRemote.Service.Native.DisplayConfigApi;
 
@@ -13,7 +16,22 @@ public class WindowsMonitorServiceTests
     private readonly IDisplayConfigApi _api = A.Fake<IDisplayConfigApi>();
     private readonly ILogger<WindowsMonitorService> _logger = A.Fake<ILogger<WindowsMonitorService>>();
 
-    private WindowsMonitorService CreateService() => new(_api, _logger);
+    private static IOptionsMonitor<PcRemoteOptions> MakeOptions(DisplaySwitchingMode mode = DisplaySwitchingMode.Direct)
+    {
+        var options = A.Fake<IOptionsMonitor<PcRemoteOptions>>();
+        A.CallTo(() => options.CurrentValue).Returns(new PcRemoteOptions { DisplaySwitching = mode });
+        return options;
+    }
+
+    private WindowsMonitorService CreateService() => new(_api, _logger, MakeOptions());
+
+    private WindowsMonitorService CreateCompatibleService()
+    {
+        var service = new WindowsMonitorService(_api, _logger, MakeOptions(DisplaySwitchingMode.Compatible));
+        service.RetryDelaysMs = [0, 0, 0];
+        service.StepDelayMs = 0;
+        return service;
+    }
 
     // ── Test data builders ────────────────────────────────────────────
 
@@ -360,6 +378,18 @@ public class WindowsMonitorServiceTests
     }
 
     [Fact]
+    public async Task EnableMonitorAsync_AlreadyActive_DoesNotCallApply()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateService();
+
+        await service.EnableMonitorAsync("GSM59A4"); // already active
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task EnableMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
         SetupTwoMonitorConfig();
@@ -384,6 +414,18 @@ public class WindowsMonitorServiceTests
 
         var targetPath = appliedPaths!.First(p => p.targetInfo.id == 20);
         (targetPath.flags & DISPLAYCONFIG_PATH_FLAGS.ACTIVE).ShouldBe(DISPLAYCONFIG_PATH_FLAGS.NONE);
+    }
+
+    [Fact]
+    public async Task DisableMonitorAsync_AlreadyInactive_DoesNotCallApply()
+    {
+        SetupOneActiveOneInactive();
+        var service = CreateService();
+
+        await service.DisableMonitorAsync("DEL4321"); // already inactive
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustNotHaveHappened();
     }
 
     [Fact]
@@ -544,98 +586,6 @@ public class WindowsMonitorServiceTests
         result.ShouldBe(expected);
     }
 
-    [Fact]
-    public void FormatEdidId_LG_ProducesGSM()
-    {
-        // "GSM" = G(7) S(19) M(13) → native: (7<<10)|(19<<5)|13 = 0x1E6D
-        // Big-endian on wire: 0x6D1E
-        var result = WindowsMonitorService.FormatEdidId(0x6D1E, 0x59A4);
-
-        result.ShouldBe("GSM59A4");
-    }
-
-    [Fact]
-    public void FormatEdidId_Dell_ProducesDEL()
-    {
-        // "DEL" = D(4) E(5) L(12) → native: (4<<10)|(5<<5)|12 = 0x10AC
-        // Big-endian on wire: 0xAC10
-        var result = WindowsMonitorService.FormatEdidId(0xAC10, 0x4321);
-
-        result.ShouldBe("DEL4321");
-    }
-
-    // ── FindMonitor / MatchesId ───────────────────────────────────────
-
-    [Fact]
-    public void FindMonitor_MatchByGdiName()
-    {
-        var monitors = new List<MonitorInfo>
-        {
-            new() { Name = @"\\.\DISPLAY1", MonitorId = "GSM59A4", MonitorName = "LG", Width = 0, Height = 0, DisplayFrequency = 0, IsActive = true, IsPrimary = true },
-            new() { Name = @"\\.\DISPLAY2", MonitorId = "DEL4321", MonitorName = "Dell", Width = 0, Height = 0, DisplayFrequency = 0, IsActive = true, IsPrimary = false },
-        };
-
-        var result = WindowsMonitorService.FindMonitor(monitors, @"\\.\DISPLAY2");
-
-        result.MonitorId.ShouldBe("DEL4321");
-    }
-
-    [Fact]
-    public void FindMonitor_MatchByMonitorId()
-    {
-        var monitors = new List<MonitorInfo>
-        {
-            new() { Name = @"\\.\DISPLAY1", MonitorId = "GSM59A4", MonitorName = "LG", Width = 0, Height = 0, DisplayFrequency = 0, IsActive = true, IsPrimary = true },
-        };
-
-        var result = WindowsMonitorService.FindMonitor(monitors, "GSM59A4");
-
-        result.Name.ShouldBe(@"\\.\DISPLAY1");
-    }
-
-    [Fact]
-    public void FindMonitor_MatchBySerialNumber()
-    {
-        var monitors = new List<MonitorInfo>
-        {
-            new() { Name = @"\\.\DISPLAY1", MonitorId = "GSM59A4", SerialNumber = "ABC123", MonitorName = "LG", Width = 0, Height = 0, DisplayFrequency = 0, IsActive = true, IsPrimary = true },
-        };
-
-        var result = WindowsMonitorService.FindMonitor(monitors, "ABC123");
-
-        result.MonitorId.ShouldBe("GSM59A4");
-    }
-
-    [Fact]
-    public void FindMonitor_CaseInsensitive()
-    {
-        var monitors = new List<MonitorInfo>
-        {
-            new() { Name = @"\\.\DISPLAY1", MonitorId = "GSM59A4", MonitorName = "LG", Width = 0, Height = 0, DisplayFrequency = 0, IsActive = true, IsPrimary = true },
-        };
-
-        var result = WindowsMonitorService.FindMonitor(monitors, "gsm59a4");
-
-        result.Name.ShouldBe(@"\\.\DISPLAY1");
-    }
-
-    [Fact]
-    public void FindMonitor_UnknownId_ThrowsKeyNotFoundException()
-    {
-        var monitors = new List<MonitorInfo>
-        {
-            new() { Name = @"\\.\DISPLAY1", MonitorId = "GSM59A4", MonitorName = "LG", Width = 0, Height = 0, DisplayFrequency = 0, IsActive = true, IsPrimary = true },
-        };
-
-        Should.Throw<KeyNotFoundException>(() => WindowsMonitorService.FindMonitor(monitors, "UNKNOWN"));
-    }
-
-    [Fact]
-    public void FindMonitor_EmptyList_ThrowsKeyNotFoundException()
-    {
-        Should.Throw<KeyNotFoundException>(() => WindowsMonitorService.FindMonitor([], "GSM59A4"));
-    }
-
     // ── EDID collision (identical monitors) ─────────────────────────────
 
     private void SetupIdenticalMonitors()
@@ -733,12 +683,205 @@ public class WindowsMonitorServiceTests
     [Fact]
     public async Task EnableMonitorAsync_IdenticalEdid_SecondMonitor_ResolvesCorrectTarget()
     {
-        SetupIdenticalMonitors();
+        // Setup identical monitors but second one inactive
+        var paths = new[]
+        {
+            MakeActivePath(Adapter1, targetId: 10, sourceId: 0, sourceModeIdx: 0, targetModeIdx: 1),
+            MakeInactivePath(Adapter1, targetId: 20, sourceId: 1),
+        };
+
+        var modes = new[]
+        {
+            MakeSourceMode(Adapter1, 0, 2560, 1440, 0, 0),
+            MakeTargetMode(Adapter1, 10, 144000, 1000),
+        };
+
+        A.CallTo(() => _api.QueryConfig(A<QueryDisplayConfigFlags>._)).Returns((paths, modes));
+        A.CallTo(() => _api.GetTargetDeviceInfo(Adapter1, 10)).Returns(("LG ULTRAGEAR", (ushort)0x6D1E, (ushort)0x59A4));
+        A.CallTo(() => _api.GetTargetDeviceInfo(Adapter1, 20)).Returns(("LG ULTRAGEAR", (ushort)0x6D1E, (ushort)0x59A4));
+        A.CallTo(() => _api.GetSourceGdiName(Adapter1, 0)).Returns(@"\\.\DISPLAY1");
+
         var service = CreateService();
 
         await service.EnableMonitorAsync("GSM59A4#2");
 
         // Should have called ApplyConfig — verifying it didn't throw
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // ── Retry resilience ────────────────────────────────────────────
+
+    private WindowsMonitorService CreateServiceWithNoRetryDelay()
+    {
+        var service = new WindowsMonitorService(_api, _logger, MakeOptions());
+        service.RetryDelaysMs = [0, 0, 0];
+        return service;
+    }
+
+    [Fact]
+    public async Task EnableMonitorAsync_Error31_RetriesAndSucceeds()
+    {
+        SetupOneActiveOneInactive();
+        var service = CreateServiceWithNoRetryDelay();
+
+        var callCount = 0;
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new Win32Exception(ERROR_GEN_FAILURE);
+            });
+
+        await service.EnableMonitorAsync("DEL4321");
+
+        callCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task DisableMonitorAsync_Error31_RetriesAndSucceeds()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateServiceWithNoRetryDelay();
+
+        var callCount = 0;
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new Win32Exception(ERROR_GEN_FAILURE);
+            });
+
+        await service.DisableMonitorAsync("DEL4321");
+
+        callCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task SetPrimaryAsync_Error31_RetriesAndSucceeds()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateServiceWithNoRetryDelay();
+
+        var callCount = 0;
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new Win32Exception(ERROR_GEN_FAILURE);
+            });
+
+        await service.SetPrimaryAsync("DEL4321");
+
+        callCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task SoloMonitorAsync_Error31_RetriesAndSucceeds()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateServiceWithNoRetryDelay();
+
+        var callCount = 0;
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new Win32Exception(ERROR_GEN_FAILURE);
+            });
+
+        await service.SoloMonitorAsync("DEL4321");
+
+        callCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task EnableMonitorAsync_Error87_RequeriesAndRetries()
+    {
+        SetupOneActiveOneInactive();
+        var service = CreateServiceWithNoRetryDelay();
+
+        var queryCount = 0;
+        A.CallTo(() => _api.QueryConfig(A<QueryDisplayConfigFlags>._))
+            .ReturnsLazily(() =>
+            {
+                queryCount++;
+                // Return the same valid config each time
+                var paths = new[]
+                {
+                    MakeActivePath(Adapter1, targetId: 10, sourceId: 0, sourceModeIdx: 0, targetModeIdx: 1),
+                    MakeInactivePath(Adapter1, targetId: 20, sourceId: 1),
+                };
+                var modes = new[]
+                {
+                    MakeSourceMode(Adapter1, 0, 3840, 2160, 0, 0),
+                    MakeTargetMode(Adapter1, 10, 120000, 1000),
+                };
+                return (paths, modes);
+            });
+
+        var applyCount = 0;
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() =>
+            {
+                applyCount++;
+                if (applyCount == 1)
+                    throw new Win32Exception(ERROR_INVALID_PARAMETER);
+            });
+
+        await service.EnableMonitorAsync("DEL4321");
+
+        applyCount.ShouldBe(2);
+        // Initial query for GetMonitorsAsync + first buildConfig + re-query on error 87
+        queryCount.ShouldBeGreaterThanOrEqualTo(3);
+    }
+
+    [Fact]
+    public async Task EnableMonitorAsync_ExhaustsRetries_Throws()
+    {
+        SetupOneActiveOneInactive();
+        var service = CreateServiceWithNoRetryDelay();
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Throws(() => new Win32Exception(ERROR_GEN_FAILURE));
+
+        await Should.ThrowAsync<Win32Exception>(() => service.EnableMonitorAsync("DEL4321"));
+
+        // 1 initial + 3 retries = 4 total attempts
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustHaveHappened(4, Times.Exactly);
+    }
+
+    [Fact]
+    public async Task SoloMonitorAsync_ExhaustsRetries_Throws()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateServiceWithNoRetryDelay();
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Throws(() => new Win32Exception(ERROR_GEN_FAILURE));
+
+        await Should.ThrowAsync<Win32Exception>(() => service.SoloMonitorAsync("DEL4321"));
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustHaveHappened(4, Times.Exactly);
+    }
+
+    [Fact]
+    public async Task EnableMonitorAsync_NonRetryableError_ThrowsImmediately()
+    {
+        SetupOneActiveOneInactive();
+        var service = CreateServiceWithNoRetryDelay();
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Throws(() => new Win32Exception(5)); // ERROR_ACCESS_DENIED — not retryable
+
+        await Should.ThrowAsync<Win32Exception>(() => service.EnableMonitorAsync("DEL4321"));
+
         A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
             .MustHaveHappenedOnceExactly();
     }
@@ -757,5 +900,204 @@ public class WindowsMonitorServiceTests
         var rational = new DISPLAYCONFIG_RATIONAL { Numerator = numerator, Denominator = denominator };
 
         rational.ToHz().ShouldBe(expected);
+    }
+
+    // ── Compatible mode ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task Compatible_SoloMonitorAsync_CallsApplyMultipleTimes()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateCompatibleService();
+
+        var applyCount = 0;
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() => applyCount++);
+
+        await service.SoloMonitorAsync("DEL4321");
+
+        // Should call Apply multiple times (set primary + disable other)
+        applyCount.ShouldBeGreaterThan(1);
+    }
+
+    [Fact]
+    public async Task Compatible_SoloMonitorAsync_SkipsEnableIfTargetAlreadyActive()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateCompatibleService();
+
+        var applyCallPaths = new List<DISPLAYCONFIG_PATH_INFO[]>();
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes((DISPLAYCONFIG_PATH_INFO[] p, DISPLAYCONFIG_MODE_INFO[] _, SetDisplayConfigFlags _) =>
+                applyCallPaths.Add(p));
+
+        await service.SoloMonitorAsync("GSM59A4"); // already active + primary
+
+        // Only the disable step for the other monitor
+        applyCallPaths.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Compatible_EnableMonitorAsync_NoOpIfAlreadyActive()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateCompatibleService();
+
+        await service.EnableMonitorAsync("GSM59A4"); // already active
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Compatible_DisableMonitorAsync_NoOpIfAlreadyInactive()
+    {
+        SetupOneActiveOneInactive();
+        var service = CreateCompatibleService();
+
+        await service.DisableMonitorAsync("DEL4321"); // already inactive
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Compatible_DisableMonitorAsync_ShufflesPrimaryFirst()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateCompatibleService();
+
+        var applyCount = 0;
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() => applyCount++);
+
+        // GSM59A4 is the primary — disabling it should set DEL4321 as primary first
+        await service.DisableMonitorAsync("GSM59A4");
+
+        // At least 2 calls: SetPrimary(DEL4321) + Disable(GSM59A4)
+        applyCount.ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task Compatible_SetPrimaryAsync_EnablesFirstIfInactive()
+    {
+        var service = CreateCompatibleService();
+
+        // Start with DEL4321 inactive; after first ApplyConfig (Enable), switch to both active
+        var applyCount = 0;
+        A.CallTo(() => _api.QueryConfig(A<QueryDisplayConfigFlags>._))
+            .ReturnsLazily(() =>
+            {
+                if (applyCount > 0)
+                {
+                    // After Enable: both active, GSM59A4 at (0,0), DEL4321 at (3840,0)
+                    return (
+                        new[]
+                        {
+                            MakeActivePath(Adapter1, targetId: 10, sourceId: 0, sourceModeIdx: 0, targetModeIdx: 1),
+                            MakeActivePath(Adapter1, targetId: 20, sourceId: 1, sourceModeIdx: 2, targetModeIdx: 3),
+                        },
+                        new[]
+                        {
+                            MakeSourceMode(Adapter1, 0, 3840, 2160, 0, 0),
+                            MakeTargetMode(Adapter1, 10, 120000, 1000),
+                            MakeSourceMode(Adapter1, 1, 2560, 1440, 3840, 0),
+                            MakeTargetMode(Adapter1, 20, 60000, 1000),
+                        });
+                }
+                // Initial: DEL4321 inactive
+                return (
+                    new[]
+                    {
+                        MakeActivePath(Adapter1, targetId: 10, sourceId: 0, sourceModeIdx: 0, targetModeIdx: 1),
+                        MakeInactivePath(Adapter1, targetId: 20, sourceId: 1),
+                    },
+                    new[]
+                    {
+                        MakeSourceMode(Adapter1, 0, 3840, 2160, 0, 0),
+                        MakeTargetMode(Adapter1, 10, 120000, 1000),
+                    });
+            });
+
+        A.CallTo(() => _api.GetTargetDeviceInfo(Adapter1, 10)).Returns(("LG ULTRAGEAR", (ushort)0x6D1E, (ushort)0x59A4));
+        A.CallTo(() => _api.GetTargetDeviceInfo(Adapter1, 20)).Returns(("Dell U2723QE", (ushort)0xAC10, (ushort)0x4321));
+        A.CallTo(() => _api.GetSourceGdiName(Adapter1, 0)).Returns(@"\\.\DISPLAY1");
+        A.CallTo(() => _api.GetSourceGdiName(Adapter1, 1)).Returns(@"\\.\DISPLAY2");
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .Invokes(() => applyCount++);
+
+        await service.SetPrimaryAsync("DEL4321"); // inactive
+
+        // At least 2 calls: Enable + SetPrimary
+        applyCount.ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task Compatible_VerificationFailure_Retries()
+    {
+        SetupOneActiveOneInactive();
+        var service = CreateCompatibleService();
+
+        // First Apply succeeds but verification fails (still shows inactive)
+        var queryCount = 0;
+        A.CallTo(() => _api.QueryConfig(A<QueryDisplayConfigFlags>._))
+            .ReturnsLazily(() =>
+            {
+                queryCount++;
+                // After enough queries, return the monitor as active
+                if (queryCount >= 5)
+                {
+                    var activePaths = new[]
+                    {
+                        MakeActivePath(Adapter1, targetId: 10, sourceId: 0, sourceModeIdx: 0, targetModeIdx: 1),
+                        MakeActivePath(Adapter1, targetId: 20, sourceId: 1, sourceModeIdx: 2, targetModeIdx: 3),
+                    };
+                    var activeModes = new[]
+                    {
+                        MakeSourceMode(Adapter1, 0, 3840, 2160, 0, 0),
+                        MakeTargetMode(Adapter1, 10, 120000, 1000),
+                        MakeSourceMode(Adapter1, 1, 2560, 1440, 3840, 0),
+                        MakeTargetMode(Adapter1, 20, 60000, 1000),
+                    };
+                    return (activePaths, activeModes);
+                }
+
+                // Return original inactive config
+                var paths = new[]
+                {
+                    MakeActivePath(Adapter1, targetId: 10, sourceId: 0, sourceModeIdx: 0, targetModeIdx: 1),
+                    MakeInactivePath(Adapter1, targetId: 20, sourceId: 1),
+                };
+                var modes = new[]
+                {
+                    MakeSourceMode(Adapter1, 0, 3840, 2160, 0, 0),
+                    MakeTargetMode(Adapter1, 10, 120000, 1000),
+                };
+                return (paths, modes);
+            });
+
+        A.CallTo(() => _api.GetTargetDeviceInfo(Adapter1, 10)).Returns(("LG ULTRAGEAR", (ushort)0x6D1E, (ushort)0x59A4));
+        A.CallTo(() => _api.GetTargetDeviceInfo(Adapter1, 20)).Returns(("Dell U2723QE", (ushort)0xAC10, (ushort)0x4321));
+        A.CallTo(() => _api.GetSourceGdiName(Adapter1, 0)).Returns(@"\\.\DISPLAY1");
+        A.CallTo(() => _api.GetSourceGdiName(Adapter1, 1)).Returns(@"\\.\DISPLAY2");
+
+        await service.EnableMonitorAsync("DEL4321");
+
+        // Should have called ApplyConfig at least 2 times (first attempt + retry after verification failure)
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustHaveHappened(2, Times.OrMore);
+    }
+
+    [Fact]
+    public async Task Direct_SoloMonitorAsync_UnchangedBehavior_SingleApplyCall()
+    {
+        SetupTwoMonitorConfig();
+        var service = CreateService(); // Direct mode (default)
+
+        await service.SoloMonitorAsync("GSM59A4");
+
+        A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
+            .MustHaveHappenedOnceExactly();
     }
 }

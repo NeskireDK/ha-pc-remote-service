@@ -205,7 +205,7 @@ public class ModeServiceTests
     }
 
     [Fact]
-    public async Task ApplyModeAsync_AudioBeforeSoloBeforeVolume()
+    public async Task ApplyModeAsync_SoloBeforeAudioBeforeVolume()
     {
         var callOrder = new List<string>();
 
@@ -228,7 +228,8 @@ public class ModeServiceTests
 
         await service.ApplyModeAsync("full");
 
-        callOrder.ShouldBe(new[] { "audio", "monitor", "volume" });
+        // Monitor first — HDMI/DP audio devices only appear after the display is active
+        callOrder.ShouldBe(new[] { "monitor", "audio", "volume" });
     }
 
     // ── ApplyModeAsync — volume edge values ──────────────────────────

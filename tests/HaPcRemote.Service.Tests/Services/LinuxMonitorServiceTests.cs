@@ -68,20 +68,15 @@ public class LinuxMonitorServiceTests
     // ── EnableMonitorAsync tests ─────────────────────────────────────
 
     [Fact]
-    public async Task EnableMonitorAsync_CallsXrandrAuto()
+    public async Task EnableMonitorAsync_UnknownId_ThrowsKeyNotFoundException()
     {
         A.CallTo(() => _cliRunner.RunAsync("xrandr",
             A<IEnumerable<string>>.That.Contains("--listmonitors"), A<int>._))
             .Returns("Monitors: 1\n 0: +*DP-0 2560/597x1440/336+0+0  DP-0\n");
 
         var service = CreateService();
-        await service.GetMonitorsAsync(); // prime cache
-        await service.EnableMonitorAsync("DP-0");
 
-        A.CallTo(() => _cliRunner.RunAsync("xrandr",
-            A<IEnumerable<string>>.That.Matches(a =>
-                a.Contains("--output") && a.Contains("DP-0") && a.Contains("--auto")),
-            A<int>._)).MustHaveHappenedOnceExactly();
+        await Should.ThrowAsync<KeyNotFoundException>(() => service.EnableMonitorAsync("UNKNOWN"));
     }
 
     // ── DisableMonitorAsync tests ────────────────────────────────────
@@ -101,6 +96,24 @@ public class LinuxMonitorServiceTests
             A<IEnumerable<string>>.That.Matches(a =>
                 a.Contains("--output") && a.Contains("DP-0") && a.Contains("--off")),
             A<int>._)).MustHaveHappenedOnceExactly();
+    }
+
+    // ── Idempotency tests ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task EnableMonitorAsync_AlreadyActive_DoesNotCallXrandr()
+    {
+        A.CallTo(() => _cliRunner.RunAsync("xrandr",
+            A<IEnumerable<string>>.That.Contains("--listmonitors"), A<int>._))
+            .Returns("Monitors: 1\n 0: +*DP-0 2560/597x1440/336+0+0  DP-0\n");
+
+        var service = CreateService();
+
+        await service.EnableMonitorAsync("DP-0"); // already active
+
+        A.CallTo(() => _cliRunner.RunAsync("xrandr",
+            A<IEnumerable<string>>.That.Contains("--auto"), A<int>._))
+            .MustNotHaveHappened();
     }
 
     // ── SoloMonitorAsync tests ───────────────────────────────────────

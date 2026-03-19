@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Service.Services;
 
-public class ModeService(
+public sealed class ModeService(
     IOptionsMonitor<PcRemoteOptions> options,
     IAudioService audioService,
     IMonitorService monitorService,
@@ -20,11 +20,13 @@ public class ModeService(
         if (!modes.TryGetValue(modeName, out var config))
             throw new KeyNotFoundException($"Mode '{modeName}' not found.");
 
-        if (config.AudioDevice is not null)
-            await audioService.SetDefaultDeviceAsync(config.AudioDevice);
-
+        // Monitor first — audio devices may only appear after the monitor is active
         if (config.SoloMonitor is not null)
             await monitorService.SoloMonitorAsync(config.SoloMonitor);
+
+        // Audio after monitor — HDMI/DP audio is tied to the display
+        if (config.AudioDevice is not null)
+            await audioService.SetDefaultDeviceAsync(config.AudioDevice);
 
         if (config.Volume.HasValue)
             await audioService.SetVolumeAsync(config.Volume.Value);

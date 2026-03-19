@@ -23,7 +23,6 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
     private static readonly IPAddress MdnsMulticastAddress = IPAddress.Parse("224.0.0.251");
     private static readonly IPEndPoint MdnsEndpoint = new(MdnsMulticastAddress, MdnsPort);
 
-    private readonly int _servicePort = options.CurrentValue.Port;
     private readonly string _hostname = GetHostname();
     private readonly string _instanceName = $"{Environment.MachineName}._pc-remote._tcp.local.";
     private readonly Dictionary<string, string> _txtRecords = new()
@@ -47,7 +46,7 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
         {
             _udpClient = CreateUdpClient();
             _listenTask = ListenAsync(_cts.Token);
-            logger.LogInformation("mDNS advertiser started: {Instance} on port {Port}", _instanceName, _servicePort);
+            logger.LogInformation("mDNS advertiser started: {Instance} on port {Port}", _instanceName, options.CurrentValue.Port);
 
             // Send an initial unsolicited announcement
             _ = Task.Run(() => SendAnnouncementAsync(), cancellationToken);
@@ -226,6 +225,7 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
 
     private byte[] BuildPacket(uint ptrTtl, uint srvTtl, uint txtTtl, uint aTtl)
     {
+        var port = options.CurrentValue.Port;
         using var ms = new MemoryStream(512);
         using var writer = new BinaryWriter(ms);
 
@@ -255,7 +255,7 @@ public sealed class MdnsAdvertiserService(IOptionsMonitor<PcRemoteOptions> optio
         WriteBigEndian(writer, (ushort)(6 + srvTarget.Length));
         WriteBigEndian(writer, 0); // Priority
         WriteBigEndian(writer, 0); // Weight
-        WriteBigEndian(writer, (ushort)_servicePort); // Port
+        WriteBigEndian(writer, (ushort)port); // Port
         writer.Write(srvTarget);
 
         // TXT record

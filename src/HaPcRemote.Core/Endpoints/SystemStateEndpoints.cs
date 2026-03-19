@@ -1,4 +1,5 @@
 using HaPcRemote.Service.Configuration;
+using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,10 @@ public static class SystemStateEndpoints
 {
     public static IEndpointRouteBuilder MapSystemStateEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/system/state", async (
+        var group = endpoints.MapGroup("/api/system");
+        group.AddEndpointFilter<EndpointExceptionFilter>();
+
+        group.MapGet("/state", async (
             IAudioService audioService,
             IMonitorService monitorService,
             ISteamService steamService,

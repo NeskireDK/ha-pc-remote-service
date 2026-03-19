@@ -22,7 +22,9 @@ internal sealed class SettingsForm : Form
         IServiceProvider services,
         InMemoryLogProvider logProvider)
     {
-        Text = "HA PC Remote - Settings";
+        var version = UpdateService.GetCurrentVersion();
+        var versionStr = version is not null ? $" v{UpdateService.FormatVersion(version)}" : "";
+        Text = $"HA PC Remote{versionStr} - Settings";
         MinimumSize = new Size(600, 450);
 
         var settings = TraySettings.Load();
@@ -55,8 +57,7 @@ internal sealed class SettingsForm : Form
         _tabControl.TabPages.Add(_powerTab);
         _tabControl.TabPages.Add(_logTab);
 
-        // Shared footer — buttons swap when the selected tab changes.
-        // ModesTab manages its own footer internally (it has row-management buttons).
+        // Shared footer — buttons swap when the selected tab changes
         _footer = new TabFooter();
         _tabControl.SelectedIndexChanged += (_, _) => SyncFooter();
 
@@ -78,7 +79,6 @@ internal sealed class SettingsForm : Form
         }
         else
         {
-            // ModesTab (or any tab without ISettingsTab) — hide the shared footer
             _footer.Visible = false;
         }
     }

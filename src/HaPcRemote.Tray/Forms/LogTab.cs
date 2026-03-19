@@ -50,7 +50,7 @@ internal sealed class LogTab : TabPage, ISettingsTab
             catch { /* best effort */ }
         };
 
-        return [clearButton, debugButton];
+        return [debugButton, clearButton];
     }
 
     private void OnNewLogEntry(LogEntry entry)

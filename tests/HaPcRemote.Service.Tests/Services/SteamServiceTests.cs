@@ -1,4 +1,3 @@
-using System.Reflection;
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
@@ -18,12 +17,12 @@ public class SteamServiceTests
     private readonly IHttpClientFactory _httpClientFactory = A.Fake<IHttpClientFactory>();
     private readonly IEmulatorTracker _emulatorTracker = A.Fake<IEmulatorTracker>();
 
-    private SteamService CreateService(PcRemoteOptions? options = null)
+    private SteamService CreateService(PcRemoteOptions? options = null, Func<int, Task>? delay = null)
     {
         options ??= new PcRemoteOptions();
         var monitor = A.Fake<IOptionsMonitor<PcRemoteOptions>>();
         A.CallTo(() => monitor.CurrentValue).Returns(options);
-        return new SteamService(_platform, _modeService, monitor, _httpClientFactory, _emulatorTracker, _logger);
+        return new SteamService(_platform, _modeService, monitor, _httpClientFactory, _emulatorTracker, _logger, delay);
     }
 
     // ── ParseLibraryFolders tests (static) ───────────────────────────
@@ -31,7 +30,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseLibraryFolders_ValidVdf_ReturnsLibraryPaths()
     {
-        var paths = SteamService.ParseLibraryFolders(TestData.Load("library-folders.vdf"));
+        var paths = SteamVdfParser.ParseLibraryFolders(TestData.Load("library-folders.vdf"));
 
         paths.Count.ShouldBe(2);
         paths[0].ShouldBe(@"C:\Program Files (x86)\Steam");
@@ -47,7 +46,7 @@ public class SteamServiceTests
             }
             """;
 
-        var paths = SteamService.ParseLibraryFolders(vdf);
+        var paths = SteamVdfParser.ParseLibraryFolders(vdf);
 
         paths.ShouldBeEmpty();
     }
@@ -57,7 +56,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseAppManifest_ValidAcf_ReturnsGameInfo()
     {
-        var game = SteamService.ParseAppManifest(TestData.Load("app-manifest-730.acf"));
+        var game = SteamVdfParser.ParseAppManifest(TestData.Load("app-manifest-730.acf"));
 
         game.ShouldNotBeNull();
         game.AppId.ShouldBe(730);
@@ -76,7 +75,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldBeNull();
     }
@@ -92,7 +91,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldBeNull();
     }
@@ -108,7 +107,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldBeNull();
     }
@@ -124,7 +123,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldNotBeNull();
         game.LastPlayed.ShouldBe(0L);
@@ -135,7 +134,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseInstallDir_ValidAcf_ReturnsInstallDir()
     {
-        var installDir = SteamService.ParseInstallDir(TestData.Load("app-manifest-730.acf"));
+        var installDir = SteamVdfParser.ParseInstallDir(TestData.Load("app-manifest-730.acf"));
 
         installDir.ShouldBe("Counter-Strike Global Offensive");
     }
@@ -151,7 +150,7 @@ public class SteamServiceTests
             }
             """;
 
-        var installDir = SteamService.ParseInstallDir(acf);
+        var installDir = SteamVdfParser.ParseInstallDir(acf);
 
         installDir.ShouldBeNull();
     }
@@ -175,15 +174,24 @@ public class SteamServiceTests
     public async Task GetRunningGame_GameRunning_CacheWarm_ReturnsGameInfo()
     {
         A.CallTo(() => _platform.GetRunningAppId()).Returns(730);
-        A.CallTo(() => _platform.GetSteamPath()).Returns(@"C:\Steam");
+        A.CallTo(() => _platform.GetSteamPath()).Returns(@"C:\FakeNonExistentSteamPath_12345");
         var service = CreateService();
-        // Warm the cache manually via GetGamesAsync (returns empty list since filesystem is fake)
-        // Then set up the cache via reflection would be complex — instead just verify the result
-        // with an empty cache: name falls back to "Unknown (730)" but appId is correct
+
+        // Pre-warm the cache with a non-empty game list so the warm-path check (_cachedGames.Count == 0) doesn't re-trigger
+        await service.GetGamesAsync();
+        InjectCachedGames(service, [new SteamGame { AppId = 730, Name = "Counter-Strike 2", LastPlayed = 0 }]);
+
+        // Reset call count tracking so we can assert the warm path doesn't reload
+        Fake.ClearRecordedCalls(_platform);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(730);
+
         var result = await service.GetRunningGameAsync();
 
         result.ShouldNotBeNull();
         result.AppId.ShouldBe(730);
+        result.Name.ShouldBe("Counter-Strike 2");
+        // Cache was warm — GetSteamPath must not have been called to reload games
+        A.CallTo(() => _platform.GetSteamPath()).MustNotHaveHappened();
     }
 
     [Fact]
@@ -331,7 +339,7 @@ public class SteamServiceTests
             }
             """;
 
-        var paths = SteamService.ParseLibraryFolders(vdf);
+        var paths = SteamVdfParser.ParseLibraryFolders(vdf);
 
         paths.ShouldBeEmpty();
     }
@@ -349,7 +357,7 @@ public class SteamServiceTests
             }
             """;
 
-        var paths = SteamService.ParseLibraryFolders(vdf);
+        var paths = SteamVdfParser.ParseLibraryFolders(vdf);
 
         paths.Count.ShouldBe(1);
         paths[0].ShouldBe(@"E:\Games\Steam");
@@ -367,7 +375,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldBeNull();
     }
@@ -384,7 +392,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldNotBeNull();
         game.AppId.ShouldBe(0);
@@ -403,7 +411,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldNotBeNull();
         game.LastPlayed.ShouldBe(1700000000L);
@@ -422,7 +430,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldNotBeNull();
         game.LastPlayed.ShouldBe(1708000000L);
@@ -440,7 +448,7 @@ public class SteamServiceTests
             }
             """;
 
-        var game = SteamService.ParseAppManifest(acf);
+        var game = SteamVdfParser.ParseAppManifest(acf);
 
         game.ShouldNotBeNull();
         game.LastPlayed.ShouldBe(9999999999L);
@@ -459,14 +467,13 @@ public class SteamServiceTests
     }
 
     [Fact]
-    public async Task GetGamesAsync_EmptySteamPath_Throws()
+    public async Task GetGamesAsync_NonExistentPath_ReturnsEmpty()
     {
-        A.CallTo(() => _platform.GetSteamPath()).Returns(string.Empty);
+        // GetSteamPath returns a non-null but non-existent path — libraryfolders.vdf won't exist
+        // so LoadInstalledGames returns empty list without throwing
+        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
         var service = CreateService();
 
-        // GetSteamPath returns empty string — treated as non-null but libraryfolders.vdf won't exist
-        // so should return empty list, not throw
-        A.CallTo(() => _platform.GetSteamPath()).Returns("C:\\FakeNonExistentSteamPath_12345");
         var result = await service.GetGamesAsync();
 
         result.ShouldBeEmpty();
@@ -543,7 +550,7 @@ public class SteamServiceTests
     [InlineData(int.MaxValue, false)]
     public void IsShortcutAppId_ReturnsExpected(int appId, bool expected)
     {
-        SteamService.IsShortcutAppId(appId).ShouldBe(expected);
+        SteamVdfParser.IsShortcutAppId(appId).ShouldBe(expected);
     }
 
     // ── ParseShortcuts tests ───────────────────────────────────────────
@@ -552,7 +559,7 @@ public class SteamServiceTests
     public void ParseShortcuts_ValidBinaryVdf_ReturnsShortcuts()
     {
         using var stream = File.OpenRead(TestData.FilePath("shortcuts.vdf"));
-        var shortcuts = SteamService.ParseShortcuts(stream);
+        var shortcuts = SteamVdfParser.ParseShortcuts(stream);
 
         shortcuts.Count.ShouldBe(2);
 
@@ -573,7 +580,7 @@ public class SteamServiceTests
     public void ParseShortcuts_EmptyFile_ReturnsEmptyList()
     {
         using var stream = File.OpenRead(TestData.FilePath("shortcuts-empty.vdf"));
-        var shortcuts = SteamService.ParseShortcuts(stream);
+        var shortcuts = SteamVdfParser.ParseShortcuts(stream);
 
         shortcuts.ShouldBeEmpty();
     }
@@ -582,7 +589,7 @@ public class SteamServiceTests
     public void ParseShortcuts_CorruptData_ReturnsEmptyList()
     {
         using var stream = new MemoryStream([0xFF, 0xFE, 0x00, 0x01]);
-        var shortcuts = SteamService.ParseShortcuts(stream);
+        var shortcuts = SteamVdfParser.ParseShortcuts(stream);
 
         shortcuts.ShouldBeEmpty();
     }
@@ -634,17 +641,17 @@ public class SteamServiceTests
     [Fact]
     public void GenerateShortcutAppId_AlwaysNegative()
     {
-        var appId = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var appId = SteamVdfParser.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
 
         appId.ShouldBeLessThan(0);
-        SteamService.IsShortcutAppId(appId).ShouldBeTrue();
+        SteamVdfParser.IsShortcutAppId(appId).ShouldBeTrue();
     }
 
     [Fact]
     public void GenerateShortcutAppId_DeterministicForSameInputs()
     {
-        var id1 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
-        var id2 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var id1 = SteamVdfParser.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var id2 = SteamVdfParser.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
 
         id1.ShouldBe(id2);
     }
@@ -652,8 +659,8 @@ public class SteamServiceTests
     [Fact]
     public void GenerateShortcutAppId_DifferentForDifferentInputs()
     {
-        var id1 = SteamService.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
-        var id2 = SteamService.GenerateShortcutAppId(@"C:\Games\other.exe", "Other Game");
+        var id1 = SteamVdfParser.GenerateShortcutAppId(@"C:\Games\test.exe", "Test Game");
+        var id2 = SteamVdfParser.GenerateShortcutAppId(@"C:\Games\other.exe", "Other Game");
 
         id1.ShouldNotBe(id2);
     }
@@ -823,16 +830,15 @@ public class SteamServiceTests
                 ["couch"] = new() { LaunchApp = "steam-bigpicture", SoloMonitor = "tv" }
             }
         };
-        var service = CreateService(options);
+        var delayMs = new List<int>();
+        var service = CreateService(options, delay: ms => { delayMs.Add(ms); return Task.CompletedTask; });
         A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
         _ = await service.LaunchGameAsync(730);
-        sw.Stop();
 
         A.CallTo(() => _modeService.ApplyModeAsync("couch")).MustHaveHappenedOnceExactly();
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
-        sw.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(2500);
+        delayMs.ShouldContain(3000); // default PostLaunchDelayMs
     }
 
     [Fact]
@@ -846,16 +852,15 @@ public class SteamServiceTests
                 ["desktop"] = new() { SoloMonitor = "dual", AudioDevice = "Speakers" }
             }
         };
-        var service = CreateService(options);
+        var delayMs = new List<int>();
+        var service = CreateService(options, delay: ms => { delayMs.Add(ms); return Task.CompletedTask; });
         A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
         _ = await service.LaunchGameAsync(730);
-        sw.Stop();
 
         A.CallTo(() => _modeService.ApplyModeAsync("desktop")).MustHaveHappenedOnceExactly();
         A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
-        sw.ElapsedMilliseconds.ShouldBeLessThan(8000);
+        delayMs.ShouldBeEmpty(); // no LaunchApp configured, no delay expected
     }
 
     // ── GetBindings tests ─────────────────────────────────────────
@@ -909,9 +914,7 @@ public class SteamServiceTests
 
     private static void InjectCachedGames(SteamService service, List<SteamGame> games)
     {
-        typeof(SteamService)
-            .GetField("_cachedGames", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .SetValue(service, games);
+        service.SetCachedGamesForTest(games);
     }
 
     [Fact]
@@ -1051,7 +1054,7 @@ public class SteamServiceTests
         // The test VDF (shortcuts.vdf) contains two entries.
         // "Emulator Game" has LaunchOptions set in the binary VDF.
         using var stream = File.OpenRead(TestData.FilePath("shortcuts.vdf"));
-        var shortcuts = SteamService.ParseShortcuts(stream);
+        var shortcuts = SteamVdfParser.ParseShortcuts(stream);
 
         // At minimum, verify LaunchOptions is parsed (non-null) for the entry that has it
         var withLaunchOpts = shortcuts.FirstOrDefault(s => s.LaunchOptions != null);
@@ -1066,7 +1069,7 @@ public class SteamServiceTests
     [InlineData("  ", null, null)]
     public void ParseExeField_EmptyOrNull_ReturnsNulls(string? input, string? expectedExe, string? expectedArgs)
     {
-        var (exe, args) = SteamService.ParseExeField(input);
+        var (exe, args) = SteamVdfParser.ParseExeField(input);
         exe.ShouldBe(expectedExe);
         args.ShouldBe(expectedArgs);
     }
@@ -1074,7 +1077,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseExeField_QuotedExeOnly_ReturnsPathNoArgs()
     {
-        var (exe, args) = SteamService.ParseExeField(@"""C:\Games\custom.exe""");
+        var (exe, args) = SteamVdfParser.ParseExeField(@"""C:\Games\custom.exe""");
         exe.ShouldBe(@"C:\Games\custom.exe");
         args.ShouldBeNull();
     }
@@ -1082,7 +1085,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseExeField_QuotedExeWithArgs_SplitsCorrectly()
     {
-        var (exe, args) = SteamService.ParseExeField(@"""D:\shadps4\shadPS4.exe"" -g ""D:\shadps4\games\CUSA03173\eboot.bin""");
+        var (exe, args) = SteamVdfParser.ParseExeField(@"""D:\shadps4\shadPS4.exe"" -g ""D:\shadps4\games\CUSA03173\eboot.bin""");
         exe.ShouldBe(@"D:\shadps4\shadPS4.exe");
         args.ShouldBe(@"-g ""D:\shadps4\games\CUSA03173\eboot.bin""");
     }
@@ -1090,7 +1093,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseExeField_UnquotedExe_ReturnsPath()
     {
-        var (exe, args) = SteamService.ParseExeField(@"C:\simple.exe");
+        var (exe, args) = SteamVdfParser.ParseExeField(@"C:\simple.exe");
         exe.ShouldBe(@"C:\simple.exe");
         args.ShouldBeNull();
     }
@@ -1098,7 +1101,7 @@ public class SteamServiceTests
     [Fact]
     public void ParseExeField_QuotedExeWithSimpleArgs_SplitsCorrectly()
     {
-        var (exe, args) = SteamService.ParseExeField(@"""C:\Emulators\rpcs3.exe"" --no-gui");
+        var (exe, args) = SteamVdfParser.ParseExeField(@"""C:\Emulators\rpcs3.exe"" --no-gui");
         exe.ShouldBe(@"C:\Emulators\rpcs3.exe");
         args.ShouldBe("--no-gui");
     }

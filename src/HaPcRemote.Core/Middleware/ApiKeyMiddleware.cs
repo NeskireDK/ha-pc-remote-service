@@ -9,8 +9,6 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddlew
 {
     private const string ApiKeyHeaderName = "X-Api-Key";
 
-    private static readonly string[] ExemptPaths = ["/api/health", "/api/steam/artwork"];
-
     public async Task InvokeAsync(HttpContext context, IOptionsMonitor<PcRemoteOptions> options)
     {
         var config = options.CurrentValue;
@@ -25,7 +23,7 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddlew
 
         // Only require auth for /api/ paths; skip non-API requests (favicon.ico, etc.)
         if (!path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
-            ExemptPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+            IsExemptPath(path))
         {
             await next(context);
             return;
@@ -53,5 +51,18 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddlew
         }
 
         await next(context);
+    }
+
+    private static bool IsExemptPath(string path) =>
+        path.Equals("/api/health", StringComparison.OrdinalIgnoreCase) ||
+        IsArtworkImagePath(path);
+
+    private static bool IsArtworkImagePath(string path)
+    {
+        const string prefix = "/api/steam/artwork/";
+        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+        var segment = path[prefix.Length..];
+        return !segment.Contains('/') && int.TryParse(segment, out _);
     }
 }

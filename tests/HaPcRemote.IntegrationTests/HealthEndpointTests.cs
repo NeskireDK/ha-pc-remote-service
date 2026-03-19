@@ -1,4 +1,4 @@
-using HaPcRemote.IntegrationTests.Models;
+using HaPcRemote.Service.Models;
 using Shouldly;
 
 namespace HaPcRemote.IntegrationTests;
@@ -15,6 +15,7 @@ public class HealthEndpointTests : IntegrationTestBase
         response.Success.ShouldBeTrue();
         response.Data.ShouldNotBeNull();
         response.Data.MachineName.ShouldNotBeNullOrWhiteSpace();
+        response.Data.Version.ShouldNotBeNullOrEmpty();
         response.Data.MacAddresses.ShouldNotBeNull();
         response.Data.MacAddresses.ShouldNotBeEmpty();
     }

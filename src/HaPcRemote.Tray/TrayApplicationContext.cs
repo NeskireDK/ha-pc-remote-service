@@ -1,11 +1,11 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using HaPcRemote.Service.Logging;
 using HaPcRemote.Service.Services;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Tray.Forms;
 using HaPcRemote.Tray.Logging;
 using HaPcRemote.Tray.Models;
-using HaPcRemote.Tray.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -24,21 +24,25 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly CancellationTokenSource _webCts;
     private readonly ILogger _logger;
     private readonly InMemoryLogProvider _logProvider;
-    private readonly UpdateChecker _updateChecker;
+    private readonly IUpdateService _updateService;
     private readonly System.Windows.Forms.Timer _updateTimer;
     private readonly int _port;
     private readonly Func<IServiceProvider> _serviceAccessor;
     private readonly System.Windows.Forms.Timer _steamPollTimer;
     private readonly Icon _defaultIcon;
     private Icon? _playingIcon;
+    private IntPtr _playingIconHandle = IntPtr.Zero;
     private bool _isGamePlaying;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
 
     private readonly SemaphoreSlim _updateLock = new(1, 1);
 
     private SettingsForm? _settingsForm;
     private ToolStripMenuItem? _updateMenuItem;
     private ToolStripMenuItem? _autoUpdateMenuItem;
-    private UpdateChecker.ReleaseInfo? _pendingRelease;
+    private ReleaseInfo? _pendingRelease;
 
     public TrayApplicationContext(Func<IServiceProvider> serviceAccessor, CancellationTokenSource webCts, InMemoryLogProvider logProvider)
     {
@@ -53,10 +57,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var options = webServices.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
         _port = options.Port;
 
-        _updateChecker = new UpdateChecker(loggerFactory.CreateLogger<UpdateChecker>());
+        _updateService = webServices.GetRequiredService<IUpdateService>();
 
         var settings = TraySettings.Load();
-        var logLevel = ParseLogLevel(settings.LogLevel);
+        var logLevel = TabHelpers.ParseLogLevel(settings.LogLevel);
         InMemoryLogProvider.MinimumLevel = logLevel;
         FileLoggerProvider.MinimumLevel = logLevel;
 
@@ -193,8 +197,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         using var g = Graphics.FromImage(bmp);
         using var brush = new SolidBrush(Color.Lime);
         g.FillEllipse(brush, bmp.Width - 7, bmp.Height - 7, 6, 6);
-        _playingIcon = Icon.FromHandle(bmp.GetHicon());
+        var hIcon = bmp.GetHicon();
         bmp.Dispose();
+        if (_playingIconHandle != IntPtr.Zero)
+            DestroyIcon(_playingIconHandle);
+        _playingIconHandle = hIcon;
+        _playingIcon = Icon.FromHandle(hIcon);
         return _playingIcon;
     }
 
@@ -206,14 +214,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _updateTimer.Interval = GetUpdateTimerInterval(s.AutoUpdate);
         _logger.LogInformation("Auto update {State}", s.AutoUpdate ? "enabled" : "disabled");
     }
-
-    private static LogLevel ParseLogLevel(string level) => level switch
-    {
-        "Error"   => LogLevel.Error,
-        "Info"    => LogLevel.Information,
-        "Verbose" => LogLevel.Debug,
-        _         => LogLevel.Warning
-    };
 
     private static int GetUpdateTimerInterval(bool autoUpdate)
         => autoUpdate ? 5 * 60 * 1000 : 4 * 60 * 60 * 1000;
@@ -253,8 +253,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _updateMenuItem.Text = "Checking...";
         }
 
-        var settings = TraySettings.Load();
-        var release = await _updateChecker.CheckAsync(settings.IncludePrereleases, _cts.Token);
+        var release = await _updateService.CheckAsync(_cts.Token);
 
         if (release is null)
         {
@@ -301,7 +300,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private async Task HandleDownloadAsync(UpdateChecker.ReleaseInfo release)
+    private async Task HandleDownloadAsync(ReleaseInfo release)
     {
         if (_updateMenuItem is null) return;
 
@@ -316,7 +315,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _updateMenuItem.Enabled = false;
             _updateMenuItem.Text = "Updating…";
 
-            if (await _updateChecker.DownloadAndInstallAsync(release, _cts.Token))
+            var result = await _updateService.ApplyAsync(release, _cts.Token);
+            if (result.Status == UpdateStatus.UpdateStarted)
             {
                 Application.Exit();
             }
@@ -343,8 +343,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private static string GetVersionString()
     {
-        var version = UpdateChecker.GetCurrentVersion();
-        return version is null ? "" : $"v{version.ToString(3)}";
+        var version = UpdateService.GetCurrentVersion();
+        return version is null ? "" : $"v{UpdateService.FormatVersion(version)}";
     }
 
     private static Icon LoadAppIcon()
@@ -361,7 +361,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _updateLock.Dispose();
             _updateTimer.Dispose();
             _steamPollTimer.Dispose();
-            _playingIcon?.Dispose();
+            if (_playingIconHandle != IntPtr.Zero)
+                DestroyIcon(_playingIconHandle);
             _settingsForm?.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();

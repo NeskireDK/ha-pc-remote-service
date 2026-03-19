@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using HaPcRemote.Service.Middleware;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Services;
 using HaPcRemote.Service.Views;
@@ -10,7 +11,10 @@ public static class ArtworkDebugEndpoints
 {
     public static IEndpointRouteBuilder MapArtworkDebugEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/steam/artwork/debug", async (HttpContext context, ISteamService steamService) =>
+        var group = endpoints.MapGroup("/");
+        group.AddEndpointFilter<EndpointExceptionFilter>();
+
+        group.MapGet("/api/steam/artwork/debug", async (HttpContext context, ISteamService steamService) =>
         {
             var remote = context.Connection.RemoteIpAddress;
             if (remote is not null && !IPAddress.IsLoopback(remote))
@@ -21,7 +25,7 @@ public static class ArtworkDebugEndpoints
             return Results.Content(html, "text/html");
         });
 
-        endpoints.MapGet("/api/steam/artwork/{appId:int}/debug", async (int appId, HttpContext context, ISteamService steamService) =>
+        group.MapGet("/api/steam/artwork/{appId:int}/debug", async (int appId, HttpContext context, ISteamService steamService) =>
         {
             var remote = context.Connection.RemoteIpAddress;
             if (remote is not null && !IPAddress.IsLoopback(remote))
@@ -35,7 +39,7 @@ public static class ArtworkDebugEndpoints
             return Results.Content(html, "text/html");
         });
 
-        endpoints.MapGet("/api/debug/styles.css", (HttpContext context) =>
+        group.MapGet("/api/debug/styles.css", (HttpContext context) =>
         {
             var remote = context.Connection.RemoteIpAddress;
             if (remote is not null && !IPAddress.IsLoopback(remote))

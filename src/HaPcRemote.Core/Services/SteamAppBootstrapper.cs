@@ -18,36 +18,11 @@ public static class SteamAppBootstrapper
         if (!OperatingSystem.IsWindows())
             return;
 
-        var needsSteam = !currentOptions.Apps.ContainsKey("steam");
+        // steam-bigpicture is a fixed URI — write it regardless of whether steam.exe is findable
+        var needsBigPicture = !currentOptions.Apps.TryGetValue("steam-bigpicture", out var existing)
+            || !existing.ExePath.StartsWith("steam://", StringComparison.OrdinalIgnoreCase);
 
-        // Always overwrite steam-bigpicture — it's a fixed URI, not user-configurable,
-        // and existing installs may have the old steam.exe -bigpicture entry.
-        if (!needsSteam && currentOptions.Apps.TryGetValue("steam-bigpicture", out var existing)
-            && existing.ExePath.StartsWith("steam://", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        var steamPath = platform.GetSteamPath();
-        if (string.IsNullOrEmpty(steamPath))
-            return;
-
-        var exePath = Path.Combine(steamPath, "steam.exe");
-        if (!File.Exists(exePath))
-            return;
-
-        if (needsSteam)
-        {
-            writer.SaveApp("steam", new AppDefinitionOptions
-            {
-                DisplayName = "Steam",
-                ExePath = exePath,
-                Arguments = "",
-                ProcessName = "steam",
-                UseShellExecute = false
-            });
-
-            logger.LogInformation("Auto-registered Steam app entry: {ExePath}", exePath);
-        }
-
+        if (needsBigPicture)
         {
             writer.SaveApp("steam-bigpicture", new AppDefinitionOptions
             {
@@ -60,5 +35,28 @@ public static class SteamAppBootstrapper
 
             logger.LogInformation("Auto-registered Steam Big Picture app entry via steam:// URI");
         }
+
+        // steam entry requires the actual exe path
+        if (currentOptions.Apps.ContainsKey("steam"))
+            return;
+
+        var steamPath = platform.GetSteamPath();
+        if (string.IsNullOrEmpty(steamPath))
+            return;
+
+        var exePath = Path.Combine(steamPath, "steam.exe");
+        if (!File.Exists(exePath))
+            return;
+
+        writer.SaveApp("steam", new AppDefinitionOptions
+        {
+            DisplayName = "Steam",
+            ExePath = exePath,
+            Arguments = "",
+            ProcessName = "steam",
+            UseShellExecute = false
+        });
+
+        logger.LogInformation("Auto-registered Steam app entry: {ExePath}", exePath);
     }
 }

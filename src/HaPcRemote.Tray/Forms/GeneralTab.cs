@@ -19,6 +19,8 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
     private readonly Label _portStatusLabel;
     private readonly Button _portSaveButton;
     private readonly Label _soundVolumeViewLabel;
+    private readonly ComboBox _displaySwitchingCombo;
+    private readonly IConfigurationWriter _configWriter;
     private readonly int _currentPort;
 
     public GeneralTab(IServiceProvider services)
@@ -29,6 +31,7 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
         Padding = new Padding(20);
 
         _restartService = services.GetRequiredService<KestrelRestartService>();
+        _configWriter = services.GetRequiredService<IConfigurationWriter>();
         var options = services.GetRequiredService<IOptions<PcRemoteOptions>>().Value;
         _currentPort = options.Port;
 
@@ -96,18 +99,24 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
 
         UpdateToolStatus(_soundVolumeViewLabel, Path.Combine(options.ToolsPath, "SoundVolumeView.exe"));
 
+        // Display switching mode
+        _displaySwitchingCombo = TabHelpers.MakeComboBox();
+        _displaySwitchingCombo.Items.AddRange(Enum.GetNames<DisplaySwitchingMode>());
+        _displaySwitchingCombo.SelectedItem = options.DisplaySwitching.ToString();
+        var displaySwitchingPanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        displaySwitchingPanel.Controls.Add(_displaySwitchingCombo);
+        displaySwitchingPanel.Controls.Add(MakeHelpIcon(_toolTip,
+            "How monitor changes are applied.\n" +
+            "Direct: single API call (fastest, works on most hardware)\n" +
+            "Compatible: sequential steps with verification (use if Direct fails)"));
+        layout.Controls.Add(MakeLabel("Display Switching:"), 0, row);
+        layout.Controls.Add(displaySwitchingPanel, 1, row++);
+
         // Separator
         layout.Controls.Add(new Label { AutoSize = true, Height = 10 }, 0, row++);
 
         // Log level
-        _logLevelCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 200,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _logLevelCombo = TabHelpers.MakeComboBox();
         _logLevelCombo.Items.AddRange(["Error", "Warning", "Info", "Verbose"]);
 
         var settings = TraySettings.Load();
@@ -255,41 +264,14 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
         }
     }
 
-    private static Label MakeLabel(string text) => new()
-    {
-        Text = text,
-        ForeColor = Color.White,
-        AutoSize = true,
-        Anchor = AnchorStyles.Left,
-        Padding = new Padding(0, 3, 0, 0)
-    };
+    private static Label MakeLabel(string text) => TabHelpers.MakeLabel(text, new Padding(0, 3, 0, 0));
 
-    private static Label MakeHelpIcon(ToolTip toolTip, string helpText)
-    {
-        var label = new Label
-        {
-            Text = "ⓘ",
-            ForeColor = Color.FromArgb(120, 180, 255),
-            AutoSize = true,
-            Cursor = Cursors.Help,
-            Padding = new Padding(4, 4, 0, 0),
-            Font = new Font("Segoe UI", 9f)
-        };
-        toolTip.SetToolTip(label, helpText);
-        label.Click += (_, _) => toolTip.Show(helpText, label, 3000);
-        return label;
-    }
+    private static Label MakeHelpIcon(ToolTip toolTip, string helpText) => TabHelpers.MakeHelpIcon(toolTip, helpText);
 
     private void OnApply(object? sender, EventArgs e)
     {
         var level = _logLevelCombo.SelectedItem?.ToString() ?? "Warning";
-        var logLevel = level switch
-        {
-            "Error" => LogLevel.Error,
-            "Info" => LogLevel.Information,
-            "Verbose" => LogLevel.Debug,
-            _ => LogLevel.Warning
-        };
+        var logLevel = TabHelpers.ParseLogLevel(level);
 
         InMemoryLogProvider.MinimumLevel = logLevel;
         FileLoggerProvider.MinimumLevel = logLevel;
@@ -299,6 +281,10 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
         s.AutoUpdate = _autoUpdateCheck.Checked;
         s.IncludePrereleases = _includePrereleasesCheck.Checked;
         s.Save();
+
+        var displayMode = Enum.TryParse<DisplaySwitchingMode>(_displaySwitchingCombo.SelectedItem?.ToString(), out var dm)
+            ? dm : DisplaySwitchingMode.Direct;
+        _configWriter.SaveDisplaySwitching(displayMode);
     }
 
     private void OnCancel(object? sender, EventArgs e)
@@ -313,5 +299,7 @@ internal sealed class GeneralTab : TabPage, ISettingsTab
         };
         _autoUpdateCheck.Checked = s.AutoUpdate;
         _includePrereleasesCheck.Checked = s.IncludePrereleases;
+
+        _displaySwitchingCombo.SelectedItem = _configWriter.Read().DisplaySwitching.ToString();
     }
 }

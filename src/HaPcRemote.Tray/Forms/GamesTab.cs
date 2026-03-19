@@ -1,5 +1,6 @@
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HaPcRemote.Tray.Forms;
@@ -10,6 +11,7 @@ internal sealed class GamesTab : TabPage, ISettingsTab
     private readonly ISteamService _steamService;
     private readonly IModeService _modeService;
     private readonly IOptionsMonitor<PcRemoteOptions> _options;
+    private readonly ILogger<GamesTab> _logger;
 
     private readonly ComboBox _defaultModeCombo;
     private readonly DataGridView _gameGrid;
@@ -27,6 +29,7 @@ internal sealed class GamesTab : TabPage, ISettingsTab
         _steamService = services.GetRequiredService<ISteamService>();
         _modeService = services.GetRequiredService<IModeService>();
         _options = services.GetRequiredService<IOptionsMonitor<PcRemoteOptions>>();
+        _logger = services.GetRequiredService<ILogger<GamesTab>>();
 
         var layout = new TableLayoutPanel
         {
@@ -41,14 +44,7 @@ internal sealed class GamesTab : TabPage, ISettingsTab
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         // Default PC mode
-        _defaultModeCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 200,
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
-        };
+        _defaultModeCombo = TabHelpers.MakeComboBox();
         layout.Controls.Add(MakeLabel("Default PC Mode:"), 0, 0);
         var defaultModePanel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
         defaultModePanel.Controls.Add(_defaultModeCombo);
@@ -192,7 +188,7 @@ internal sealed class GamesTab : TabPage, ISettingsTab
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Failed to refresh games tab: {ex.Message}");
+            _logger.LogError(ex, "Failed to refresh games tab");
         }
     }
 
@@ -229,28 +225,7 @@ internal sealed class GamesTab : TabPage, ISettingsTab
         _footer?.ShowStatus("Saved");
     }
 
-    private static Label MakeLabel(string text) => new()
-    {
-        Text = text,
-        ForeColor = Color.White,
-        AutoSize = true,
-        Anchor = AnchorStyles.Left,
-        Padding = new Padding(0, 6, 0, 0)
-    };
+    private static Label MakeLabel(string text) => TabHelpers.MakeLabel(text);
 
-    private static Label MakeHelpIcon(ToolTip toolTip, string helpText)
-    {
-        var label = new Label
-        {
-            Text = "ⓘ",
-            ForeColor = Color.FromArgb(120, 180, 255),
-            AutoSize = true,
-            Cursor = Cursors.Help,
-            Padding = new Padding(4, 5, 0, 0),
-            Font = new Font("Segoe UI", 9f)
-        };
-        toolTip.SetToolTip(label, helpText);
-        label.Click += (_, _) => toolTip.Show(helpText, label, 3000);
-        return label;
-    }
+    private static Label MakeHelpIcon(ToolTip toolTip, string helpText) => TabHelpers.MakeHelpIcon(toolTip, helpText);
 }
