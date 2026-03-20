@@ -197,7 +197,7 @@ internal sealed class WindowsMonitorService : IMonitorService
         _logger.LogInformation("Enabling monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
 
         var targetKey = ResolveTargetKey(target);
-        ApplyWithRetry(() => BuildEnableConfig(targetKey));
+        ApplyWithRetry(() => BuildEnableConfig(targetKey), SetDisplayConfigFlags.SDC_TOPOLOGY_EXTEND);
         InvalidateCache();
     }
 
@@ -244,7 +244,7 @@ internal sealed class WindowsMonitorService : IMonitorService
     private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildEnableConfig(
         (LUID adapterId, uint targetId) targetKey)
     {
-        var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
+        var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT);
         var idx = FindPathIndex(paths, targetKey);
         paths[idx].flags |= DISPLAYCONFIG_PATH_FLAGS.ACTIVE;
         paths[idx].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
@@ -443,7 +443,8 @@ internal sealed class WindowsMonitorService : IMonitorService
         await ApplyStepWithVerification(
             () => BuildEnableConfig(targetKey),
             () => FindMonitor(QueryMonitors(), id).IsActive,
-            $"Enable({id})");
+            $"Enable({id})",
+            SetDisplayConfigFlags.SDC_TOPOLOGY_EXTEND);
     }
 
     private async Task SetPrimaryCompatibleAsync(string id)
@@ -508,11 +509,12 @@ internal sealed class WindowsMonitorService : IMonitorService
     private async Task ApplyStepWithVerification(
         Func<(DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes)> buildConfig,
         Func<bool> verify,
-        string stepName)
+        string stepName,
+        SetDisplayConfigFlags extraFlags = 0)
     {
         for (var attempt = 0; attempt < MaxVerifyAttempts; attempt++)
         {
-            ApplyWithRetry(buildConfig);
+            ApplyWithRetry(buildConfig, extraFlags);
             InvalidateCache();
 
             if (attempt > 0 && StepDelayMs > 0)
@@ -556,13 +558,15 @@ internal sealed class WindowsMonitorService : IMonitorService
     /// Error 87 (INVALID_PARAMETER): stale adapter LUIDs — re-query and rebuild config via <paramref name="buildConfig"/>.
     /// </summary>
     private void ApplyWithRetry(
-        Func<(DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes)> buildConfig)
+        Func<(DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes)> buildConfig,
+        SetDisplayConfigFlags extraFlags = 0)
     {
-        const SetDisplayConfigFlags flags =
+        var flags =
             SetDisplayConfigFlags.SDC_APPLY
             | SetDisplayConfigFlags.SDC_USE_SUPPLIED_DISPLAY_CONFIG
             | SetDisplayConfigFlags.SDC_ALLOW_CHANGES
-            | SetDisplayConfigFlags.SDC_SAVE_TO_DATABASE;
+            | SetDisplayConfigFlags.SDC_SAVE_TO_DATABASE
+            | extraFlags;
 
         var (paths, modes) = buildConfig();
 
