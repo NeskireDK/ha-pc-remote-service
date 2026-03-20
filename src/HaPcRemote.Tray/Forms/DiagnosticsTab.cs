@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using HaPcRemote.Service.Native;
 using HaPcRemote.Service.Services;
 using static HaPcRemote.Service.Native.DisplayConfigApi;
@@ -121,9 +122,9 @@ internal sealed class DiagnosticsTab : TabPage, ISettingsTab
 
             sb.AppendLine();
         }
-        catch (Exception ex) when (ex.Message.Contains("87") || ex.Message.Contains("invalid parameter", StringComparison.OrdinalIgnoreCase))
+        catch (Win32Exception ex) when (ex.NativeErrorCode == ERROR_INVALID_PARAMETER)
         {
-            sb.AppendLine("  unavailable (error 87 — not supported in this configuration)");
+            sb.AppendLine("  unavailable (error 87 — no saved layout in this configuration)");
             sb.AppendLine();
         }
         catch (Exception ex)

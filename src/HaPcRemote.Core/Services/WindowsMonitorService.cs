@@ -60,6 +60,7 @@ internal sealed class WindowsMonitorService : IMonitorService
     {
         _logger.LogDebug("QueryMonitors: starting enumeration");
         var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
+        var savedKeys = ProbeSavedLayoutKeys();
         var monitors = new List<MonitorInfo>();
         var seen = new HashSet<(LUID adapterId, uint targetId)>();
         var edidCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -171,6 +172,7 @@ internal sealed class WindowsMonitorService : IMonitorService
                 DisplayFrequency = hz,
                 IsActive = isActive,
                 IsPrimary = isPrimary,
+                HasSavedLayout = savedKeys.Contains(key),
             });
         }
 
@@ -179,8 +181,6 @@ internal sealed class WindowsMonitorService : IMonitorService
         foreach (var m in monitors)
             _logger.LogDebug("  {Id}: \"{Name}\" ({Gdi}) {W}x{H}@{Hz}Hz active={Active} primary={Primary}",
                 m.MonitorId, m.MonitorName, m.Name, m.Width, m.Height, m.DisplayFrequency, m.IsActive, m.IsPrimary);
-
-        ProbeSavedLayouts(monitors);
 
         return monitors;
     }
@@ -570,21 +570,13 @@ internal sealed class WindowsMonitorService : IMonitorService
 
     // ── Saved layout probe ─────────────────────────────────────────────
 
-    private void ProbeSavedLayouts(List<MonitorInfo> monitors)
+    private HashSet<(LUID adapterId, uint targetId)> ProbeSavedLayoutKeys()
     {
         try
         {
             var (dbPaths, _) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT);
-            var savedKeys = new HashSet<(LUID adapterId, uint targetId)>(
+            return new HashSet<(LUID adapterId, uint targetId)>(
                 dbPaths.Select(p => (p.targetInfo.adapterId, p.targetInfo.id)));
-
-            for (var i = 0; i < monitors.Count; i++)
-            {
-                if (!_targetKeys.TryGetValue(monitors[i].MonitorId, out var key))
-                    continue;
-                if (savedKeys.Contains(key))
-                    monitors[i].HasSavedLayout = true;
-            }
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == ERROR_INVALID_PARAMETER)
         {
@@ -592,8 +584,10 @@ internal sealed class WindowsMonitorService : IMonitorService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "ProbeSavedLayouts: unexpected error, HasSavedLayout will be false");
+            _logger.LogWarning(ex, "ProbeSavedLayoutKeys: unexpected error, HasSavedLayout will be false");
         }
+
+        return [];
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
