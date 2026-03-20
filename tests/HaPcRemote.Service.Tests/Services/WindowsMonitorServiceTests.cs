@@ -16,10 +16,16 @@ public class WindowsMonitorServiceTests
     private readonly IDisplayConfigApi _api = A.Fake<IDisplayConfigApi>();
     private readonly ILogger<WindowsMonitorService> _logger = A.Fake<ILogger<WindowsMonitorService>>();
 
-    private static IOptionsMonitor<PcRemoteOptions> MakeOptions(DisplaySwitchingMode mode = DisplaySwitchingMode.Direct)
+    private static IOptionsMonitor<PcRemoteOptions> MakeOptions(
+        DisplaySwitchingMode mode = DisplaySwitchingMode.Direct,
+        bool useSavedLayout = true)
     {
         var options = A.Fake<IOptionsMonitor<PcRemoteOptions>>();
-        A.CallTo(() => options.CurrentValue).Returns(new PcRemoteOptions { DisplaySwitching = mode });
+        A.CallTo(() => options.CurrentValue).Returns(new PcRemoteOptions
+        {
+            DisplaySwitching = mode,
+            UseSavedLayout = useSavedLayout
+        });
         return options;
     }
 
@@ -1099,5 +1105,73 @@ public class WindowsMonitorServiceTests
 
         A.CallTo(() => _api.ApplyConfig(A<DISPLAYCONFIG_PATH_INFO[]>._, A<DISPLAYCONFIG_MODE_INFO[]>._, A<SetDisplayConfigFlags>._))
             .MustHaveHappenedOnceExactly();
+    }
+
+    // ── UseSavedLayout tests ─────────────────────────────────────────
+
+    private WindowsMonitorService CreateServiceWithSavedLayout(bool useSavedLayout)
+        => new(_api, _logger, MakeOptions(useSavedLayout: useSavedLayout));
+
+    /// <summary>
+    /// Sets up one active + one inactive monitor using standard EDID values.
+    /// Returns the inactive monitor's enable-config paths/modes for use with QDC_DATABASE_CURRENT or QDC_ALL_PATHS.
+    /// Inactive monitor ID = "DEL4321" (targetId 20).
+    /// </summary>
+    private (DISPLAYCONFIG_PATH_INFO[], DISPLAYCONFIG_MODE_INFO[]) SetupSavedLayoutMocks()
+    {
+        SetupOneActiveOneInactive();
+
+        var enablePaths = new[] { MakeInactivePath(Adapter1, 20, 1) };
+        var enableModes = Array.Empty<DISPLAYCONFIG_MODE_INFO>();
+        return (enablePaths, enableModes);
+    }
+
+    [Fact]
+    public async Task EnableMonitor_UseSavedLayout_QueriesDatabaseCurrentFirst()
+    {
+        var service = CreateServiceWithSavedLayout(true);
+        var (paths, modes) = SetupSavedLayoutMocks();
+
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT))
+            .Returns((paths, modes));
+
+        await service.EnableMonitorAsync("DEL4321");
+
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task EnableMonitor_UseSavedLayout_FallsBackOnError87()
+    {
+        var service = CreateServiceWithSavedLayout(true);
+        var (paths, modes) = SetupSavedLayoutMocks();
+
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT))
+            .Throws(new Win32Exception(87));
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS))
+            .Returns((paths, modes));
+
+        await service.EnableMonitorAsync("DEL4321");
+
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS))
+            .MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task EnableMonitor_UseSavedLayoutFalse_SkipsDatabaseCurrent()
+    {
+        var service = CreateServiceWithSavedLayout(false);
+        var (paths, modes) = SetupSavedLayoutMocks();
+
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS))
+            .Returns((paths, modes));
+
+        await service.EnableMonitorAsync("DEL4321");
+
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT))
+            .MustNotHaveHappened();
+        A.CallTo(() => _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS))
+            .MustHaveHappened();
     }
 }
