@@ -108,6 +108,7 @@ internal static class TrayWebHost
         app.MapSteamEndpoints();
         app.MapArtworkDebugEndpoints();
         app.MapPowerEndpoints();
+        app.MapDisplayEndpoints();
 
         return app;
     }
