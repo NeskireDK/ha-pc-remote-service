@@ -201,7 +201,8 @@ internal sealed class WindowsMonitorService : IMonitorService
         _logger.LogInformation("Enabling monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
 
         var targetKey = ResolveTargetKey(target);
-        ApplyWithRetry(() => BuildEnableConfig(targetKey), SetDisplayConfigFlags.SDC_TOPOLOGY_EXTEND);
+        // TODO #121: SDC_TOPOLOGY_EXTEND removed — causes error 87 with SDC_USE_SUPPLIED_DISPLAY_CONFIG. Investigate proper topology handling.
+        ApplyWithRetry(() => BuildEnableConfig(targetKey));
         InvalidateCache();
     }
 
@@ -455,11 +456,11 @@ internal sealed class WindowsMonitorService : IMonitorService
         _logger.LogInformation("Enabling monitor (compatible): {Name} ({Id})", target.MonitorName, target.MonitorId);
 
         var targetKey = ResolveTargetKey(target);
+        // TODO #121: SDC_TOPOLOGY_EXTEND removed — causes error 87 with SDC_USE_SUPPLIED_DISPLAY_CONFIG. Investigate proper topology handling.
         await ApplyStepWithVerification(
             () => BuildEnableConfig(targetKey),
             () => FindMonitor(QueryMonitors(), id).IsActive,
-            $"Enable({id})",
-            SetDisplayConfigFlags.SDC_TOPOLOGY_EXTEND);
+            $"Enable({id})");
     }
 
     private async Task SetPrimaryCompatibleAsync(string id)
