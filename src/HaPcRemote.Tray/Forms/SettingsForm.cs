@@ -65,8 +65,8 @@ internal sealed class SettingsForm : Form
         _gamesTab.SetFooter(_footer);
         _powerTab.SetFooter(_footer);
 
-        Controls.Add(_tabControl);
         Controls.Add(_footer);
+        Controls.Add(_tabControl);
 
         SyncFooter();
     }
