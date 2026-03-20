@@ -248,33 +248,44 @@ internal sealed class WindowsMonitorService : IMonitorService
         InvalidateCache();
     }
 
-    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildEnableConfig(
-        (LUID adapterId, uint targetId) targetKey)
+    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes, bool UsedDatabase)
+        QueryConfigWithFallback((LUID adapterId, uint targetId) requiredTarget)
     {
-        DISPLAYCONFIG_PATH_INFO[] paths;
-        DISPLAYCONFIG_MODE_INFO[] modes;
-
         if (_options.CurrentValue.UseSavedLayout)
         {
             try
             {
-                (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT);
+                var (dbPaths, dbModes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT);
+                if (ContainsTarget(dbPaths, requiredTarget))
+                    return (dbPaths, dbModes, true);
+
+                _logger.LogDebug("Target not in QDC_DATABASE_CURRENT result, falling back to QDC_ALL_PATHS");
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == ERROR_INVALID_PARAMETER)
             {
                 _logger.LogDebug("QDC_DATABASE_CURRENT unavailable, falling back to QDC_ALL_PATHS");
-                (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
             }
         }
-        else
-        {
-            (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
-        }
+
+        var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
+        return (paths, modes, false);
+    }
+
+    private static bool ContainsTarget(DISPLAYCONFIG_PATH_INFO[] paths, (LUID adapterId, uint targetId) key) =>
+        Array.Exists(paths, p => p.targetInfo.adapterId == key.adapterId && p.targetInfo.id == key.targetId);
+
+    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildEnableConfig(
+        (LUID adapterId, uint targetId) targetKey)
+    {
+        var (paths, modes, usedDatabase) = QueryConfigWithFallback(targetKey);
 
         var idx = FindPathIndex(paths, targetKey);
         paths[idx].flags |= DISPLAYCONFIG_PATH_FLAGS.ACTIVE;
-        paths[idx].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-        paths[idx].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+        if (!usedDatabase)
+        {
+            paths[idx].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+            paths[idx].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+        }
         return (paths, modes);
     }
 
@@ -368,7 +379,7 @@ internal sealed class WindowsMonitorService : IMonitorService
     private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildSoloConfig(
         (LUID adapterId, uint targetId) targetKey, string monitorId)
     {
-        var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
+        var (paths, modes, usedDatabase) = QueryConfigWithFallback(targetKey);
 
         var activeCount = 0;
         var inactiveCount = 0;
@@ -381,8 +392,11 @@ internal sealed class WindowsMonitorService : IMonitorService
             if (isTarget)
             {
                 paths[i].flags |= DISPLAYCONFIG_PATH_FLAGS.ACTIVE;
-                paths[i].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-                paths[i].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+                if (!usedDatabase)
+                {
+                    paths[i].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+                    paths[i].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+                }
                 activeCount++;
             }
             else
