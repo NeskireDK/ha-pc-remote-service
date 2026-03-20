@@ -171,7 +171,7 @@ internal sealed class WindowsMonitorService : IMonitorService
             });
         }
 
-        _logger.LogInformation("QueryMonitors: found {Count} monitors", monitors.Count);
+        _logger.LogDebug("QueryMonitors: found {Count} monitors", monitors.Count);
         foreach (var m in monitors)
             _logger.LogDebug("  {Id}: \"{Name}\" ({Gdi}) {W}x{H}@{Hz}Hz active={Active} primary={Primary}",
                 m.MonitorId, m.MonitorName, m.Name, m.Width, m.Height, m.DisplayFrequency, m.IsActive, m.IsPrimary);
@@ -190,7 +190,7 @@ internal sealed class WindowsMonitorService : IMonitorService
 
         if (target.IsActive)
         {
-            _logger.LogInformation("Monitor '{Id}' is already enabled, skipping", id);
+            _logger.LogDebug("Monitor '{Id}' is already enabled, skipping", id);
             return;
         }
 
@@ -210,7 +210,7 @@ internal sealed class WindowsMonitorService : IMonitorService
 
         if (!target.IsActive)
         {
-            _logger.LogInformation("Monitor '{Id}' is already disabled, skipping", id);
+            _logger.LogDebug("Monitor '{Id}' is already disabled, skipping", id);
             return;
         }
 
@@ -433,7 +433,7 @@ internal sealed class WindowsMonitorService : IMonitorService
 
         if (target.IsActive)
         {
-            _logger.LogInformation("Monitor '{Id}' is already enabled, skipping (compatible)", id);
+            _logger.LogDebug("Monitor '{Id}' is already enabled, skipping (compatible)", id);
             return;
         }
 
@@ -482,7 +482,7 @@ internal sealed class WindowsMonitorService : IMonitorService
 
         if (!target.IsActive)
         {
-            _logger.LogInformation("Monitor '{Id}' is already disabled, skipping (compatible)", id);
+            _logger.LogDebug("Monitor '{Id}' is already disabled, skipping (compatible)", id);
             return;
         }
 

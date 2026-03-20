@@ -63,7 +63,7 @@ public sealed class UpdateService(IHttpClientFactory httpClientFactory, ILogger<
 
         var release = await CheckForUpdateAsync(currentVersion, prerelease, ct);
         if (release is null)
-            logger.LogInformation("No update found — already up to date at {CurrentVersion}", currentVersionStr);
+            logger.LogDebug("No update found — already up to date at {CurrentVersion}", currentVersionStr);
         return release;
     }
 
