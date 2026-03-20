@@ -28,8 +28,18 @@ internal sealed class LogTab : TabPage, ISettingsTab
             Font = new Font("Consolas", 9.5f),
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.None,
-            WordWrap = true
+            WordWrap = true,
+            ShortcutsEnabled = true
         };
+
+        var contextMenu = new ContextMenuStrip();
+        contextMenu.BackColor = Color.FromArgb(45, 45, 45);
+        contextMenu.ForeColor = Color.White;
+        contextMenu.Renderer = new ToolStripProfessionalRenderer(new DarkColorTable());
+        var copyItem = new ToolStripMenuItem("Copy");
+        copyItem.Click += (_, _) => _logBox.Copy();
+        contextMenu.Items.Add(copyItem);
+        _logBox.ContextMenuStrip = contextMenu;
 
         _port = port;
 
@@ -67,6 +77,18 @@ internal sealed class LogTab : TabPage, ISettingsTab
         }
     }
 
+    private bool IsScrolledToBottom()
+    {
+        // Compare visible bottom position to total content height
+        var scrollInfo = new NativeMethods.ScrollInfo
+        {
+            cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.ScrollInfo>(),
+            fMask = NativeMethods.SIF_ALL
+        };
+        NativeMethods.GetScrollInfo(_logBox.Handle, NativeMethods.SB_VERT, ref scrollInfo);
+        return scrollInfo.nPos >= scrollInfo.nMax - scrollInfo.nPage;
+    }
+
     private void AppendEntry(LogEntry entry)
     {
         var color = entry.Level switch
@@ -90,11 +112,15 @@ internal sealed class LogTab : TabPage, ISettingsTab
 
         var line = $"[{entry.Timestamp:HH:mm:ss}] [{level}] {entry.Category} - {entry.Message}\n";
 
+        var pinToBottom = IsScrolledToBottom();
+
         _logBox.SelectionStart = _logBox.TextLength;
         _logBox.SelectionLength = 0;
         _logBox.SelectionColor = color;
         _logBox.AppendText(line);
-        _logBox.ScrollToCaret();
+
+        if (pinToBottom)
+            _logBox.ScrollToCaret();
     }
 
     protected override void OnVisibleChanged(EventArgs e)
@@ -118,4 +144,36 @@ internal sealed class LogTab : TabPage, ISettingsTab
             _provider.OnLogEntry -= OnNewLogEntry;
         base.Dispose(disposing);
     }
+}
+
+file static class NativeMethods
+{
+    internal const int SB_VERT = 1;
+    internal const uint SIF_ALL = 0x17;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    internal struct ScrollInfo
+    {
+        public int cbSize;
+        public uint fMask;
+        public int nMin;
+        public int nMax;
+        public uint nPage;
+        public int nPos;
+        public int nTrackPos;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    internal static extern bool GetScrollInfo(IntPtr hwnd, int fnBar, ref ScrollInfo lpsi);
+}
+
+file sealed class DarkColorTable : ProfessionalColorTable
+{
+    public override Color MenuItemSelected => Color.FromArgb(60, 60, 60);
+    public override Color MenuItemBorder => Color.FromArgb(80, 80, 80);
+    public override Color MenuBorder => Color.FromArgb(80, 80, 80);
+    public override Color ToolStripDropDownBackground => Color.FromArgb(45, 45, 45);
+    public override Color ImageMarginGradientBegin => Color.FromArgb(45, 45, 45);
+    public override Color ImageMarginGradientMiddle => Color.FromArgb(45, 45, 45);
+    public override Color ImageMarginGradientEnd => Color.FromArgb(45, 45, 45);
 }
