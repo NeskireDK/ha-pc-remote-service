@@ -25,6 +25,9 @@ internal sealed class WindowsMonitorService : IMonitorService
     // Maps MonitorId (e.g. "GSM59A4") → native (adapterId, targetId) for path resolution
     private readonly Dictionary<string, (LUID adapterId, uint targetId)> _targetKeys = new(StringComparer.OrdinalIgnoreCase);
 
+    internal readonly record struct SavedMode(uint Width, uint Height, uint VSyncNumerator, uint VSyncDenominator);
+    private readonly Dictionary<string, SavedMode> _savedModes = new(StringComparer.OrdinalIgnoreCase);
+
     private const int MaxVerifyAttempts = 3;
 
     internal bool UseCompatibleMode => _options.CurrentValue.DisplaySwitching == DisplaySwitchingMode.Compatible;
@@ -66,6 +69,7 @@ internal sealed class WindowsMonitorService : IMonitorService
         var edidCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         _targetKeys.Clear();
+        _savedModes.Clear();
 
         _logger.LogDebug("QueryMonitors: processing {Count} paths", paths.Length);
 
@@ -136,6 +140,8 @@ internal sealed class WindowsMonitorService : IMonitorService
             int width = 0, height = 0, hz = 0;
             var isPrimary = false;
 
+            DISPLAYCONFIG_RATIONAL vSyncFreq = default;
+
             if (isActive && path.sourceInfo.modeInfoIdx != DISPLAYCONFIG_PATH_MODE_IDX_INVALID)
             {
                 var sourceMode = FindSourceMode(modes, path.sourceInfo.modeInfoIdx);
@@ -151,11 +157,17 @@ internal sealed class WindowsMonitorService : IMonitorService
             {
                 var targetMode = FindTargetMode(modes, path.targetInfo.modeInfoIdx);
                 if (targetMode.HasValue)
-                    hz = targetMode.Value.targetVideoSignalInfo.vSyncFreq.ToHz();
+                {
+                    vSyncFreq = targetMode.Value.targetVideoSignalInfo.vSyncFreq;
+                    hz = vSyncFreq.ToHz();
+                }
             }
 
             if (hz == 0)
                 hz = path.targetInfo.refreshRate.ToHz();
+
+            if (isActive && width > 0)
+                _savedModes[monitorId] = new SavedMode((uint)width, (uint)height, vSyncFreq.Numerator, vSyncFreq.Denominator);
 
             _logger.LogDebug(
                 "  Monitor: id={MonitorId} name=\"{FriendlyName}\" gdi={Gdi} {W}x{H}@{Hz}Hz active={Active} primary={Primary}",
@@ -285,6 +297,13 @@ internal sealed class WindowsMonitorService : IMonitorService
         {
             paths[idx].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
             paths[idx].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+
+            if (_options.CurrentValue.UseSavedLayout)
+            {
+                var monitorId = _targetKeys.FirstOrDefault(kv => kv.Value == targetKey).Key;
+                if (monitorId != null)
+                    ApplyCachedMode(ref paths[idx], ref modes, monitorId);
+            }
         }
         return (paths, modes);
     }
@@ -396,6 +415,8 @@ internal sealed class WindowsMonitorService : IMonitorService
                 {
                     paths[i].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
                     paths[i].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+                    if (_options.CurrentValue.UseSavedLayout)
+                        ApplyCachedMode(ref paths[i], ref modes, monitorId);
                 }
                 activeCount++;
             }
@@ -717,5 +738,69 @@ internal sealed class WindowsMonitorService : IMonitorService
         return modes[index].infoType == DISPLAYCONFIG_MODE_INFO_TYPE.TARGET
             ? modes[index].info.targetMode
             : null;
+    }
+
+    private void ApplyCachedMode(ref DISPLAYCONFIG_PATH_INFO path, ref DISPLAYCONFIG_MODE_INFO[] modes, string monitorId)
+    {
+        if (!_savedModes.TryGetValue(monitorId, out var saved))
+            return;
+
+        var adapterId = path.sourceInfo.adapterId;
+
+        var sourceEntry = new DISPLAYCONFIG_MODE_INFO
+        {
+            infoType = DISPLAYCONFIG_MODE_INFO_TYPE.SOURCE,
+            id = path.sourceInfo.id,
+            adapterId = adapterId,
+            info = new DISPLAYCONFIG_MODE_INFO_UNION
+            {
+                sourceMode = new DISPLAYCONFIG_SOURCE_MODE
+                {
+                    width = saved.Width,
+                    height = saved.Height,
+                    pixelFormat = DISPLAYCONFIG_PIXELFORMAT.PIXELFORMAT_32BPP,
+                    position = new POINTL { x = 0, y = 0 },
+                }
+            }
+        };
+
+        var targetEntry = new DISPLAYCONFIG_MODE_INFO
+        {
+            infoType = DISPLAYCONFIG_MODE_INFO_TYPE.TARGET,
+            id = path.targetInfo.id,
+            adapterId = adapterId,
+            info = new DISPLAYCONFIG_MODE_INFO_UNION
+            {
+                targetMode = new DISPLAYCONFIG_TARGET_MODE
+                {
+                    targetVideoSignalInfo = new DISPLAYCONFIG_VIDEO_SIGNAL_INFO
+                    {
+                        vSyncFreq = new DISPLAYCONFIG_RATIONAL
+                        {
+                            Numerator = saved.VSyncNumerator,
+                            Denominator = saved.VSyncDenominator,
+                        },
+                        activeSize = new DISPLAYCONFIG_2DREGION
+                        {
+                            cx = saved.Width,
+                            cy = saved.Height,
+                        },
+                    }
+                }
+            }
+        };
+
+        var sourceIdx = (uint)modes.Length;
+        var targetIdx = sourceIdx + 1;
+
+        Array.Resize(ref modes, modes.Length + 2);
+        modes[sourceIdx] = sourceEntry;
+        modes[targetIdx] = targetEntry;
+
+        path.sourceInfo.modeInfoIdx = sourceIdx;
+        path.targetInfo.modeInfoIdx = targetIdx;
+
+        _logger.LogDebug("ApplyCachedMode: injected cached mode for {MonitorId} ({W}x{H} vSync={N}/{D})",
+            monitorId, saved.Width, saved.Height, saved.VSyncNumerator, saved.VSyncDenominator);
     }
 }
