@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
@@ -788,6 +789,23 @@ public class SteamServiceTests
         _ = await service.LaunchGameAsync(999);
 
         A.CallTo(() => _platform.LaunchSteamUrl(A<string>._)).MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task LaunchGameAsync_ModeFails_StillLaunches()
+    {
+        var options = new PcRemoteOptions
+        {
+            Steam = new SteamConfig { DefaultPcMode = "couch" }
+        };
+        var service = CreateService(options);
+        A.CallTo(() => _platform.GetRunningAppId()).Returns(0);
+        A.CallTo(() => _modeService.ApplyModeAsync("couch"))
+            .Throws(new Win32Exception(31, "SetDisplayConfig failed with error code 31."));
+
+        _ = await service.LaunchGameAsync(730);
+
+        A.CallTo(() => _platform.LaunchSteamUrl("steam://rungameid/730")).MustHaveHappened();
     }
 
     [Fact]

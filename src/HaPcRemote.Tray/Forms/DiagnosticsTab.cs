@@ -76,7 +76,6 @@ internal sealed class DiagnosticsTab : TabPage, ISettingsTab
                     sb.AppendLine($"  Resolution:   {m.Width}x{m.Height} @ {m.DisplayFrequency}Hz");
                     sb.AppendLine($"  Active:       {m.IsActive}");
                     sb.AppendLine($"  Primary:      {m.IsPrimary}");
-                    sb.AppendLine($"  SavedLayout:  {m.HasSavedLayout}");
                     sb.AppendLine();
                 }
             }
@@ -120,11 +119,6 @@ internal sealed class DiagnosticsTab : TabPage, ISettingsTab
                 }
             }
 
-            sb.AppendLine();
-        }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == ERROR_INVALID_PARAMETER)
-        {
-            sb.AppendLine("  unavailable (error 87 — no saved layout in this configuration)");
             sb.AppendLine();
         }
         catch (Exception ex)

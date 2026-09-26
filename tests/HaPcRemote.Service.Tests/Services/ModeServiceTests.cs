@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using FakeItEasy;
 using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Services;
@@ -318,6 +319,22 @@ public class ModeServiceTests
 
         A.CallTo(() => _monitorService.SoloMonitorAsync("GSM59A4"))
             .MustHaveHappened(5, Times.Exactly);
+    }
+
+    [Fact]
+    public async Task ApplyModeAsync_Win32DisplayError_IsNotRetriedAtModeLevel()
+    {
+        A.CallTo(() => _monitorService.SoloMonitorAsync(A<string>._))
+            .Throws(new Win32Exception(31, "SetDisplayConfig failed with error code 31."));
+
+        var service = CreateService(
+            new Dictionary<string, ModeConfig> { ["fail"] = new() { SoloMonitor = "GSM59A4" } },
+            displayActionDelayMs: 1);
+
+        await Should.ThrowAsync<Win32Exception>(() => service.ApplyModeAsync("fail"));
+
+        A.CallTo(() => _monitorService.SoloMonitorAsync("GSM59A4"))
+            .MustHaveHappenedOnceExactly();
     }
 
     [Fact]

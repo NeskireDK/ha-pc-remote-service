@@ -35,12 +35,6 @@ public interface IConfigurationWriter
     /// <summary>Add or update a single app definition by key.</summary>
     void SaveApp(string key, AppDefinitionOptions app);
 
-    /// <summary>Update the display switching mode.</summary>
-    void SaveDisplaySwitching(DisplaySwitchingMode mode);
-
     /// <summary>Update the display action retry delay in milliseconds.</summary>
     void SaveDisplayActionDelay(int delayMs);
-
-    /// <summary>Update the saved display layout toggle.</summary>
-    void SaveUseSavedLayout(bool useSavedLayout);
 }

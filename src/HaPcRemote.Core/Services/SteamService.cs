@@ -305,6 +305,10 @@ public sealed class SteamService(
             {
                 logger.LogWarning("PC mode '{Mode}' not found, skipping mode switch for game {AppId}", resolvedMode, appId);
             }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "PC mode '{Mode}' failed, launching game {AppId} anyway", resolvedMode, appId);
+            }
         }
 
         // Non-Steam shortcuts use a shifted appid for the steam:// URI
