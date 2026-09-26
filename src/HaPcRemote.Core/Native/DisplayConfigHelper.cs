@@ -30,7 +30,9 @@ internal sealed class DisplayConfigHelper(ILogger<DisplayConfigHelper> logger) :
             paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
             modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
 
-            status = QueryDisplayConfig(flags, ref pathCount, paths, ref modeCount, modes, nint.Zero);
+            status = flags == QueryDisplayConfigFlags.QDC_DATABASE_CURRENT
+                ? QueryDisplayConfig(flags, ref pathCount, paths, ref modeCount, modes, out _)
+                : QueryDisplayConfig(flags, ref pathCount, paths, ref modeCount, modes, nint.Zero);
 
             if (status == ERROR_INSUFFICIENT_BUFFER)
             {
@@ -86,7 +88,7 @@ internal sealed class DisplayConfigHelper(ILogger<DisplayConfigHelper> logger) :
             }
         }
 
-        var status = SetDisplayConfig(paths.Length, paths, modes.Length, modes, flags);
+        var status = SetDisplayConfig(paths.Length, paths, modes.Length, modes.Length == 0 ? null : modes, flags);
         ThrowOnError(status, nameof(SetDisplayConfig));
     }
 

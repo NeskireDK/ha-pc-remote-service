@@ -111,6 +111,8 @@ Requires `SoundVolumeView.exe` in `ToolsPath`.
 
 Uses native Windows DisplayConfig API on Windows (no external tools). Linux uses xrandr.
 
+On Windows every change asks for exactly the set of monitors that should end up active. If Windows has a saved layout for that set, its resolution, refresh rate and positions are restored. Otherwise monitors that stay on keep their current mode, new ones get the Windows default, and the result is saved, so adjusting it once in Windows display settings makes it stick. A change that does not take effect returns an error instead of success.
+
 | Method | Route | Description |
 |--------|-------|-------------|
 | `GET` | `/api/monitor/list` | List connected monitors |
@@ -118,15 +120,6 @@ Uses native Windows DisplayConfig API on Windows (no external tools). Linux uses
 | `POST` | `/api/monitor/enable/{id}` | Enable a monitor |
 | `POST` | `/api/monitor/disable/{id}` | Disable a monitor |
 | `POST` | `/api/monitor/primary/{id}` | Set a monitor as primary |
-
-### Monitors — Profiles
-
-Linux only (xrandr). Returns empty on Windows — use `SoloMonitor` in mode config instead.
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| `GET` | `/api/monitor/profiles` | List saved monitor profiles |
-| `POST` | `/api/monitor/set/{profile}` | Apply a monitor profile |
 
 ### Apps
 

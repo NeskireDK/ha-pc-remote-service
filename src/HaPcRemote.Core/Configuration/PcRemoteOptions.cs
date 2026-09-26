@@ -12,17 +12,9 @@ public sealed class PcRemoteOptions
     public Dictionary<string, ModeConfig> Modes { get; set; } = new();
     public PowerSettings Power { get; set; } = new();
     public SteamConfig Steam { get; set; } = new();
-    public DisplaySwitchingMode DisplaySwitching { get; set; } = DisplaySwitchingMode.Compatible;
-    public bool UseSavedLayout { get; set; } = true;
 
     /// <summary>Base delay (ms) between mode-apply retries. Doubles each attempt. 0 = no retry.</summary>
     public int DisplayActionDelayMs { get; set; } = 300;
-}
-
-public enum DisplaySwitchingMode
-{
-    Direct,
-    Compatible
 }
 
 public sealed class PowerSettings

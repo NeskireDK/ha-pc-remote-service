@@ -50,13 +50,8 @@ public sealed class ModeService(
         }
     }
 
-    /// <summary>
-    /// Returns true for transient errors worth retrying at the mode level.
-    /// Error 87 (ERROR_INVALID_PARAMETER) is a configuration error — WindowsMonitorService
-    /// already retries internally. If it still fails, retrying at this level won't help. (#119)
-    /// </summary>
-    private static bool IsTransientError(Exception ex) =>
-        ex is not Win32Exception { NativeErrorCode: 87 /* ERROR_INVALID_PARAMETER */ };
+    /// <summary>Win32 display errors are not retried here: WindowsMonitorService already retries error 31, and nesting both outlasts Home Assistant's 10 s request timeout.</summary>
+    private static bool IsTransientError(Exception ex) => ex is not Win32Exception;
 
     private async Task ApplyModeCoreAsync(ModeConfig config)
     {

@@ -1,10 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
-using HaPcRemote.Service.Configuration;
 using HaPcRemote.Service.Models;
 using HaPcRemote.Service.Native;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using static HaPcRemote.Service.Native.DisplayConfigApi;
 
 namespace HaPcRemote.Service.Services;
@@ -14,9 +12,19 @@ internal sealed class WindowsMonitorService : IMonitorService
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(60);
 
+    private const SetDisplayConfigFlags RestoreSavedLayoutFlags =
+        SetDisplayConfigFlags.SDC_APPLY
+        | SetDisplayConfigFlags.SDC_TOPOLOGY_SUPPLIED
+        | SetDisplayConfigFlags.SDC_ALLOW_PATH_ORDER_CHANGES;
+
+    private const SetDisplayConfigFlags SuppliedConfigFlags =
+        SetDisplayConfigFlags.SDC_APPLY
+        | SetDisplayConfigFlags.SDC_USE_SUPPLIED_DISPLAY_CONFIG
+        | SetDisplayConfigFlags.SDC_ALLOW_CHANGES
+        | SetDisplayConfigFlags.SDC_SAVE_TO_DATABASE;
+
     private readonly IDisplayConfigApi _api;
     private readonly ILogger<WindowsMonitorService> _logger;
-    private readonly IOptionsMonitor<PcRemoteOptions> _options;
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
 
     private List<MonitorInfo>? _cachedMonitors;
@@ -25,18 +33,10 @@ internal sealed class WindowsMonitorService : IMonitorService
     // Maps MonitorId (e.g. "GSM59A4") → native (adapterId, targetId) for path resolution
     private readonly Dictionary<string, (LUID adapterId, uint targetId)> _targetKeys = new(StringComparer.OrdinalIgnoreCase);
 
-    internal readonly record struct SavedMode(uint Width, uint Height, uint VSyncNumerator, uint VSyncDenominator);
-    private readonly Dictionary<string, SavedMode> _savedModes = new(StringComparer.OrdinalIgnoreCase);
-
-    private const int MaxVerifyAttempts = 3;
-
-    internal bool UseCompatibleMode => _options.CurrentValue.DisplaySwitching == DisplaySwitchingMode.Compatible;
-
-    public WindowsMonitorService(IDisplayConfigApi api, ILogger<WindowsMonitorService> logger, IOptionsMonitor<PcRemoteOptions> options)
+    public WindowsMonitorService(IDisplayConfigApi api, ILogger<WindowsMonitorService> logger)
     {
         _api = api;
         _logger = logger;
-        _options = options;
     }
 
     // ── Query ─────────────────────────────────────────────────────────
@@ -63,13 +63,11 @@ internal sealed class WindowsMonitorService : IMonitorService
     {
         _logger.LogDebug("QueryMonitors: starting enumeration");
         var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
-        var savedKeys = ProbeSavedLayoutKeys();
         var monitors = new List<MonitorInfo>();
         var seen = new HashSet<(LUID adapterId, uint targetId)>();
         var edidCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         _targetKeys.Clear();
-        _savedModes.Clear();
 
         _logger.LogDebug("QueryMonitors: processing {Count} paths", paths.Length);
 
@@ -140,8 +138,6 @@ internal sealed class WindowsMonitorService : IMonitorService
             int width = 0, height = 0, hz = 0;
             var isPrimary = false;
 
-            DISPLAYCONFIG_RATIONAL vSyncFreq = default;
-
             if (isActive && path.sourceInfo.modeInfoIdx != DISPLAYCONFIG_PATH_MODE_IDX_INVALID)
             {
                 var sourceMode = FindSourceMode(modes, path.sourceInfo.modeInfoIdx);
@@ -157,17 +153,11 @@ internal sealed class WindowsMonitorService : IMonitorService
             {
                 var targetMode = FindTargetMode(modes, path.targetInfo.modeInfoIdx);
                 if (targetMode.HasValue)
-                {
-                    vSyncFreq = targetMode.Value.targetVideoSignalInfo.vSyncFreq;
-                    hz = vSyncFreq.ToHz();
-                }
+                    hz = targetMode.Value.targetVideoSignalInfo.vSyncFreq.ToHz();
             }
 
             if (hz == 0)
                 hz = path.targetInfo.refreshRate.ToHz();
-
-            if (isActive && width > 0)
-                _savedModes[monitorId] = new SavedMode((uint)width, (uint)height, vSyncFreq.Numerator, vSyncFreq.Denominator);
 
             _logger.LogDebug(
                 "  Monitor: id={MonitorId} name=\"{FriendlyName}\" gdi={Gdi} {W}x{H}@{Hz}Hz active={Active} primary={Primary}",
@@ -184,7 +174,6 @@ internal sealed class WindowsMonitorService : IMonitorService
                 DisplayFrequency = hz,
                 IsActive = isActive,
                 IsPrimary = isPrimary,
-                HasSavedLayout = savedKeys.Contains(key),
             });
         }
 
@@ -199,430 +188,138 @@ internal sealed class WindowsMonitorService : IMonitorService
 
     // ── Control ───────────────────────────────────────────────────────
 
-    public async Task EnableMonitorAsync(string id)
+    public Task EnableMonitorAsync(string id)
     {
-        if (UseCompatibleMode) { await EnableCompatibleAsync(id); return; }
-
-        var monitors = await GetMonitorsAsync();
+        var monitors = InvalidateAndQueryMonitors();
         var target = FindMonitor(monitors, id);
 
         if (target.IsActive)
         {
             _logger.LogDebug("Monitor '{Id}' is already enabled, skipping", id);
-            return;
+            return Task.CompletedTask;
         }
 
         _logger.LogInformation("Enabling monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
-
-        var targetKey = ResolveTargetKey(target);
-        // TODO #121: SDC_TOPOLOGY_EXTEND removed — causes error 87 with SDC_USE_SUPPLIED_DISPLAY_CONFIG. Investigate proper topology handling.
-        ApplyWithRetry(() => BuildEnableConfig(targetKey));
-        InvalidateCache();
+        SwitchTo([.. monitors.Where(m => m.IsActive), target], $"Enable monitor '{id}'");
+        return Task.CompletedTask;
     }
 
-    public async Task DisableMonitorAsync(string id)
+    public Task DisableMonitorAsync(string id)
     {
-        if (UseCompatibleMode) { await DisableCompatibleAsync(id); return; }
-
-        var monitors = await GetMonitorsAsync();
+        var monitors = InvalidateAndQueryMonitors();
         var target = FindMonitor(monitors, id);
 
         if (!target.IsActive)
         {
             _logger.LogDebug("Monitor '{Id}' is already disabled, skipping", id);
-            return;
+            return Task.CompletedTask;
         }
 
-        _logger.LogInformation("Disabling monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
+        var remaining = monitors.Where(m => m.IsActive && !MatchesId(m, id)).ToList();
+        if (remaining.Count == 0)
+            throw new InvalidOperationException($"Cannot disable '{id}': it is the only active monitor.");
 
-        var targetKey = ResolveTargetKey(target);
-        ApplyWithRetry(() => BuildDisableConfig(targetKey));
-        InvalidateCache();
+        _logger.LogInformation("Disabling monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
+        SwitchTo(remaining, $"Disable monitor '{id}'");
+        return Task.CompletedTask;
     }
 
-    public async Task SetPrimaryAsync(string id)
+    public Task SoloMonitorAsync(string id)
     {
-        if (UseCompatibleMode) { await SetPrimaryCompatibleAsync(id); return; }
-
-        var monitors = await GetMonitorsAsync();
+        var monitors = InvalidateAndQueryMonitors();
         var target = FindMonitor(monitors, id);
-        _logger.LogInformation("Setting primary monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
+        var active = monitors.Where(m => m.IsActive).ToList();
 
-        // Check if already primary before entering retry loop
+        if (active.Count == 1 && MatchesId(active[0], id))
+        {
+            _logger.LogDebug("Monitor '{Id}' is already the only active monitor, skipping", id);
+            return Task.CompletedTask;
+        }
+
+        _logger.LogInformation("Solo monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
+        SwitchTo([target], $"Solo monitor '{id}'");
+        return Task.CompletedTask;
+    }
+
+    public Task SetPrimaryAsync(string id)
+    {
+        var monitors = InvalidateAndQueryMonitors();
+        var target = FindMonitor(monitors, id);
+
+        if (!target.IsActive)
+            throw new InvalidOperationException($"Cannot make '{id}' primary: it is not active. Enable it first.");
+
         if (target.IsPrimary)
         {
             _logger.LogDebug("Monitor {Id} is already primary", id);
-            return;
+            return Task.CompletedTask;
         }
 
+        _logger.LogInformation("Setting primary monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
         var targetKey = ResolveTargetKey(target);
-        ApplyWithRetry(() => BuildSetPrimaryConfig(targetKey, id));
+        RetryOnTransientFailure(() =>
+        {
+            var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ONLY_ACTIVE_PATHS);
+            DisplayTopologyBuilder.MoveToOrigin(paths, modes, targetKey);
+            _api.ApplyConfig(paths, modes, SuppliedConfigFlags);
+        });
         InvalidateCache();
+
+        if (!FindMonitor(QueryMonitors(), id).IsPrimary)
+            throw new InvalidOperationException($"Set primary '{id}' did not take effect.");
+
+        return Task.CompletedTask;
     }
 
-    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes, bool UsedDatabase)
-        QueryConfigWithFallback((LUID adapterId, uint targetId) requiredTarget)
+    /// <summary>Makes exactly <paramref name="wanted"/> active, restoring Windows' saved layout for that set when one exists.</summary>
+    private void SwitchTo(IReadOnlyList<MonitorInfo> wanted, string action)
     {
-        if (_options.CurrentValue.UseSavedLayout)
+        var wantedKeys = wanted.Select(ResolveTargetKey).ToList();
+        RetryOnTransientFailure(() => ApplyTopology(wantedKeys));
+        InvalidateCache();
+
+        var active = QueryMonitors().Where(m => m.IsActive).ToList();
+        var wantedIds = wanted.Select(m => m.MonitorId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hasExactlyWanted = active.Count == wantedIds.Count && active.All(m => wantedIds.Contains(m.MonitorId));
+        var isCloned = active.Select(m => m.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() < active.Count;
+
+        if (hasExactlyWanted && !isCloned)
         {
-            try
-            {
-                var (dbPaths, dbModes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT);
-                if (ContainsTarget(dbPaths, requiredTarget))
-                    return (dbPaths, dbModes, true);
-
-                _logger.LogDebug("Target not in QDC_DATABASE_CURRENT result, falling back to QDC_ALL_PATHS");
-            }
-            catch (Win32Exception ex) when (ex.NativeErrorCode == ERROR_INVALID_PARAMETER)
-            {
-                _logger.LogDebug("QDC_DATABASE_CURRENT unavailable, falling back to QDC_ALL_PATHS");
-            }
-        }
-
-        var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
-        return (paths, modes, false);
-    }
-
-    private static bool ContainsTarget(DISPLAYCONFIG_PATH_INFO[] paths, (LUID adapterId, uint targetId) key) =>
-        Array.Exists(paths, p => p.targetInfo.adapterId == key.adapterId && p.targetInfo.id == key.targetId);
-
-    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildEnableConfig(
-        (LUID adapterId, uint targetId) targetKey)
-    {
-        var (paths, modes, usedDatabase) = QueryConfigWithFallback(targetKey);
-
-        var idx = FindPathIndex(paths, targetKey);
-        paths[idx].flags |= DISPLAYCONFIG_PATH_FLAGS.ACTIVE;
-        if (!usedDatabase)
-        {
-            paths[idx].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-            paths[idx].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-
-            if (_options.CurrentValue.UseSavedLayout)
-            {
-                var monitorId = _targetKeys.FirstOrDefault(kv => kv.Value == targetKey).Key;
-                if (monitorId != null)
-                    ApplyCachedMode(ref paths[idx], ref modes, monitorId);
-            }
-        }
-        return (paths, modes);
-    }
-
-    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildDisableConfig(
-        (LUID adapterId, uint targetId) targetKey)
-    {
-        var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
-        var idx = FindPathIndex(paths, targetKey);
-        paths[idx].flags &= ~DISPLAYCONFIG_PATH_FLAGS.ACTIVE;
-        return (paths, modes);
-    }
-
-    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildSetPrimaryConfig(
-        (LUID adapterId, uint targetId) targetKey, string id)
-    {
-        var (paths, modes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ONLY_ACTIVE_PATHS);
-
-        POINTL targetPosition = default;
-        uint? targetSourceIdx = null;
-
-        for (var i = 0; i < paths.Length; i++)
-        {
-            if (paths[i].targetInfo.adapterId == targetKey.adapterId
-                && paths[i].targetInfo.id == targetKey.targetId
-                && paths[i].sourceInfo.modeInfoIdx != DISPLAYCONFIG_PATH_MODE_IDX_INVALID)
-            {
-                targetSourceIdx = paths[i].sourceInfo.modeInfoIdx;
-                targetPosition = modes[paths[i].sourceInfo.modeInfoIdx].info.sourceMode.position;
-                break;
-            }
-        }
-
-        if (!targetSourceIdx.HasValue)
-            throw new InvalidOperationException($"Could not find source mode for monitor '{id}'.");
-
-        var offsetX = targetPosition.x;
-        var offsetY = targetPosition.y;
-
-        for (var i = 0; i < modes.Length; i++)
-        {
-            if (modes[i].infoType == DISPLAYCONFIG_MODE_INFO_TYPE.SOURCE)
-            {
-                modes[i].info.sourceMode.position.x -= offsetX;
-                modes[i].info.sourceMode.position.y -= offsetY;
-            }
-        }
-
-        return (paths, modes);
-    }
-
-    public async Task SoloMonitorAsync(string id)
-    {
-        if (UseCompatibleMode) { await SoloCompatibleAsync(id); return; }
-
-        var monitors = await GetMonitorsAsync();
-        var target = FindMonitor(monitors, id);
-
-        _logger.LogInformation("Solo monitor: {Name} ({Id})", target.MonitorName, target.MonitorId);
-
-        for (var round = 0; round < MaxVerifyAttempts; round++)
-        {
-            if (round > 0)
-            {
-                _logger.LogWarning("Solo monitor '{Id}' — retrying (round {Round}/{Max})", id, round + 1, MaxVerifyAttempts);
-                if (StepDelayMs > 0)
-                    await Task.Delay(StepDelayMs);
-                // Re-query to get fresh adapter IDs
-                monitors = QueryMonitors();
-                target = FindMonitor(monitors, id);
-            }
-
-            var targetKey = ResolveTargetKey(target);
-            ApplyWithRetry(() => BuildSoloConfig(targetKey, target.MonitorId));
-            InvalidateCache();
-
-            var updated = QueryMonitors();
-            var activeMonitors = updated.Where(m => m.IsActive).ToList();
-            if (activeMonitors.Count == 1 && MatchesId(activeMonitors[0], id))
-            {
-                _logger.LogDebug("Solo monitor '{Id}' verified successfully", id);
-                return;
-            }
-
-            var activeNames = string.Join(", ", activeMonitors.Select(m => $"{m.MonitorName} ({m.MonitorId})"));
-            _logger.LogWarning("Solo monitor '{Id}' may have failed — active monitors: [{Active}]", id, activeNames);
-        }
-
-        _logger.LogWarning("Solo monitor '{Id}' could not be verified after {Max} rounds", id, MaxVerifyAttempts);
-    }
-
-    private (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) BuildSoloConfig(
-        (LUID adapterId, uint targetId) targetKey, string monitorId)
-    {
-        var (paths, modes, usedDatabase) = QueryConfigWithFallback(targetKey);
-
-        var activeCount = 0;
-        var inactiveCount = 0;
-
-        for (var i = 0; i < paths.Length; i++)
-        {
-            var isTarget = paths[i].targetInfo.adapterId == targetKey.adapterId
-                           && paths[i].targetInfo.id == targetKey.targetId;
-
-            if (isTarget)
-            {
-                paths[i].flags |= DISPLAYCONFIG_PATH_FLAGS.ACTIVE;
-                if (!usedDatabase)
-                {
-                    paths[i].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-                    paths[i].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-                    if (_options.CurrentValue.UseSavedLayout)
-                        ApplyCachedMode(ref paths[i], ref modes, monitorId);
-                }
-                activeCount++;
-            }
-            else
-            {
-                paths[i].flags &= ~DISPLAYCONFIG_PATH_FLAGS.ACTIVE;
-                paths[i].sourceInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-                paths[i].targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-                inactiveCount++;
-            }
-        }
-
-        _logger.LogDebug("Solo applying: {Active} active, {Inactive} inactive paths for target {Id}",
-            activeCount, inactiveCount, monitorId);
-
-        return (paths, modes);
-    }
-
-    // ── Compatible mode ────────────────────────────────────────────────
-
-    private async Task SoloCompatibleAsync(string id)
-    {
-        for (var round = 0; round < MaxVerifyAttempts; round++)
-        {
-            if (round > 0)
-            {
-                _logger.LogWarning("Solo compatible '{Id}' — retrying (round {Round}/{Max})", id, round + 1, MaxVerifyAttempts);
-                if (StepDelayMs > 0)
-                    await Task.Delay(StepDelayMs);
-            }
-
-            _logger.LogInformation("Solo monitor (compatible): {Id}", id);
-
-            // Step 1: Enable target if not active
-            var monitors = InvalidateAndQueryMonitors();
-            var target = FindMonitor(monitors, id);
-            if (!target.IsActive)
-            {
-                await EnableCompatibleAsync(id);
-                monitors = InvalidateAndQueryMonitors();
-                target = FindMonitor(monitors, id);
-            }
-
-            // Step 2: Set primary (doesn't change which monitors are active)
-            if (!target.IsPrimary)
-                await SetPrimaryCompatibleAsync(id);
-
-            // Step 3: Disable each other active monitor
-            var others = monitors.Where(m => m.IsActive && !MatchesId(m, id)).ToList();
-            foreach (var other in others)
-            {
-                await DisableCompatibleAsync(other.MonitorId);
-            }
-
-            // Final verification
-            var final_ = InvalidateAndQueryMonitors();
-            var active = final_.Where(m => m.IsActive).ToList();
-            if (active.Count == 1 && MatchesId(active[0], id))
-            {
-                _logger.LogDebug("Solo compatible '{Id}' verified successfully", id);
-                return;
-            }
-
-            var activeNames = string.Join(", ", active.Select(m => $"{m.MonitorName} ({m.MonitorId})"));
-            _logger.LogWarning("Solo compatible '{Id}' — unexpected result: [{Active}]", id, activeNames);
-        }
-
-        _logger.LogWarning("Solo compatible '{Id}' could not be verified after {Max} rounds", id, MaxVerifyAttempts);
-    }
-
-    private async Task EnableCompatibleAsync(string id)
-    {
-        var monitors = InvalidateAndQueryMonitors();
-        var target = FindMonitor(monitors, id);
-
-        if (target.IsActive)
-        {
-            _logger.LogDebug("Monitor '{Id}' is already enabled, skipping (compatible)", id);
+            _logger.LogDebug("{Action} verified", action);
             return;
         }
 
-        _logger.LogInformation("Enabling monitor (compatible): {Name} ({Id})", target.MonitorName, target.MonitorId);
-
-        var targetKey = ResolveTargetKey(target);
-        // TODO #121: SDC_TOPOLOGY_EXTEND removed — causes error 87 with SDC_USE_SUPPLIED_DISPLAY_CONFIG. Investigate proper topology handling.
-        await ApplyStepWithVerification(
-            () => BuildEnableConfig(targetKey),
-            () => FindMonitor(QueryMonitors(), id).IsActive,
-            $"Enable({id})");
+        var activeNames = string.Join(", ", active.Select(m => $"{m.MonitorName} ({m.MonitorId}) on {m.Name}"));
+        throw new InvalidOperationException($"{action} did not take effect. Active monitors: [{activeNames}]");
     }
 
-    private async Task SetPrimaryCompatibleAsync(string id)
+    private void ApplyTopology(IReadOnlyList<(LUID adapterId, uint targetId)> wantedKeys)
     {
-        var monitors = InvalidateAndQueryMonitors();
-        var target = FindMonitor(monitors, id);
+        var (allPaths, _) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ALL_PATHS);
+        var (activePaths, activeModes) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_ONLY_ACTIVE_PATHS);
+        var paths = DisplayTopologyBuilder.BuildPaths(allPaths, activePaths, wantedKeys);
 
-        if (!target.IsActive)
+        try
         {
-            _logger.LogInformation("Monitor '{Id}' not active — enabling first (compatible)", id);
-            await EnableCompatibleAsync(id);
-            monitors = InvalidateAndQueryMonitors();
-            target = FindMonitor(monitors, id);
-        }
-
-        if (target.IsPrimary)
-        {
-            _logger.LogDebug("Monitor {Id} is already primary (compatible)", id);
+            _api.ApplyConfig(paths, [], RestoreSavedLayoutFlags);
+            _logger.LogInformation("Applied Windows' saved layout for {Count} monitor(s)", paths.Length);
             return;
         }
-
-        _logger.LogInformation("Setting primary (compatible): {Name} ({Id})", target.MonitorName, target.MonitorId);
-
-        var targetKey = ResolveTargetKey(target);
-        await ApplyStepWithVerification(
-            () => BuildSetPrimaryConfig(targetKey, id),
-            () => FindMonitor(QueryMonitors(), id).IsPrimary,
-            $"SetPrimary({id})");
-    }
-
-    private async Task DisableCompatibleAsync(string id)
-    {
-        var monitors = InvalidateAndQueryMonitors();
-        var target = FindMonitor(monitors, id);
-
-        if (!target.IsActive)
+        catch (Win32Exception ex)
         {
-            _logger.LogDebug("Monitor '{Id}' is already disabled, skipping (compatible)", id);
-            return;
+            _logger.LogInformation(
+                "No saved Windows layout for this set of monitors (error {Code}); keeping current modes, Windows picks the rest",
+                ex.NativeErrorCode);
         }
 
-        // If disabling the primary, move primary to another active monitor first
-        if (target.IsPrimary)
-        {
-            var other = monitors.FirstOrDefault(m => m.IsActive && !MatchesId(m, id));
-            if (other != null)
-            {
-                _logger.LogInformation("Shuffling primary to {Other} before disabling {Id} (compatible)", other.MonitorId, id);
-                await SetPrimaryCompatibleAsync(other.MonitorId);
-            }
-        }
-
-        _logger.LogInformation("Disabling monitor (compatible): {Name} ({Id})", target.MonitorName, target.MonitorId);
-
-        var targetKey = ResolveTargetKey(target);
-        await ApplyStepWithVerification(
-            () => BuildDisableConfig(targetKey),
-            () => !FindMonitor(QueryMonitors(), id).IsActive,
-            $"Disable({id})");
-    }
-
-    private async Task ApplyStepWithVerification(
-        Func<(DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes)> buildConfig,
-        Func<bool> verify,
-        string stepName,
-        SetDisplayConfigFlags extraFlags = 0)
-    {
-        for (var attempt = 0; attempt < MaxVerifyAttempts; attempt++)
-        {
-            ApplyWithRetry(buildConfig, extraFlags);
-            InvalidateCache();
-
-            if (attempt > 0 && StepDelayMs > 0)
-                await Task.Delay(StepDelayMs);
-
-            if (verify())
-            {
-                _logger.LogDebug("Step {Step} verified successfully", stepName);
-                return;
-            }
-
-            _logger.LogWarning("Step {Step} verification failed, retrying ({Attempt}/{Max})",
-                stepName, attempt + 1, MaxVerifyAttempts);
-
-            if (StepDelayMs > 0)
-                await Task.Delay(StepDelayMs);
-        }
-
-        _logger.LogWarning("Step {Step} could not be verified after {Max} attempts", stepName, MaxVerifyAttempts);
+        var (keptPaths, keptModes) = DisplayTopologyBuilder.KeepActiveModes(paths, activePaths, activeModes);
+        _api.ApplyConfig(keptPaths, keptModes, SuppliedConfigFlags);
     }
 
     private List<MonitorInfo> InvalidateAndQueryMonitors()
     {
         InvalidateCache();
         return QueryMonitors();
-    }
-
-    // ── Saved layout probe ─────────────────────────────────────────────
-
-    private HashSet<(LUID adapterId, uint targetId)> ProbeSavedLayoutKeys()
-    {
-        try
-        {
-            var (dbPaths, _) = _api.QueryConfig(QueryDisplayConfigFlags.QDC_DATABASE_CURRENT);
-            return new HashSet<(LUID adapterId, uint targetId)>(
-                dbPaths.Select(p => (p.targetInfo.adapterId, p.targetInfo.id)));
-        }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == ERROR_INVALID_PARAMETER)
-        {
-            _logger.LogDebug("QDC_DATABASE_CURRENT unavailable — no saved layouts");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "ProbeSavedLayoutKeys: unexpected error, HasSavedLayout will be false");
-        }
-
-        return [];
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
@@ -633,63 +330,25 @@ internal sealed class WindowsMonitorService : IMonitorService
     }
 
     internal int[] RetryDelaysMs = [500, 1000, 2000];
-    internal int StepDelayMs = 500;
 
-    /// <summary>
-    /// Applies a display config change with retry logic for transient driver errors.
-    /// Error 31 (GEN_FAILURE): transient driver timing — wait and retry with same config.
-    /// Error 87 (INVALID_PARAMETER): stale adapter LUIDs — re-query and rebuild config via <paramref name="buildConfig"/>.
-    /// </summary>
-    private void ApplyWithRetry(
-        Func<(DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes)> buildConfig,
-        SetDisplayConfigFlags extraFlags = 0)
+    /// <summary>Retries <paramref name="apply"/> on error 31, which the driver returns while a previous change is still settling.</summary>
+    private void RetryOnTransientFailure(Action apply)
     {
-        var flags =
-            SetDisplayConfigFlags.SDC_APPLY
-            | SetDisplayConfigFlags.SDC_USE_SUPPLIED_DISPLAY_CONFIG
-            | SetDisplayConfigFlags.SDC_ALLOW_CHANGES
-            | SetDisplayConfigFlags.SDC_SAVE_TO_DATABASE
-            | extraFlags;
-
-        var (paths, modes) = buildConfig();
-
         for (var attempt = 0;; attempt++)
         {
             try
             {
-                _api.ApplyConfig(paths, modes, flags);
+                apply();
                 return;
             }
-            catch (Win32Exception ex) when (attempt < RetryDelaysMs.Length &&
-                                            (ex.NativeErrorCode == ERROR_GEN_FAILURE ||
-                                             ex.NativeErrorCode == ERROR_INVALID_PARAMETER))
+            catch (Win32Exception ex) when (attempt < RetryDelaysMs.Length && ex.NativeErrorCode == ERROR_GEN_FAILURE)
             {
                 var delay = RetryDelaysMs[attempt];
-                _logger.LogWarning(
-                    "SetDisplayConfig failed with error {Code} on attempt {Attempt}, retrying in {Delay}ms",
-                    ex.NativeErrorCode, attempt + 1, delay);
-
+                _logger.LogWarning("SetDisplayConfig failed with error 31 on attempt {Attempt}, retrying in {Delay}ms",
+                    attempt + 1, delay);
                 Thread.Sleep(delay);
-
-                if (ex.NativeErrorCode == ERROR_INVALID_PARAMETER)
-                {
-                    _logger.LogDebug("Re-querying display config due to stale adapter IDs");
-                    (paths, modes) = buildConfig();
-                }
             }
         }
-    }
-
-    private static int FindPathIndex(DISPLAYCONFIG_PATH_INFO[] paths, (LUID adapterId, uint targetId) targetKey)
-    {
-        for (var i = 0; i < paths.Length; i++)
-        {
-            if (paths[i].targetInfo.adapterId == targetKey.adapterId
-                && paths[i].targetInfo.id == targetKey.targetId)
-                return i;
-        }
-
-        throw new InvalidOperationException($"Could not find path for target {targetKey.targetId}.");
     }
 
     private (LUID adapterId, uint targetId) ResolveTargetKey(MonitorInfo monitor)
@@ -738,69 +397,5 @@ internal sealed class WindowsMonitorService : IMonitorService
         return modes[index].infoType == DISPLAYCONFIG_MODE_INFO_TYPE.TARGET
             ? modes[index].info.targetMode
             : null;
-    }
-
-    private void ApplyCachedMode(ref DISPLAYCONFIG_PATH_INFO path, ref DISPLAYCONFIG_MODE_INFO[] modes, string monitorId)
-    {
-        if (!_savedModes.TryGetValue(monitorId, out var saved))
-            return;
-
-        var adapterId = path.sourceInfo.adapterId;
-
-        var sourceEntry = new DISPLAYCONFIG_MODE_INFO
-        {
-            infoType = DISPLAYCONFIG_MODE_INFO_TYPE.SOURCE,
-            id = path.sourceInfo.id,
-            adapterId = adapterId,
-            info = new DISPLAYCONFIG_MODE_INFO_UNION
-            {
-                sourceMode = new DISPLAYCONFIG_SOURCE_MODE
-                {
-                    width = saved.Width,
-                    height = saved.Height,
-                    pixelFormat = DISPLAYCONFIG_PIXELFORMAT.PIXELFORMAT_32BPP,
-                    position = new POINTL { x = 0, y = 0 },
-                }
-            }
-        };
-
-        var targetEntry = new DISPLAYCONFIG_MODE_INFO
-        {
-            infoType = DISPLAYCONFIG_MODE_INFO_TYPE.TARGET,
-            id = path.targetInfo.id,
-            adapterId = adapterId,
-            info = new DISPLAYCONFIG_MODE_INFO_UNION
-            {
-                targetMode = new DISPLAYCONFIG_TARGET_MODE
-                {
-                    targetVideoSignalInfo = new DISPLAYCONFIG_VIDEO_SIGNAL_INFO
-                    {
-                        vSyncFreq = new DISPLAYCONFIG_RATIONAL
-                        {
-                            Numerator = saved.VSyncNumerator,
-                            Denominator = saved.VSyncDenominator,
-                        },
-                        activeSize = new DISPLAYCONFIG_2DREGION
-                        {
-                            cx = saved.Width,
-                            cy = saved.Height,
-                        },
-                    }
-                }
-            }
-        };
-
-        var sourceIdx = (uint)modes.Length;
-        var targetIdx = sourceIdx + 1;
-
-        Array.Resize(ref modes, modes.Length + 2);
-        modes[sourceIdx] = sourceEntry;
-        modes[targetIdx] = targetEntry;
-
-        path.sourceInfo.modeInfoIdx = sourceIdx;
-        path.targetInfo.modeInfoIdx = targetIdx;
-
-        _logger.LogDebug("ApplyCachedMode: injected cached mode for {MonitorId} ({W}x{H} vSync={N}/{D})",
-            monitorId, saved.Width, saved.Height, saved.VSyncNumerator, saved.VSyncDenominator);
     }
 }
